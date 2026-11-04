@@ -1,4 +1,5 @@
 {% extends 'juniors/base.html' %}
+{% load legal_tags %}
 {% block title %}Детский профиль{% endblock %}
 {% block junior_content %}
 <header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">Заполните сведения о ребёнке. Документы загружать не нужно.</p></div></header>
@@ -17,7 +18,7 @@
 <h2>Подтверждение сведений</h2>
 {% for field in form.visible_fields %}{% if field.name == 'representative' or field.name == 'accurate' %}<div class="jl-field"><label class="jl-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{{ field.errors }}</div>{% endif %}{% endfor %}
 <p class="jl-muted">Родитель знакомится с условиями выбранного турнира и выполняет относящиеся к нему обязанности по участию ребёнка. Платформа и организатор сохраняют свои обязанности.</p>
-{% if not child %}<section aria-label="Согласие на обработку данных ребёнка"><h2>Обработка данных ребёнка</h2><p>Версия {{ release.version }}. Прочитайте текст перед сохранением профиля.</p><details><summary>Прочитать согласие</summary>{{ release.processing_text|linebreaks }}</details><div class="jl-field"><label class="jl-check" for="{{ form.processing_accepted.id_for_label }}">{{ form.processing_accepted }}<span>{{ form.processing_accepted.label }}</span></label>{{ form.processing_accepted.errors }}</div><p class="jl-muted">Эта отметка не разрешает публиковать имя ребёнка. Разрешение на публикацию оформляется отдельно и не обязательно для участия.</p></section>{% endif %}
+{% if not child %}<section aria-label="Согласие на обработку данных ребёнка"><h2>Обработка данных ребёнка</h2><p>Версия {{ release.version }}. Прочитайте текст перед сохранением профиля.</p><details><summary>Прочитать согласие</summary><div class="legal-text">{{ release.processing_text|legal_markdown }}</div></details><div class="jl-field"><label class="jl-check" for="{{ form.processing_accepted.id_for_label }}">{{ form.processing_accepted }}<span>{{ form.processing_accepted.label }}</span></label>{{ form.processing_accepted.errors }}</div><p class="jl-muted">Эта отметка не разрешает публиковать имя ребёнка. Разрешение на публикацию оформляется отдельно и не обязательно для участия.</p></section>{% endif %}
 <div class="jl-actions"><button class="jl-button" type="submit">Сохранить профиль</button><a href="{% url 'juniors:family' %}">Отмена</a></div>
 </form>{% endif %}{% endif %}
 {% endblock %}

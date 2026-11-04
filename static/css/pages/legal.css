@@ -28,54 +28,55 @@
     text-align: left;
 }
 
-.legal-doc__body {
+:is(.legal-doc__body, .legal-text) {
     padding: var(--spacing-2xl) !important;
 }
 
-.legal-doc__body h1,
-.legal-doc__body h2 {
+:is(.legal-doc__body, .legal-text) h1,
+:is(.legal-doc__body, .legal-text) h2 {
     margin-top: var(--spacing-xl);
     margin-bottom: var(--spacing-md);
     font-size: var(--font-size-xl);
     color: var(--color-primary);
 }
 
-.legal-doc__body h1:first-child,
-.legal-doc__body h2:first-child {
+:is(.legal-doc__body, .legal-text) h1:first-child,
+:is(.legal-doc__body, .legal-text) h2:first-child {
     margin-top: 0;
 }
 
-.legal-doc__body p {
+:is(.legal-doc__body, .legal-text) p {
     margin-bottom: var(--spacing-md);
     line-height: 1.7;
 }
 
-.legal-doc__body ul {
+:is(.legal-doc__body, .legal-text) ul,
+:is(.legal-doc__body, .legal-text) ol {
     margin-bottom: var(--spacing-md);
     padding-left: var(--spacing-xl);
 }
 
-.legal-doc__body li {
+:is(.legal-doc__body, .legal-text) li {
     margin-bottom: var(--spacing-xs);
     list-style: disc;
 }
 
-.legal-doc__body a {
+:is(.legal-doc__body, .legal-text) a {
     color: var(--color-primary);
     text-decoration: underline;
 }
 
-.legal-doc__body a:hover {
+:is(.legal-doc__body, .legal-text) a:hover {
     color: var(--color-text-secondary);
 }
 
-.legal-doc__body hr {
+:is(.legal-doc__body, .legal-text) hr {
     border: none;
     border-top: 1px solid var(--color-border);
     margin: var(--spacing-xl) 0;
 }
 
-.legal-doc__body strong {
+:is(.legal-doc__body, .legal-text) strong {
     color: var(--color-text);
 }
 
@@ -119,4 +120,24 @@
 .legal-list__link:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+}
+
+.legal-text {
+    margin-top: var(--spacing-md);
+    overflow-wrap: anywhere;
+}
+
+.legal-text h1 {
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--spacing-md);
+}
+
+:is(.legal-doc__body, .legal-text) ol li {
+    list-style: decimal;
+}
+
+@media (width <= 600px) {
+    .legal-doc__body {
+        padding: var(--spacing-lg) !important;
+    }
 }

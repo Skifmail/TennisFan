@@ -73,3 +73,22 @@ def test_internal_guide_is_not_public(client: Client) -> None:
     for url in ("/kids/documents/organizer/", "/legal/junior-organizer/"):
         assert client.get(url).status_code == 404
     assert finders.find("documents/juniors/organizer.txt") is None
+
+
+def test_junior_documents_have_official_structure(client: Client) -> None:
+    for slug in TITLES:
+        response = client.get(reverse("legal_junior_" + slug.replace("-", "_")))
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert html.count("<h1") == 1
+        assert "<h2>1." in html
+        assert "<strong>" in html
+        assert "<li>" in html
+        for marker in (
+            "Проект от",
+            "До применения необходимо",
+            "для подготовки детской лиги к запуску",
+            "Текущий интерфейс не объявляется",
+            "Онлайн-оплата для обычных пользователей пока закрыта",
+        ):
+            assert marker not in html

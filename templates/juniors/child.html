@@ -1,15 +1,31 @@
 {% extends 'juniors/base.html' %}
+{% load legal_tags %}
 {% block title %}Профиль ребёнка{% endblock %}
 {% block junior_content %}
-<header class="jl-heading"><div><p class="jl-eyebrow">ЗАКРЫТЫЙ ПРОФИЛЬ</p><h1>{{ child }}</h1><p class="jl-muted">{{ child.city }} · {{ child.get_ball_display }}</p></div><span class="jl-badge">{% if child.status == 'draft' %}Представительство не проверено{% else %}{{ child.get_status_display }}{% endif %}</span></header>
-<div class="jl-grid"><section class="jl-card"><h2>Данные участника</h2><dl class="jl-details"><dt>Дата рождения</dt><dd>{{ child.birth_date|date:'d.m.Y' }}</dd><dt>Пол</dt><dd>{{ child.get_gender_display }}</dd><dt>Ваши полномочия</dt><dd>{{ link.get_status_display }}</dd></dl>{% if child.status == 'draft' and link.status != 'verified' %}{% if junior_actions_allowed %}<a class="jl-link" href="{% url 'juniors:edit_child' pk=child.pk %}">Изменить данные →</a>{% endif %}{% endif %}</section>
-<section class="jl-card"><p class="jl-eyebrow">СЛЕДУЮЩИЙ ШАГ</p><h2>Подтверждение представителя</h2><p>Перед первым участием уполномоченный организатор проверит ваши документы и возраст ребёнка. Уточните у него время и место проверки. Загружать документы на сайт не нужно. По спорным вопросам напишите на tennis@tennisfan.ru.</p>{% if link.reason %}<p class="jl-note">{{ link.reason }}</p>{% endif %}<p class="jl-muted">Проверка контакта и проверка полномочий — разные этапы.</p></section></div>
-{% if link.status != 'verified' and processing_accepted %}<section class="jl-card jl-note"><h2>Согласие на обработку данных</h2><p>Получено при создании профиля. Проверка представителя ещё не завершена.</p><details><summary>Прочитать текст</summary>{{ release.processing_text|linebreaks }}</details>{% if junior_actions_allowed %}<form method="post" action="{% url 'juniors:consent' pk=child.pk %}">{% csrf_token %}<input type="hidden" name="kind" value="processing"><input type="hidden" name="action" value="withdraw"><button class="jl-button" type="submit">Отозвать согласие</button></form>{% endif %}</section>{% endif %}
+<header class="jl-heading"><div><p class="jl-eyebrow">ЗАКРЫТЫЙ ПРОФИЛЬ</p><h1>{{ child }}</h1><p class="jl-muted">{{ child.city }} · {{ child.get_ball_display }}</p></div><span class="jl-badge">{% if link.status == 'verified' %}Представитель подтверждён{% elif link.status == 'pending' %}Представительство ожидает проверки{% else %}Полномочия: {{ link.get_status_display|lower }}{% endif %}</span></header>
+<div class="jl-grid"><section class="jl-card"><h2>Данные участника</h2><dl class="jl-details"><dt>Дата рождения</dt><dd>{{ child.birth_date|date:'d.m.Y' }}</dd><dt>Пол</dt><dd>{{ child.get_gender_display }}</dd><dt>Ваши полномочия</dt><dd>{{ link.get_status_display }}</dd><dt>Статус профиля</dt><dd>{% if child.status == 'draft' %}Ожидает активации{% else %}{{ child.get_status_display }}{% endif %}</dd></dl>{% if child.status == 'draft' and link.status != 'verified' %}{% if junior_actions_allowed %}<a class="jl-link" href="{% url 'juniors:edit_child' pk=child.pk %}">Изменить данные →</a>{% endif %}{% endif %}</section>
+<section class="jl-card">
+{% if link.status == 'verified' %}
+<p class="jl-eyebrow">ПРЕДСТАВИТЕЛЬ</p><h2>Проверка пройдена</h2>
+<p>Ваши полномочия подтверждены{% if link.verified_at %} {{ link.verified_at|date:'d.m.Y' }}{% endif %}.</p>
+{% if child.status == 'draft' %}
+{% if not release %}<p>Профиль пока не активирован: платформа готовит тексты согласий. После их утверждения вы сможете оформить согласие на обработку данных здесь.</p>
+{% elif not processing_accepted %}<p>Для активации профиля оформите согласие на обработку данных ребёнка в блоке «Ваши согласия» ниже.</p>
+{% else %}<p>Профиль ожидает активации. Если статус не меняется, напишите на tennis@tennisfan.ru.</p>{% endif %}
+{% endif %}
+{% else %}
+<p class="jl-eyebrow">ПРЕДСТАВИТЕЛЬ</p><h2>Подтверждение представителя</h2>
+<p>Перед первым участием уполномоченный организатор проверит ваши документы и возраст ребёнка. Уточните у него время и место проверки. Загружать документы на сайт не нужно. По спорным вопросам напишите на tennis@tennisfan.ru.</p>
+{% if link.reason %}<p class="jl-note">{{ link.reason }}</p>{% endif %}
+<p class="jl-muted">Проверка контакта и проверка полномочий — разные этапы.</p>
+{% endif %}
+</section></div>
+{% if link.status != 'verified' and processing_accepted %}<section class="jl-card jl-note"><h2>Согласие на обработку данных</h2><p>Получено при создании профиля. Проверка представителя ещё не завершена.</p><details><summary>Прочитать текст</summary><div class="legal-text">{{ release.processing_text|legal_markdown }}</div></details>{% if junior_actions_allowed %}<form method="post" action="{% url 'juniors:consent' pk=child.pk %}">{% csrf_token %}<input type="hidden" name="kind" value="processing"><input type="hidden" name="action" value="withdraw"><button class="jl-button" type="submit">Отозвать согласие</button></form>{% endif %}</section>{% endif %}
 {% if link.status == 'verified' %}
 <section class="jl-card jl-note"><h2>Ваши согласия</h2>
 {% if release %}
 <p>Версия {{ release.version }}. Согласия оформляются отдельно и сохраняются для следующих входов.</p>
-<details><summary>Обработка данных ребёнка</summary><div>{{ release.processing_text|linebreaks }}</div></details>
+<details><summary>Обработка данных ребёнка</summary><div><div class="legal-text">{{ release.processing_text|legal_markdown }}</div></div></details>
 {% if junior_actions_allowed %}<form method="post" action="{% url 'juniors:consent' pk=child.pk %}" class="jl-actions">{% csrf_token %}<input type="hidden" name="kind" value="processing"><input type="hidden" name="release" value="{{ release.pk }}">{% if processing_accepted %}<input type="hidden" name="action" value="withdraw"><button class="jl-button" type="submit">Отозвать согласие на обработку</button>{% else %}<label><input type="checkbox" name="accepted" value="yes" required> Согласен с обработкой данных ребёнка</label><button class="jl-button" type="submit">Подтвердить</button>{% endif %}</form>{% endif %}
 {% else %}<p>Оформление согласий откроется после утверждения юридических текстов платформой. Участие пока недоступно.</p>{% endif %}</section>
 {% endif %}
@@ -23,7 +39,7 @@
 <p class="jl-muted">Отзыв прекращает действующие разрешения на публикацию имени для этого ребёнка, включая разрешение другого представителя.</p>
 {% else %}
 {% if can_allow_publication %}
-<details><summary>Прочитать разрешение на публикацию</summary>{{ release.publication_text|linebreaks }}</details>
+<details><summary>Прочитать разрешение на публикацию</summary><div class="legal-text">{{ release.publication_text|legal_markdown }}</div></details>
 {% if junior_actions_allowed %}<form method="post" action="{% url 'juniors:consent' pk=child.pk %}" class="jl-form">{% csrf_token %}<input type="hidden" name="kind" value="publication"><input type="hidden" name="release" value="{{ release.pk }}"><label class="jl-check"><input type="checkbox" name="accepted" value="yes" required><span>Разрешаю показывать имя и фамилию ребёнка вместе с результатами по приведённому тексту</span></label><button class="jl-button" type="submit">Разрешить публикацию</button></form>{% endif %}
 {% else %}<p>Разрешить публикацию можно после проверки представителя, активации профиля и подготовки текста согласия.</p>{% endif %}
 {% endif %}

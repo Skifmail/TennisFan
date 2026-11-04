@@ -154,7 +154,7 @@ def test_documents_and_missing_release_page(client, settings):
     ):
         response = client.get(f"/kids/documents/{slug}/", follow=True)
         assert response.status_code == 200
-        assert b"<h1>" in response.content
+        assert b"<h2>" in response.content
     assert client.get("/kids/documents/unknown/").status_code == 404
     staff = make_user(email="legal-view@kids.test", is_staff=True)
     client.force_login(staff)

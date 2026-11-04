@@ -1,0 +1,7 @@
+{% extends 'juniors/base.html' %}
+{% block title %}{{ document_title }}{% endblock %}
+{% block junior_content %}
+<header class="jl-heading"><div><p class="jl-eyebrow">ДОКУМЕНТЫ</p><h1>{{ document_title }}</h1><p>Тексты готовятся к запуску. Они не означают, что запись и оплата уже открыты.</p></div></header>
+<nav class="jl-actions" aria-label="Документы детской лиги">{% for key,title in documents %}<a class="jl-link" href="{% url 'juniors:document' slug=key %}">{{ title }}</a>{% endfor %}</nav>
+{% if document_html %}<article class="jl-card jl-note">{{ document_html|safe }}</article>{% endif %}
+{% endblock %}

@@ -1,9 +1,23 @@
 {% extends 'juniors/base.html' %}
 {% block title %}Детский профиль{% endblock %}
 {% block junior_content %}
-<header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">Профиль создаётся закрытым. Проверка представителя проходит отдельно.</p></div></header>
-{% if junior_actions_allowed %}<form method="post" class="jl-card jl-form" novalidate>{% csrf_token %}
+<header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">Заполните сведения о ребёнке. Документы загружать не нужно.</p></div></header>
+<aside class="jl-note">Профиль будет доступен вам в семейном кабинете. Перед первым участием уполномоченный организатор проверит представительство и возраст ребёнка. До проверки имя не публикуется и запись на турниры недоступна.</aside>
+{% if not child and not release %}
+<aside class="jl-note">Добавление профиля откроется после утверждения текста согласия. По вопросам участия напишите на tennis@tennisfan.ru.</aside>
+{% else %}{% if junior_actions_allowed %}
+<form method="post" class="jl-card jl-form jl-note" novalidate>{% csrf_token %}
 {% if form.errors %}<div class="jl-error" role="alert"><strong>Проверьте заполнение формы.</strong>{{ form.non_field_errors }}<ul>{% for field in form %}{% if field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ field.errors|striptags }}</a></li>{% endif %}{% endfor %}</ul></div>{% endif %}
-<div class="jl-form-grid">{% for field in form %}<div class="jl-field {% if field.field.widget.input_type == 'checkbox' %}jl-field-wide{% endif %}">{% if field.field.widget.input_type == 'checkbox' %}<label class="jl-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-label="обязательно">*</span>{% endif %}</label>{{ field }}{% endif %}{% if field.help_text %}<small id="{{ field.id_for_label }}_helptext">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div id="{{ field.id_for_label }}_error" class="jl-error-text">{{ field.errors }}</div>{% endif %}</div>{% endfor %}</div>
-<div class="jl-actions"><button class="jl-button" type="submit">Сохранить профиль</button><a href="{% url 'juniors:family' %}">Отмена</a></div></form>{% endif %}
+{% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+<div class="jl-form-grid">
+{% for field in form.visible_fields %}{% if field.field.widget.input_type != 'checkbox' %}
+<div class="jl-field"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-label="обязательно">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>
+{% endif %}{% endfor %}
+</div>
+<h2>Подтверждение сведений</h2>
+{% for field in form.visible_fields %}{% if field.name == 'representative' or field.name == 'accurate' %}<div class="jl-field"><label class="jl-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{{ field.errors }}</div>{% endif %}{% endfor %}
+<p class="jl-muted">Родитель знакомится с условиями выбранного турнира и выполняет относящиеся к нему обязанности по участию ребёнка. Платформа и организатор сохраняют свои обязанности.</p>
+{% if not child %}<section aria-label="Согласие на обработку данных ребёнка"><h2>Обработка данных ребёнка</h2><p>Версия {{ release.version }}. Прочитайте текст перед сохранением профиля.</p><details><summary>Прочитать согласие</summary>{{ release.processing_text|linebreaks }}</details><div class="jl-field"><label class="jl-check" for="{{ form.processing_accepted.id_for_label }}">{{ form.processing_accepted }}<span>{{ form.processing_accepted.label }}</span></label>{{ form.processing_accepted.errors }}</div><p class="jl-muted">Эта отметка не разрешает публиковать имя ребёнка. Разрешение на публикацию оформляется отдельно и не обязательно для участия.</p></section>{% endif %}
+<div class="jl-actions"><button class="jl-button" type="submit">Сохранить профиль</button><a href="{% url 'juniors:family' %}">Отмена</a></div>
+</form>{% endif %}{% endif %}
 {% endblock %}

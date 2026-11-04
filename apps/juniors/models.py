@@ -77,7 +77,7 @@ class ChildProfile(models.Model):
     @property
     def public_label(self) -> str:
         """Возвращает нейтральную подпись без раскрытия имени ребёнка."""
-        return f"Участник {self.pk}"
+        return f"Участник №{self.pk}"
 
 
 class GuardianLink(models.Model):

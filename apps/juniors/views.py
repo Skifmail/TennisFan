@@ -46,6 +46,7 @@ from .services import (
     accept_consent,
     create_child,
     public_child_label,
+    publication_is_allowed,
     update_draft,
     withdraw_consent,
 )
@@ -257,6 +258,7 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
         link = guardian_for(account(request), child, verified=False)
     else:
         link = None
+    release = LegalRelease.objects.filter(reviewed=True, is_current=True).first()
     form = ChildForm(
         request.POST or None,
         instance=child,
@@ -279,10 +281,14 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
         else:
             messages.success(
                 request,
-                "Профиль сохранён. Для участия подтвердите полномочия представителя.",
+                "Профиль сохранён. Перед первым участием организатор проверит представительство и возраст ребёнка.",
             )
             return redirect("juniors:child", pk=saved.pk)
-    return render(request, "juniors/child_form.html", {"form": form, "child": child})
+    return render(
+        request,
+        "juniors/child_form.html",
+        {"form": form, "child": child, "release": release},
+    )
 
 
 @league_available
@@ -303,7 +309,14 @@ def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "link": link,
             "release": release,
             "processing_accepted": consents.filter(kind="processing").exists(),
-            "publication_accepted": consents.filter(kind="publication").exists(),
+            "publication_accepted": link.consents.filter(
+                kind="publication", withdrawn_at__isnull=True, release__reviewed=True
+            ).exists(),
+            "publication_visible": publication_is_allowed(child),
+            "public_label": public_child_label(child),
+            "can_allow_publication": link.status == "verified"
+            and child.status == "active"
+            and release is not None,
             "entries": child.entries.select_related("tournament"),
             "statistics": child_statistics(child),
             "appeals": JuniorAppeal.objects.filter(
@@ -335,7 +348,17 @@ def consent_action(request: HttpRequest, pk: int) -> HttpResponse:
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
     else:
-        messages.success(request, "Настройки согласия сохранены.")
+        if kind == "publication":
+            messages.success(
+                request,
+                (
+                    "Имя скрыто в списках, сетках и рейтингах, включая прошлые результаты."
+                    if request.POST.get("action") == "withdraw"
+                    else "Публикация имени и фамилии разрешена. Вы можете отменить её в любой момент."
+                ),
+            )
+        else:
+            messages.success(request, "Настройки согласия сохранены.")
     return redirect("juniors:child", pk=pk)
 
 
@@ -544,3 +567,27 @@ def appeal(request: HttpRequest, pk: int, match_id: int) -> HttpResponse:
     else:
         messages.success(request, "Возражение передано организатору.")
     return redirect("juniors:child", pk=pk)
+
+
+@league_available
+@never_cache
+def legal_documents(request: HttpRequest, slug: str | None = None) -> HttpResponse:
+    import markdown  # type: ignore[import-untyped]
+
+    from .legal import TITLES, document_text
+
+    if slug is not None and slug not in TITLES:
+        raise Http404
+    return render(
+        request,
+        "juniors/legal.html",
+        {
+            "documents": TITLES.items(),
+            "document_title": TITLES[slug] if slug else "Документы детской лиги",
+            "document_html": (
+                markdown.markdown(document_text(slug), extensions=["extra"])
+                if slug
+                else ""
+            ),
+        },
+    )

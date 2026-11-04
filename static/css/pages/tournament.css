@@ -533,7 +533,6 @@
     border: 1px solid rgb(166 130 74 / 70%);
     border-radius: 12px;
     box-shadow: 0 14px 32px rgb(0 0 0 / 40%);
-    animation: manage-export-pop 0.14s ease-out;
 }
 
 .manage-export__panel a {
@@ -571,17 +570,6 @@
     min-height: 36px;
     font-size: 0.85rem;
     white-space: nowrap;
-}
-
-@keyframes manage-export-pop {
-    from {
-        opacity: 0;
-        transform: translateY(-4px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 /* Окно ожидания скачивания регламента и сетки (static/js/export-download.js) */
@@ -979,42 +967,6 @@ html.export-loader-open {
     .manage-export__public .btn-manage-tournament {
         flex: 1;
         min-height: 40px;
-    }
-}
-
-.manage-page__actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-}
-
-.manage-page__actions > form {
-    margin: 0;
-}
-
-@media (width <= 768px) {
-    .manage-page__actions {
-        flex-direction: column;
-        align-items: stretch;
-        gap: var(--spacing-md);
-    }
-
-    .manage-page__actions > form {
-        display: block !important;
-        width: 100%;
-    }
-
-    .manage-page__actions > a.btn {
-        width: 100%;
-        box-sizing: border-box;
-        justify-content: center;
-        text-align: center;
-    }
-
-    .manage-page__actions .btn {
-        width: 100%;
-        box-sizing: border-box;
     }
 }
 

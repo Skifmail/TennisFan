@@ -1,0 +1,754 @@
+/*
+ * tournament-manage.css
+ *
+ * Описание: Панель управления турниром — шапка с метаданными, блок действий,
+ * карточки выбора режима запуска, состояния наведения и фокуса, мобильная версия.
+ * Компоненты: .manage-page, .manage-hero, .manage-actions, .manage-start-*
+ * Используется на: странице управления турниром
+ *
+ * Последнее обновление: 2026-11
+ */
+
+/* --------------------------------------------------------------------------
+ * Локальные токены страницы
+ * -------------------------------------------------------------------------- */
+.manage-page {
+    --manage-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --manage-gold: #e9c87e;
+    --manage-cream: #f1e6cf;
+    --manage-muted: rgb(241 230 207 / 60%);
+    --manage-line: rgb(166 130 74 / 16%);
+    --manage-line-strong: rgb(166 130 74 / 30%);
+
+    padding-top: var(--spacing-2xl);
+    padding-bottom: var(--spacing-3xl);
+}
+
+/* --------------------------------------------------------------------------
+ * Крошки и кнопки скачивания
+ * -------------------------------------------------------------------------- */
+.manage-page .manage-page-header {
+    gap: 0.85rem 1rem;
+}
+
+.manage-page .manage-crumbs {
+    font-size: 0.85rem;
+}
+
+.manage-page .manage-crumbs__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    color: rgb(241 230 207 / 55%);
+    transition: color 160ms var(--manage-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .manage-page .manage-crumbs__link:hover {
+        color: var(--manage-gold);
+    }
+}
+
+.manage-page .manage-crumbs__sep {
+    color: rgb(241 230 207 / 26%);
+}
+
+.manage-page .manage-crumbs__current {
+    color: var(--manage-cream);
+    font-weight: 600;
+}
+
+.manage-page .manage-export__btn {
+    transition:
+        background-color 180ms var(--manage-ease),
+        border-color 180ms var(--manage-ease),
+        color 180ms var(--manage-ease),
+        transform 140ms var(--manage-ease);
+}
+
+.manage-page .manage-export__btn:active {
+    transform: scale(0.98);
+}
+
+.manage-page .manage-export__chevron {
+    transition: transform 180ms var(--manage-ease);
+}
+
+.manage-page .manage-export__panel {
+    animation: manage-panel-in 140ms var(--manage-ease);
+    transform-origin: top left;
+}
+
+/* --------------------------------------------------------------------------
+ * Шапка страницы
+ * -------------------------------------------------------------------------- */
+.manage-hero {
+    position: relative;
+    margin-bottom: var(--spacing-lg);
+    padding: clamp(1.2rem, 2.6vw, 1.9rem);
+    overflow: hidden;
+    border: 1px solid rgb(166 130 74 / 24%);
+    border-radius: var(--radius-lg);
+    background:
+        radial-gradient(120% 150% at 100% 0%, rgb(166 130 74 / 16%), transparent 55%),
+        linear-gradient(160deg, rgb(2 38 26 / 96%), rgb(1 24 17 / 98%));
+    box-shadow:
+        0 20px 48px rgb(0 0 0 / 26%),
+        inset 0 1px 0 rgb(255 255 255 / 4%);
+}
+
+.manage-hero::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--manage-gold), rgb(166 130 74 / 0%));
+    content: "";
+    pointer-events: none;
+}
+
+.manage-hero::after {
+    position: absolute;
+    right: -70px;
+    bottom: -120px;
+    width: 260px;
+    height: 260px;
+    border: 1px solid rgb(166 130 74 / 14%);
+    border-radius: 50%;
+    content: "";
+    pointer-events: none;
+}
+
+.manage-hero__main {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+}
+
+.manage-hero__eyebrow {
+    margin: 0 0 0.45rem;
+    color: #d6b877;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.manage-hero__title {
+    margin: 0 0 0.4rem;
+    padding: 0;
+    color: #f7efdd;
+    font-family: var(--font-heading);
+    font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.manage-hero__tournament {
+    margin: 0;
+    max-width: 60ch;
+    color: rgb(241 230 207 / 74%);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.manage-hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.1rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.manage-hero__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 32px;
+    padding: 0.32rem 0.7rem;
+    border: 1px solid rgb(166 130 74 / 22%);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 20%);
+    color: rgb(241 230 207 / 82%);
+    font-size: 0.8rem;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.manage-hero__chip-label {
+    color: rgb(241 230 207 / 45%);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.manage-hero__dot {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+    box-shadow: 0 0 0 3px rgb(255 255 255 / 6%);
+}
+
+.manage-hero__chip--status {
+    border-color: rgb(233 200 126 / 28%);
+    background: rgb(166 130 74 / 10%);
+    color: var(--manage-gold);
+    font-weight: 600;
+}
+
+.manage-hero__chip--active,
+.manage-hero__chip--playoffs {
+    border-color: rgb(134 239 172 / 28%);
+    background: rgb(34 197 94 / 10%);
+    color: #86efac;
+}
+
+.manage-hero__chip--completed {
+    border-color: rgb(241 230 207 / 16%);
+    background: rgb(0 0 0 / 14%);
+    color: rgb(241 230 207 / 60%);
+}
+
+.manage-hero__chip--cancelled {
+    border-color: rgb(248 113 113 / 28%);
+    background: rgb(220 53 69 / 10%);
+    color: #fca5a5;
+}
+
+/* --------------------------------------------------------------------------
+ * Блок действий
+ * -------------------------------------------------------------------------- */
+.manage-actions {
+    margin-bottom: var(--spacing-lg);
+    padding: clamp(1.1rem, 2.4vw, 1.6rem);
+    border: 1px solid rgb(166 130 74 / 22%);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, rgb(1 43 28 / 90%), rgb(1 31 21 / 94%));
+    box-shadow: 0 16px 40px rgb(0 0 0 / 22%);
+}
+
+.manage-actions__head {
+    margin-bottom: var(--spacing-lg);
+}
+
+.manage-actions__title {
+    margin: 0 0 0.35rem;
+    color: var(--manage-cream);
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.manage-actions__lead {
+    max-width: 62ch;
+    margin: 0;
+    color: var(--manage-muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.manage-actions__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--manage-line);
+}
+
+.manage-actions__row > form {
+    display: flex;
+    margin: 0;
+}
+
+.manage-actions__row .btn {
+    min-height: 42px;
+}
+
+.manage-actions__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--manage-line);
+}
+
+.manage-actions__footer > form {
+    display: flex;
+    margin: 0 0 0 auto;
+}
+
+/* Если других действий нет, разделитель перед одиночной кнопкой не нужен */
+.manage-actions__head + .manage-actions__row,
+.manage-actions__head + .manage-actions__footer {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.manage-actions__danger {
+    color: #f0a8a8;
+    border-color: rgb(248 113 113 / 40%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .manage-actions__danger:hover {
+        border-color: rgb(248 113 113 / 65%);
+        background: rgb(248 113 113 / 10%);
+        color: #fecaca;
+    }
+}
+
+/* Утилиты выравнивания, которые используются в формах страницы */
+.manage-page .align-items-end {
+    align-items: flex-end;
+}
+
+.manage-page .align-items-center {
+    align-items: center;
+}
+
+/* --------------------------------------------------------------------------
+ * Выбор режима запуска
+ * -------------------------------------------------------------------------- */
+.manage-start-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    width: 100%;
+}
+
+.manage-start-mode {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.manage-start-mode__legend {
+    margin-bottom: 0.6rem;
+    padding: 0;
+    color: var(--manage-cream);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.manage-start-mode__options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.manage-start-mode__option {
+    position: relative;
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    padding: clamp(0.85rem, 2vw, 1.05rem);
+    border: 1px solid rgb(166 130 74 / 22%);
+    border-radius: 12px;
+    background: rgb(0 0 0 / 16%);
+    cursor: pointer;
+    transition:
+        border-color 160ms var(--manage-ease),
+        background-color 160ms var(--manage-ease),
+        box-shadow 160ms var(--manage-ease),
+        transform 140ms var(--manage-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .manage-start-mode__option:hover {
+        border-color: rgb(166 130 74 / 45%);
+        background: rgb(0 0 0 / 24%);
+    }
+}
+
+.manage-start-mode__option:active {
+    transform: scale(0.995);
+}
+
+.manage-start-mode__option:has(input:checked) {
+    border-color: rgb(233 200 126 / 75%);
+    background: linear-gradient(180deg, rgb(166 130 74 / 14%), rgb(166 130 74 / 8%));
+    box-shadow: inset 0 0 0 1px rgb(233 200 126 / 22%);
+}
+
+.manage-start-mode__option:has(input:focus-visible) {
+    outline: 2px solid var(--manage-gold);
+    outline-offset: 2px;
+}
+
+/* Нативный индикатор скрыт, но остаётся доступным с клавиатуры */
+.manage-start-mode__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    border: 0;
+    white-space: nowrap;
+}
+
+.manage-start-mode__indicator {
+    position: relative;
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    border: 1.5px solid rgb(166 130 74 / 50%);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 18%);
+    transition:
+        border-color 160ms var(--manage-ease),
+        background-color 160ms var(--manage-ease);
+}
+
+.manage-start-mode__indicator::after {
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--manage-gold);
+    content: "";
+    opacity: 0;
+    transform: scale(0.4);
+    transition:
+        transform 180ms var(--manage-ease),
+        opacity 140ms var(--manage-ease);
+}
+
+.manage-start-mode__input:checked ~ .manage-start-mode__indicator {
+    border-color: var(--manage-gold);
+    background: rgb(166 130 74 / 12%);
+}
+
+.manage-start-mode__input:checked ~ .manage-start-mode__indicator::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.manage-start-mode__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.manage-start-mode__title {
+    color: var(--manage-cream);
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.manage-start-mode__hint {
+    color: rgb(241 230 207 / 58%);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.manage-start-submit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: center;
+}
+
+.manage-start-submit .btn {
+    min-height: 44px;
+    padding-inline: 1.25rem;
+}
+
+.manage-start-submit__hint {
+    max-width: 68ch;
+    color: rgb(241 230 207 / 52%);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+ * Карточки разделов
+ * -------------------------------------------------------------------------- */
+.manage-page .card {
+    border-color: rgb(166 130 74 / 18%);
+    background: linear-gradient(180deg, rgb(1 43 28 / 88%), rgb(1 31 22 / 94%));
+    box-shadow: 0 14px 36px rgb(0 0 0 / 18%);
+}
+
+/* Карточки разделов не кликабельны — подъём при наведении здесь только мешает */
+.manage-page .card:hover {
+    border-color: rgb(166 130 74 / 24%);
+    box-shadow: 0 14px 36px rgb(0 0 0 / 18%);
+    transform: none;
+}
+
+.manage-page .card-body {
+    padding: clamp(1.1rem, 2.2vw, 1.5rem);
+}
+
+.manage-page .card > .card-body > .section-title {
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--manage-line);
+    color: var(--manage-cream);
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+}
+
+/* --------------------------------------------------------------------------
+ * Списки участников и вложенные блоки
+ * -------------------------------------------------------------------------- */
+.manage-page .manage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.manage-page .manage-list-item {
+    border-color: rgb(166 130 74 / 16%);
+    border-radius: 10px;
+    background: rgb(0 0 0 / 14%);
+    transition:
+        border-color 160ms var(--manage-ease),
+        background-color 160ms var(--manage-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .manage-page .manage-list-item:hover {
+        border-color: rgb(166 130 74 / 32%);
+        background: rgb(0 0 0 / 20%);
+    }
+}
+
+.manage-page .manage-block-bg {
+    padding: 1rem 1.1rem;
+    border: 1px solid rgb(166 130 74 / 14%);
+    border-radius: var(--radius-md);
+    background: rgb(0 0 0 / 14%);
+}
+
+.manage-page .manage-block-bg > .h6 {
+    margin-bottom: 0.6rem;
+    color: var(--manage-cream);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* --------------------------------------------------------------------------
+ * Поля выбора в блоках управления
+ * -------------------------------------------------------------------------- */
+.manage-page .form-select,
+.manage-page .form-control {
+    color-scheme: dark;
+}
+
+.manage-page .form-select {
+    padding: 0.55rem 0.8rem;
+    border: 1px solid rgb(166 130 74 / 35%);
+    border-radius: var(--radius-md);
+    background: rgb(1 43 28 / 80%);
+    color: var(--manage-cream);
+    font-size: 0.875rem;
+    transition:
+        border-color 160ms var(--manage-ease),
+        box-shadow 160ms var(--manage-ease);
+}
+
+.manage-page .form-select:focus {
+    outline: none;
+    border-color: var(--manage-gold);
+    box-shadow: 0 0 0 3px rgb(233 200 126 / 18%);
+}
+
+.manage-page .manage-player-select {
+    width: auto;
+    min-width: 18rem;
+    max-width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+ * Итоговая таблица
+ * -------------------------------------------------------------------------- */
+.manage-page .manage-standings-table {
+    border-collapse: collapse;
+    color: var(--manage-cream);
+    font-size: 0.875rem;
+}
+
+.manage-page .manage-standings-table th {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid rgb(166 130 74 / 24%);
+    color: var(--manage-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.manage-page .manage-standings-table th.text-center {
+    text-align: center;
+}
+
+.manage-page .manage-standings-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid rgb(166 130 74 / 10%);
+}
+
+.manage-page .manage-standings-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .manage-page .manage-standings-table tbody tr:hover td {
+        background: rgb(166 130 74 / 6%);
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Фокус и нажатия
+ * -------------------------------------------------------------------------- */
+.manage-page a:focus-visible,
+.manage-page button:focus-visible,
+.manage-page summary:focus-visible {
+    outline: 2px solid var(--manage-gold);
+    outline-offset: 2px;
+}
+
+.manage-page .btn {
+    will-change: auto;
+}
+
+.manage-page .btn:focus-visible,
+.manage-page .manage-export__btn:focus-visible {
+    outline: 2px solid var(--manage-gold);
+    outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .manage-page .manage-export__btn:hover {
+        transform: translateY(-1px);
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Планшеты и телефоны
+ * -------------------------------------------------------------------------- */
+@media (width <= 768px) {
+    .manage-page {
+        padding-top: var(--spacing-lg);
+    }
+
+    .manage-hero {
+        padding: 1.1rem;
+    }
+
+    .manage-hero__title {
+        font-size: clamp(1.45rem, 6vw, 1.8rem);
+    }
+
+    .manage-hero__meta {
+        gap: 0.4rem;
+        margin-top: 0.9rem;
+    }
+
+    .manage-hero__chip {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.76rem;
+    }
+
+    .manage-actions {
+        padding: 1rem;
+    }
+
+    .manage-start-mode__options {
+        grid-template-columns: 1fr;
+    }
+
+    .manage-start-submit,
+    .manage-actions__row,
+    .manage-actions__footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .manage-actions__row > form,
+    .manage-actions__footer > form {
+        display: block;
+        width: 100%;
+        margin: 0;
+    }
+
+    .manage-actions__row .btn,
+    .manage-actions__footer .btn,
+    .manage-start-submit .btn {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .manage-start-submit__hint {
+        max-width: none;
+    }
+
+    .manage-page .card > .card-body > .section-title {
+        font-size: 1.05rem;
+    }
+
+    .manage-page .manage-player-select {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Уменьшенное движение
+ * -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .manage-page .btn,
+    .manage-page .manage-crumbs__link,
+    .manage-page .manage-export__btn,
+    .manage-page .manage-export__chevron,
+    .manage-page .manage-start-mode__option,
+    .manage-page .manage-start-mode__indicator,
+    .manage-page .manage-start-mode__indicator::after,
+    .manage-page .manage-list-item,
+    .manage-page .form-select {
+        transition: none;
+    }
+
+    .manage-page .manage-export__panel {
+        animation: none;
+    }
+
+    .manage-page .btn:active,
+    .manage-page .manage-export__btn:hover,
+    .manage-page .manage-export__btn:active,
+    .manage-page .manage-start-mode__option:active {
+        transform: none;
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Анимации
+ * -------------------------------------------------------------------------- */
+@keyframes manage-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

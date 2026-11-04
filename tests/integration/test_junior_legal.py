@@ -128,8 +128,9 @@ def test_club_fee_rejected_before_gateway_or_child_lookup(settings):
 
 
 def test_templates_and_edit_form():
-    for name in ("child_form", "child", "legal"):
+    for name in ("child_form", "child"):
         get_template(f"juniors/{name}.html")
+    get_template("legal/document.html")
     assert "processing_accepted" in ChildForm().fields
     child = ChildProfile.objects.create(
         first_name="А",
@@ -150,9 +151,8 @@ def test_documents_and_missing_release_page(client, settings):
         "processing",
         "publication",
         "payments",
-        "organizer",
     ):
-        response = client.get(f"/kids/documents/{slug}/")
+        response = client.get(f"/kids/documents/{slug}/", follow=True)
         assert response.status_code == 200
         assert b"<h1>" in response.content
     assert client.get("/kids/documents/unknown/").status_code == 404

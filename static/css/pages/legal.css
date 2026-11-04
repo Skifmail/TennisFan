@@ -101,3 +101,22 @@
     background: var(--color-primary-transparent);
     color: var(--color-primary);
 }
+
+.legal-group + .legal-group {
+    margin-top: var(--spacing-2xl);
+}
+
+.legal-group {
+    scroll-margin-top: 100px;
+}
+
+.legal-group__title {
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-xl);
+    color: var(--color-text);
+}
+
+.legal-list__link:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}

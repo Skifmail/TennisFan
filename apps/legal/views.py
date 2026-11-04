@@ -54,6 +54,8 @@ def _load_document(slug: str) -> tuple[str, str] | None:
     except (OSError, UnicodeError):
         logger.exception("Не удалось прочитать правовой документ", document_slug=slug)
         return None
+    if slug in JUNIOR_DOCS and raw.startswith("# "):
+        raw = raw.split("\n", 1)[1]
     return markdown.markdown(raw, extensions=["extra"]), meta["title"]
 
 

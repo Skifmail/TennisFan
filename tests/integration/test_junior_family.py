@@ -234,3 +234,49 @@ def test_child_form_requires_csrf_token() -> None:
     client.force_login(parent)
     assert client.post(reverse("juniors:add_child"), {}).status_code == 403
     assert not ChildProfile.objects.exists()
+
+
+@pytest.mark.parametrize(
+    "verified,has_release", [(True, False), (True, True), (False, False)]
+)
+@override_settings(JUNIOR_LEAGUE_ENABLED=True, SECURE_SSL_REDIRECT=False)
+def test_profile_distinguishes_verification_from_activation(
+    client, verified: bool, has_release: bool
+) -> None:
+    parent = make_user(email="profile-status@junior.test")
+    kid = child()
+    link = GuardianLink.objects.create(child=kid, user=parent)
+    if has_release:
+        current_release()
+    if verified:
+        reviewer = make_user(
+            email="status-reviewer@junior.test", is_staff=True, is_superuser=True
+        )
+        verify_guardian(
+            actor=reviewer,
+            link_id=link.pk,
+            approved=True,
+            evidence="Оригиналы и полномочия проверены лично",
+        )
+    kid.refresh_from_db()
+    assert kid.status == "draft"
+    client.force_login(parent)
+    response = client.get(reverse("juniors:child", args=[kid.pk]))
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Ожидает активации" in html
+    if verified:
+        assert "Представитель подтверждён" in html
+        assert "Проверка пройдена" in html
+        assert "Представительство не проверено" not in html
+        assert "организатор проверит ваши документы" not in html
+        if has_release:
+            assert "Для активации профиля оформите согласие" in html
+        else:
+            assert (
+                "Профиль пока не активирован: платформа готовит тексты согласий" in html
+            )
+    else:
+        assert "Представительство ожидает проверки" in html
+        assert "организатор проверит ваши документы" in html
+        assert "Проверка пройдена" not in html

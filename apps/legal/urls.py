@@ -50,3 +50,13 @@ urlpatterns = [
         name="legal_club_organizer_rules",
     ),
 ]
+
+urlpatterns += [
+    path(
+        f"{slug}/",
+        views.legal_document,
+        {"slug": slug},
+        name="legal_" + slug.replace("-", "_"),
+    )
+    for slug in views.JUNIOR_DOCS
+]

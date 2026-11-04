@@ -7,19 +7,34 @@
     <div class="container container--legal">
         <header class="legal-header">
             <h1 class="page-title page-title--legal">Правовые документы</h1>
-            <p class="page-subtitle">Официальные документы TennisFan / TennisTop</p>
+            <p class="page-subtitle">Условия использования платформы, правила и согласия.</p>
         </header>
-        <div class="legal-list card">
-            <div class="card-body">
-                <ul class="legal-list__ul">
-                    {% for doc in documents %}
-                    <li>
-                        <a href="{% url doc.url_name %}" class="legal-list__link">{{ doc.title }}</a>
-                    </li>
-                    {% endfor %}
-                </ul>
+        <section class="legal-group" aria-labelledby="platform-documents-title">
+            <h2 id="platform-documents-title" class="legal-group__title">Документы платформы</h2>
+            <div class="legal-list card">
+                <div class="card-body">
+                    <ul class="legal-list__ul">
+                        {% for doc in documents %}
+                        <li>
+                            <a href="{% url doc.url_name %}" class="legal-list__link">{{ doc.title }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
-        </div>
+        </section>
+        <section id="junior-documents" class="legal-group" aria-labelledby="junior-documents-title">
+            <h2 id="junior-documents-title" class="legal-group__title">Документы детской лиги</h2>
+            <div class="legal-list card">
+                <div class="card-body">
+                    <ul class="legal-list__ul">
+                        {% for doc in junior_documents %}
+                        <li><a href="{% url doc.url_name %}" class="legal-list__link">{{ doc.title }}</a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 {% endblock %}

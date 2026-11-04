@@ -569,25 +569,15 @@ def appeal(request: HttpRequest, pk: int, match_id: int) -> HttpResponse:
     return redirect("juniors:child", pk=pk)
 
 
-@league_available
 @never_cache
 def legal_documents(request: HttpRequest, slug: str | None = None) -> HttpResponse:
-    import markdown  # type: ignore[import-untyped]
+    """Перенаправляет прежние адреса в общий раздел правовых документов."""
+    from .legal import TITLES
 
-    from .legal import TITLES, document_text
+    if slug is None:
+        from django.urls import reverse
 
-    if slug is not None and slug not in TITLES:
+        return redirect(reverse("legal_index") + "#junior-documents", permanent=True)
+    if slug not in TITLES:
         raise Http404
-    return render(
-        request,
-        "juniors/legal.html",
-        {
-            "documents": TITLES.items(),
-            "document_title": TITLES[slug] if slug else "Документы детской лиги",
-            "document_html": (
-                markdown.markdown(document_text(slug), extensions=["extra"])
-                if slug
-                else ""
-            ),
-        },
-    )
+    return redirect("legal_junior_" + slug.replace("-", "_"), permanent=True)

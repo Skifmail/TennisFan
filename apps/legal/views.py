@@ -8,7 +8,9 @@ from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from loguru import logger
 
-from .utils import LEGAL_DOCUMENT_PATHS
+from apps.juniors.legal import TITLES as JUNIOR_TITLES
+
+from .utils import DOCS_ROOT, LEGAL_DOCUMENT_PATHS
 
 
 class _DocMeta(TypedDict):
@@ -32,6 +34,15 @@ DOCS: Final[dict[str, _DocMeta]] = {
     slug: {"file": path, "title": _TITLES[slug]}
     for slug, path in LEGAL_DOCUMENT_PATHS.items()
 }
+
+JUNIOR_DOCS: Final[dict[str, _DocMeta]] = {
+    f"junior-{slug}": {
+        "file": DOCS_ROOT / "juniors" / f"{slug}.txt",
+        "title": title,
+    }
+    for slug, title in JUNIOR_TITLES.items()
+}
+DOCS.update(JUNIOR_DOCS)
 
 
 def _load_document(slug: str) -> tuple[str, str] | None:
@@ -91,4 +102,11 @@ def legal_index(request: HttpRequest) -> HttpResponse:
         for slug, meta in DOCS.items()
         if meta["file"].exists()
     ]
-    return render(request, "legal/index.html", {"documents": items})
+    return render(
+        request,
+        "legal/index.html",
+        {
+            "documents": [item for item in items if item["slug"] not in JUNIOR_DOCS],
+            "junior_documents": [item for item in items if item["slug"] in JUNIOR_DOCS],
+        },
+    )

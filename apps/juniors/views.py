@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
-from typing import Any
+from typing import Any, TypeVar
 
 from django.conf import settings
 from django.contrib import messages
@@ -13,7 +13,8 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
+from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import urlencode
@@ -61,11 +62,14 @@ def posted_id(request: HttpRequest, key: str) -> int:
     return int(value)
 
 
-def league_available(view: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
+Response = TypeVar("Response", bound=HttpResponseBase)
+
+
+def league_available(view: Callable[..., Response]) -> Callable[..., Response]:
     """Закрывает маршруты лиги до явного включения после миграций."""
 
     @wraps(view)
-    def wrapped(request: HttpRequest, *args, **kwargs) -> HttpResponse:
+    def wrapped(request: HttpRequest, *args, **kwargs) -> Response:
         if not settings.JUNIOR_LEAGUE_ENABLED and not (
             request.user.is_authenticated and request.user.is_staff
         ):
@@ -260,8 +264,17 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
         link = None
     release = LegalRelease.objects.filter(reviewed=True, is_current=True).first()
     form = ChildForm(
-        request.POST or None,
+        request.POST if request.method == "POST" else None,
+        request.FILES or None,
         instance=child,
+        identity_locked=bool(
+            child
+            and (
+                child.birth_verified_at
+                or child.status != "draft"
+                or (link and link.status == "verified")
+            )
+        ),
         initial={"relation": link.relation if link else "parent"},
     )
     if request.method == "POST" and form.is_valid():
@@ -281,7 +294,11 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
         else:
             messages.success(
                 request,
-                "Профиль сохранён. Перед первым участием организатор проверит представительство и возраст ребёнка.",
+                (
+                    "Изменения сохранены."
+                    if child
+                    else "Профиль сохранён. Перед первым участием организатор проверит представительство и возраст ребёнка."
+                ),
             )
             return redirect("juniors:child", pk=saved.pk)
     return render(
@@ -309,6 +326,12 @@ def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "link": link,
             "release": release,
             "processing_accepted": consents.filter(kind="processing").exists(),
+            "processing_consent": link.consents.filter(
+                kind="processing", withdrawn_at__isnull=True
+            )
+            .select_related("release")
+            .order_by("-accepted_at")
+            .first(),
             "publication_accepted": link.consents.filter(
                 kind="publication", withdrawn_at__isnull=True, release__reviewed=True
             ).exists(),
@@ -329,12 +352,43 @@ def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
 @league_available
 @never_cache
 @login_required
+@require_http_methods(["GET", "HEAD"])
+def child_photo(request: HttpRequest, pk: int) -> FileResponse:
+    """Отдаёт фото только представителю этой семьи или владельцу взрослой истории."""
+    child = get_object_or_404(ChildProfile, pk=pk)
+    actor = account(request)
+    if child.adult_user_id != actor.pk:
+        guardian_for(actor, child, verified=False)
+    if not child.photo:
+        raise Http404
+    try:
+        stream = child.photo.open("rb")
+    except FileNotFoundError as exc:
+        raise Http404 from exc
+    response = FileResponse(stream, content_type="image/jpeg")
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+@league_available
+@never_cache
+@login_required
 @require_POST
 def consent_action(request: HttpRequest, pk: int) -> HttpResponse:
-    get_object_or_404(ChildProfile, pk=pk)
+    child = get_object_or_404(ChildProfile, pk=pk)
     kind = request.POST.get("kind", "")
+    action = request.POST.get("action", "")
+    if action == "set_publication":
+        kind = "publication"
+        if request.POST.get("accepted") != "yes":
+            action = "withdraw"
+        elif publication_is_allowed(child):
+            guardian_for(account(request), child)
+            messages.success(request, "Настройка сохранена.")
+            return redirect("juniors:child", pk=pk)
     try:
-        if request.POST.get("action") == "withdraw":
+        if action == "withdraw":
             withdraw_consent(actor=account(request), child_id=pk, kind=kind)
         else:
             if request.POST.get("accepted") != "yes":
@@ -353,7 +407,7 @@ def consent_action(request: HttpRequest, pk: int) -> HttpResponse:
                 request,
                 (
                     "Имя скрыто в списках, сетках и рейтингах, включая прошлые результаты."
-                    if request.POST.get("action") == "withdraw"
+                    if action == "withdraw"
                     else "Публикация имени и фамилии разрешена. Вы можете отменить её в любой момент."
                 ),
             )

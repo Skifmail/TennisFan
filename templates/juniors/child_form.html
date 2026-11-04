@@ -2,22 +2,28 @@
 {% load legal_tags %}
 {% block title %}Детский профиль{% endblock %}
 {% block junior_content %}
-<header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">Заполните сведения о ребёнке. Документы загружать не нужно.</p></div></header>
-<aside class="jl-note">Профиль будет доступен вам в семейном кабинете. Перед первым участием уполномоченный организатор проверит представительство и возраст ребёнка. До проверки имя не публикуется и запись на турниры недоступна.</aside>
+<header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">{% if child %}Измените город, ступень подготовки или фото ребёнка.{% else %}Заполните сведения о ребёнке. Документы загружать не нужно.{% endif %}</p></div></header>
+{% if not child %}<aside class="jl-note">Профиль будет доступен вам в семейном кабинете. Перед первым участием уполномоченный организатор проверит представительство и возраст ребёнка. До проверки имя не публикуется и запись на турниры недоступна.</aside>{% endif %}
 {% if not child and not release %}
 <aside class="jl-note">Добавление профиля откроется после утверждения текста согласия. По вопросам участия напишите на tennis@tennisfan.ru.</aside>
 {% else %}{% if junior_actions_allowed %}
-<form method="post" class="jl-card jl-form jl-note" novalidate>{% csrf_token %}
+<form method="post" enctype="multipart/form-data" class="jl-card jl-form jl-note" novalidate>{% csrf_token %}
 {% if form.errors %}<div class="jl-error" role="alert"><strong>Проверьте заполнение формы.</strong>{{ form.non_field_errors }}<ul>{% for field in form %}{% if field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ field.errors|striptags }}</a></li>{% endif %}{% endfor %}</ul></div>{% endif %}
 {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
 <div class="jl-form-grid">
-{% for field in form.visible_fields %}{% if field.field.widget.input_type != 'checkbox' %}
+{% for field in form.visible_fields %}{% if field.field.widget.input_type != 'checkbox' and field.name != 'photo' %}
 <div class="jl-field"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-label="обязательно">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>
 {% endif %}{% endfor %}
 </div>
-<h2>Подтверждение сведений</h2>
+<section class="jl-photo-editor" aria-labelledby="photo-title"><h2 id="photo-title">Фото ребёнка</h2>
+{% if child.photo %}<img class="jl-profile-photo" src="{% url 'juniors:child_photo' pk=child.pk %}" alt="Текущее фото ребёнка" width="96" height="96">{% endif %}
+<div class="jl-field"><label for="{{ form.photo.id_for_label }}">{% if child.photo %}Заменить фото{% else %}Добавить фото{% endif %}</label>{{ form.photo }}<small>{{ form.photo.help_text }}</small>{{ form.photo.errors }}</div>
+<label class="jl-check" for="{{ form.photo_accepted.id_for_label }}">{{ form.photo_accepted }}<span>{{ form.photo_accepted.label }}</span></label>{{ form.photo_accepted.errors }}
+{% if child.photo %}<label class="jl-check" for="{{ form.remove_photo.id_for_label }}">{{ form.remove_photo }}<span>{{ form.remove_photo.label }}</span></label>{% endif %}
+</section>
+{% if not child %}<h2>Подтверждение сведений</h2>
 {% for field in form.visible_fields %}{% if field.name == 'representative' or field.name == 'accurate' %}<div class="jl-field"><label class="jl-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{{ field.errors }}</div>{% endif %}{% endfor %}
-<p class="jl-muted">Родитель знакомится с условиями выбранного турнира и выполняет относящиеся к нему обязанности по участию ребёнка. Платформа и организатор сохраняют свои обязанности.</p>
+<p class="jl-muted">Родитель знакомится с условиями выбранного турнира и выполняет относящиеся к нему обязанности по участию ребёнка. Платформа и организатор сохраняют свои обязанности.</p>{% endif %}
 {% if not child %}<section aria-label="Согласие на обработку данных ребёнка"><h2>Обработка данных ребёнка</h2><p>Версия {{ release.version }}. Прочитайте текст перед сохранением профиля.</p><details><summary>Прочитать согласие</summary><div class="legal-text">{{ release.processing_text|legal_markdown }}</div></details><div class="jl-field"><label class="jl-check" for="{{ form.processing_accepted.id_for_label }}">{{ form.processing_accepted }}<span>{{ form.processing_accepted.label }}</span></label>{{ form.processing_accepted.errors }}</div><p class="jl-muted">Эта отметка не разрешает публиковать имя ребёнка. Разрешение на публикацию оформляется отдельно и не обязательно для участия.</p></section>{% endif %}
 <div class="jl-actions"><button class="jl-button" type="submit">Сохранить профиль</button><a href="{% url 'juniors:family' %}">Отмена</a></div>
 </form>{% endif %}{% endif %}

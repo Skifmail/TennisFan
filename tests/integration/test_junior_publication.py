@@ -89,7 +89,7 @@ def test_any_parent_can_stop_publication_and_old_release_can_be_withdrawn(
     client.force_login(other)
     page = client.get(f"/kids/family/{child.pk}/")
     assert page.status_code == 200
-    assert "Скрыть имя и фамилию" in page.content.decode()
+    assert "Показывать имя и фамилию в результатах" in page.content.decode()
     assert (
         client.post(
             f"/kids/family/{child.pk}/consent/",

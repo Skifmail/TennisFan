@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from apps.notifications.models import EventPolicy
 
+from .photos import photo_upload_path, private_photo_storage
 from .rules import AgeRule, Ball, ScoreFormat, age_on
 
 
@@ -31,6 +32,12 @@ class ChildProfile(models.Model):
     )
     ball = models.CharField(
         "Ступень подготовки", max_length=10, choices=Ball.choices, default=Ball.RED
+    )
+    photo = models.ImageField(
+        "Фото ребёнка",
+        upload_to=photo_upload_path,
+        storage=private_photo_storage,
+        blank=True,
     )
     status = models.CharField(
         "Статус", max_length=12, choices=Status.choices, default=Status.DRAFT

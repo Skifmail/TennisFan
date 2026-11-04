@@ -7,7 +7,7 @@
 {% if is_club_panel and club %}
 {% include "clubs/_club_dashboard_nav.html" with current="tournaments" %}
 {% endif %}
-<div class="container manage-page" style="padding-top: var(--spacing-2xl);">
+<div class="container manage-page">
     <div class="manage-page-header mb-4">
         <nav class="manage-crumbs" aria-label="Навигация">
             {% if is_club_panel and club %}
@@ -50,96 +50,137 @@
         </div>
     </div>
 
-    <h1 class="page-title" style="text-align: left;">Управление турниром</h1>
-    <p class="text-secondary mb-4">
-        {{ tournament.name }} • {{ tournament.get_status_display }}
-        {% if tournament.start_date %} • {{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}
-    </p>
+    <header class="manage-hero">
+        <div class="manage-hero__main">
+            <p class="manage-hero__eyebrow">Панель организатора</p>
+            <h1 class="manage-hero__title">Управление турниром</h1>
+            <p class="manage-hero__tournament">{{ tournament.name }}</p>
+            <ul class="manage-hero__meta">
+                <li class="manage-hero__chip manage-hero__chip--status manage-hero__chip--{{ tournament.status }}">
+                    <span class="manage-hero__dot" aria-hidden="true"></span>
+                    <span>{{ tournament.get_status_display }}</span>
+                </li>
+                {% if tournament.start_date %}
+                <li class="manage-hero__chip">
+                    <span class="manage-hero__chip-label">Даты</span>
+                    <span>{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date and tournament.end_date != tournament.start_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}</span>
+                </li>
+                {% endif %}
+                <li class="manage-hero__chip">
+                    <span class="manage-hero__chip-label">Формат</span>
+                    <span>{{ tournament.get_format_display }}</span>
+                </li>
+                <li class="manage-hero__chip">
+                    <span class="manage-hero__chip-label">{% if is_doubles_tvd %}Команды{% else %}Участники{% endif %}</span>
+                    <span>{% if is_doubles_tvd %}{{ teams|length }}{% else %}{{ participants|length }}{% endif %}</span>
+                </li>
+            </ul>
+        </div>
+    </header>
 
     {% include "tournaments/_postpayment_status_banner.html" %}
 
 
     <!-- Секция 1: Статус и действия -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="section-title mb-3">Действия</h2>
-            <div class="manage-page__actions">
+    {% if can_generate_primary_structure or can_manage_manual_pairs or can_generate_groups or can_generate_playoffs or can_finalize or can_edit_tournament or can_cancel_tournament %}
+    <section class="manage-actions" aria-labelledby="manage-actions-title">
+        <div class="manage-actions__head">
+            <h2 class="manage-actions__title" id="manage-actions-title">Действия</h2>
+            <p class="manage-actions__lead">
                 {% if can_generate_primary_structure %}
-                <form action="{% url 'tournament_manage_generate_bracket' slug=tournament.slug %}" method="post" class="manage-start-form">
-                    {% csrf_token %}
-                    {% if supports_manual_pairing %}
-                    <fieldset class="manage-start-mode">
-                        <legend class="manage-start-mode__legend">Как запустить турнир?</legend>
-                        <label class="manage-start-mode__option">
-                            <input type="radio" name="pairing_mode" value="auto" {% if not tournament.uses_manual_pairing %}checked{% endif %}>
-                            <span class="manage-start-mode__body">
-                                <span class="manage-start-mode__title">Автоматически</span>
-                                <span class="manage-start-mode__hint">
-                                    {% if tournament.format == 'round_robin' %}
-                                    Система сама составит расписание туров без повторных пар.
-                                    {% else %}
-                                    Система сама распределит пары по силе и построит сетку.
-                                    {% endif %}
-                                </span>
-                            </span>
-                        </label>
-                        <label class="manage-start-mode__option">
-                            <input type="radio" name="pairing_mode" value="manual" {% if tournament.uses_manual_pairing %}checked{% endif %}>
-                            <span class="manage-start-mode__body">
-                                <span class="manage-start-mode__title">Вручную</span>
-                                <span class="manage-start-mode__hint">Вы составите пары из зарегистрированных участников. Удобно для контроля пар.</span>
-                            </span>
-                        </label>
-                    </fieldset>
-                    {% else %}
-                    <input type="hidden" name="pairing_mode" value="auto">
-                    {% endif %}
-                    <div class="manage-start-submit">
-                        <button type="submit" class="btn btn-primary">{{ generate_primary_structure_label }}</button>
-                        <span class="text-secondary small">Можно запустить с текущим составом, не дожидаясь минимума.</span>
-                    </div>
-                </form>
+                Запуск турнира и следующие шаги для текущего этапа.
+                {% else %}
+                Что можно сделать на текущем этапе турнира.
                 {% endif %}
-                {% if can_manage_manual_pairs %}
-                <a href="{% url 'tournament_manage_pairs' slug=tournament.slug %}" class="btn btn-primary">
-                    {% if manual_pairs_have_matches %}Пары и результаты{% else %}Составить пары{% endif %}
-                </a>
-                {% endif %}
-                {% if can_generate_groups %}
-                <form action="{% url 'tournament_manage_generate_groups' slug=tournament.slug %}" method="post" class="d-inline">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">Сформировать группы</button>
-                </form>
-                {% endif %}
-                {% if can_generate_playoffs %}
-                <a href="{% url 'tournament_manage_intermediate_results' slug=tournament.slug %}" class="btn btn-outline-primary">Промежуточные результаты и создание плей-офф</a>
-                {% endif %}
-                {% if can_finalize %}
-                <form action="{% url 'tournament_manage_finalize' slug=tournament.slug %}" method="post" class="d-inline">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">Завершить турнир</button>
-                </form>
-                {% endif %}
-                {% if can_edit_tournament %}
-                <a href="{% url 'clubs:tournament_edit' slug=tournament.club.slug tournament_id=tournament.id %}" class="btn btn-outline-primary">Редактировать турнир</a>
-                {% endif %}
-                {% if can_cancel_tournament %}
-                <form action="{% url 'tournament_manage_cancel' slug=tournament.slug %}" method="post" class="d-inline" onsubmit="return confirm('Отменить турнир? Участникам будут отправлены уведомления.');">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-outline btn-danger-text">Отменить турнир</button>
-                </form>
-                {% endif %}
-                {% if not can_generate_primary_structure and not can_generate_groups and not can_generate_playoffs and not can_finalize and not can_edit_tournament and not can_cancel_tournament and not can_extend_registration and not can_reopen_tournament %}
-                <p class="text-secondary mb-0">Нет доступных действий для текущего статуса.</p>
-                {% endif %}
-            </div>
+            </p>
         </div>
-    </div>
+
+        {% if can_generate_primary_structure %}
+        <form action="{% url 'tournament_manage_generate_bracket' slug=tournament.slug %}" method="post" class="manage-start-form">
+            {% csrf_token %}
+            {% if supports_manual_pairing %}
+            <fieldset class="manage-start-mode">
+                <legend class="manage-start-mode__legend">Как запустить турнир?</legend>
+                <div class="manage-start-mode__options">
+                    <label class="manage-start-mode__option">
+                        <input class="manage-start-mode__input" type="radio" name="pairing_mode" value="auto" {% if not tournament.uses_manual_pairing %}checked{% endif %}>
+                        <span class="manage-start-mode__indicator" aria-hidden="true"></span>
+                        <span class="manage-start-mode__body">
+                            <span class="manage-start-mode__title">Автоматически</span>
+                            <span class="manage-start-mode__hint">
+                                {% if tournament.format == 'round_robin' %}
+                                Система сама составит расписание туров без повторных пар.
+                                {% else %}
+                                Система сама распределит пары по силе и построит сетку.
+                                {% endif %}
+                            </span>
+                        </span>
+                    </label>
+                    <label class="manage-start-mode__option">
+                        <input class="manage-start-mode__input" type="radio" name="pairing_mode" value="manual" {% if tournament.uses_manual_pairing %}checked{% endif %}>
+                        <span class="manage-start-mode__indicator" aria-hidden="true"></span>
+                        <span class="manage-start-mode__body">
+                            <span class="manage-start-mode__title">Вручную</span>
+                            <span class="manage-start-mode__hint">Вы составите пары из зарегистрированных участников. Удобно для контроля пар.</span>
+                        </span>
+                    </label>
+                </div>
+            </fieldset>
+            {% else %}
+            <input type="hidden" name="pairing_mode" value="auto">
+            {% endif %}
+            <div class="manage-start-submit">
+                <button type="submit" class="btn btn-primary">{{ generate_primary_structure_label }}</button>
+                <span class="manage-start-submit__hint">Можно запустить с текущим составом, не дожидаясь минимума.</span>
+            </div>
+        </form>
+        {% endif %}
+
+        {% if can_manage_manual_pairs or can_generate_groups or can_generate_playoffs or can_finalize %}
+        <div class="manage-actions__row">
+            {% if can_manage_manual_pairs %}
+            <a href="{% url 'tournament_manage_pairs' slug=tournament.slug %}" class="btn btn-primary">
+                {% if manual_pairs_have_matches %}Пары и результаты{% else %}Составить пары{% endif %}
+            </a>
+            {% endif %}
+            {% if can_generate_groups %}
+            <form action="{% url 'tournament_manage_generate_groups' slug=tournament.slug %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Сформировать группы</button>
+            </form>
+            {% endif %}
+            {% if can_generate_playoffs %}
+            <a href="{% url 'tournament_manage_intermediate_results' slug=tournament.slug %}" class="btn btn-outline">Промежуточные результаты и создание плей-офф</a>
+            {% endif %}
+            {% if can_finalize %}
+            <form action="{% url 'tournament_manage_finalize' slug=tournament.slug %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Завершить турнир</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if can_edit_tournament or can_cancel_tournament %}
+        <div class="manage-actions__footer">
+            {% if can_edit_tournament %}
+            <a href="{% url 'clubs:tournament_edit' slug=tournament.club.slug tournament_id=tournament.id %}" class="btn btn-outline">Редактировать турнир</a>
+            {% endif %}
+            {% if can_cancel_tournament %}
+            <form action="{% url 'tournament_manage_cancel' slug=tournament.slug %}" method="post" onsubmit="return confirm('Отменить турнир? Участникам будут отправлены уведомления.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline manage-actions__danger">Отменить турнир</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
 
 
     <!-- Жизненный цикл: продление / возобновление -->
     {% if can_extend_registration or can_reopen_tournament or insufficient_grace_deadline %}
-    <div class="card mb-4">
+    <div class="card manage-card mb-4">
         <div class="card-body">
             <h2 class="section-title mb-3">Набор участников</h2>
             <p class="text-secondary mb-3">
@@ -202,7 +243,7 @@
 
     <!-- Секция 2: Парный ТВД — команды и составление пар (до формирования групп) -->
     {% if not tvd_groups and is_doubles_tvd %}
-    <div class="card mb-4">
+    <div class="card manage-card mb-4">
         <div class="card-body">
             <h2 class="section-title mb-3">Команды ({{ teams|length }}) — полных: {{ full_teams_count }}</h2>
             {% if teams %}
@@ -244,19 +285,19 @@
             <p class="text-secondary mb-0">Нет заявок. Регистрация на публичной странице турнира (ожидание пары, присоединиться к команде, выбрать партнёра).</p>
             {% endif %}
             {% if players_for_pairs %}
-            <form action="{% url 'tournament_manage_compose_pair' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+            <form action="{% url 'tournament_manage_compose_pair' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg">
                 {% csrf_token %}
                 <h3 class="h6 mb-2">Составить пару вручную</h3>
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <label class="mb-0">Игрок 1</label>
-                    <select name="player1_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
+                    <select name="player1_id" required class="form-select form-select-sm manage-player-select">
                         <option value="">—</option>
                         {% for p in players_for_pairs %}
                         <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:2 }}, Р: {{ p.total_points|floatformat:0 }})</option>
                         {% endfor %}
                     </select>
                     <label class="mb-0">Игрок 2</label>
-                    <select name="player2_id" required class="form-select form-select-sm manage-player-select" style="width: auto; min-width: 18rem;">
+                    <select name="player2_id" required class="form-select form-select-sm manage-player-select">
                         <option value="">—</option>
                         {% for p in players_for_pairs %}
                         <option value="{{ p.pk }}">{{ p }} (УС: {{ p.ntrp_level|floatformat:2 }}, Р: {{ p.total_points|floatformat:0 }})</option>
@@ -269,7 +310,7 @@
             <p class="text-secondary small mt-2 mb-0">Чтобы составить пару, нужны заявки с публичной страницы (одиночные или полные команды).</p>
             {% endif %}
             {% if not tournament.bracket_generated %}
-            <form action="{% url 'tournament_manage_add_participant' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg participant-add-form" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+            <form action="{% url 'tournament_manage_add_participant' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg participant-add-form">
                 {% csrf_token %}
                 <h3 class="h6 mb-2">Добавить участника (одиночная заявка)</h3>
                 <div class="d-flex flex-wrap align-items-center gap-2 position-relative">
@@ -289,7 +330,7 @@
 
     <!-- Секция 2b: Одиночный ТВД — участники (до формирования групп) -->
     {% if not tvd_groups and not is_doubles_tvd %}
-    <div class="card mb-4">
+    <div class="card manage-card mb-4">
         <div class="card-body">
             <h2 class="section-title mb-3">Участники ({{ participants|length }})</h2>
             {% if participants %}
@@ -329,7 +370,7 @@
             <p class="text-secondary mb-0">Нет участников. Регистрация на публичной странице турнира.</p>
             {% endif %}
             {% if not tournament.bracket_generated %}
-            <form action="{% url 'tournament_manage_add_participant' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg participant-add-form" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+            <form action="{% url 'tournament_manage_add_participant' slug=tournament.slug %}" method="post" class="mt-4 manage-block-bg participant-add-form">
                 {% csrf_token %}
                 <h3 class="h6 mb-2">Добавить участника вручную</h3>
                 <div class="d-flex flex-wrap align-items-center gap-2 position-relative">
@@ -349,7 +390,7 @@
 
     <!-- Секция 3: Группы и матчи групп -->
     {% if tvd_groups %}
-    <div class="card mb-4">
+    <div class="card manage-card mb-4">
         <div class="card-body">
             <h2 class="section-title mb-3">Группы</h2>
             <div class="row g-4 tvd-groups-row">
@@ -374,7 +415,7 @@
 
     <!-- Секция 4: Плей-офф — визуальная турнирная сетка -->
     {% if tvd_main_matches or tvd_consolation_matches %}
-    <div class="card mb-4">
+    <div class="card manage-card mb-4">
         <div class="card-body">
             <h2 class="section-title mb-3">{{ matches_section_title }}</h2>
 
@@ -595,7 +636,7 @@
 
     <!-- Секция 5: Итоги -->
     {% if tvd_standings %}
-    <div class="card mb-4">
+    <div class="card manage-card mb-4">
         <div class="card-body">
             <h2 class="section-title mb-3">Итоги</h2>
             <div class="table-responsive">

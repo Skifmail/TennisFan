@@ -25,6 +25,7 @@ urlpatterns = [
     path("history/", views.adult_history, name="adult_history"),
     path("family/add/", views.child_form, name="add_child"),
     path("family/<int:pk>/", views.child_detail, name="child"),
+    path("family/<int:pk>/photo/", views.child_photo, name="child_photo"),
     path("family/<int:pk>/edit/", views.child_form, name="edit_child"),
     path("family/<int:pk>/consent/", views.consent_action, name="consent"),
     path("family/<int:pk>/matches/<int:match_id>/appeal/", views.appeal, name="appeal"),

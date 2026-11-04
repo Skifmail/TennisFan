@@ -267,7 +267,7 @@ def test_profile_distinguishes_verification_from_activation(
     assert "Ожидает активации" in html
     if verified:
         assert "Представитель подтверждён" in html
-        assert "Проверка пройдена" in html
+        assert "jl-badge--verified" in html
         assert "Представительство не проверено" not in html
         assert "организатор проверит ваши документы" not in html
         if has_release:
@@ -279,4 +279,4 @@ def test_profile_distinguishes_verification_from_activation(
     else:
         assert "Представительство ожидает проверки" in html
         assert "организатор проверит ваши документы" in html
-        assert "Проверка пройдена" not in html
+        assert "jl-badge--verified" not in html

@@ -842,3 +842,10 @@ SOCIAL_AUTH_PROVIDERS = {
     }
     for key in ("yandex", "vk")
 }
+
+# Закрытые фотографии детей не попадают в публичное медиа-хранилище.
+JUNIOR_PRIVATE_MEDIA_ROOT = Path(
+    os.environ.get(
+        "JUNIOR_PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media" / "juniors")
+    )
+)

@@ -1,5 +1,7 @@
 """Понятные формы семейного кабинета без скрытых полей полномочий."""
 
+from typing import Any
+
 from django import forms
 
 from apps.users.forms import UserRegistrationForm
@@ -39,11 +41,20 @@ class ChildForm(forms.ModelForm):
 
     accurate = forms.BooleanField(label=ACCURACY_CONFIRMATION)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, identity_locked=False, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.pk:
             self.fields.pop("processing_accepted")
             self.fields.pop("legal_release")
+            self.fields.pop("relation")
+            self.fields.pop("representative")
+            self.fields.pop("accurate")
+            if identity_locked:
+                for key in ("first_name", "last_name", "birth_date", "gender"):
+                    self.fields[key].disabled = True
+                    self.fields[key].help_text = (
+                        "Для исправления проверенных данных напишите на tennis@tennisfan.ru."
+                    )
         else:
             releases = LegalRelease.objects.filter(reviewed=True, is_current=True)
             self.fields["legal_release"].queryset = releases
@@ -56,12 +67,24 @@ class ChildForm(forms.ModelForm):
 
     class Meta:
         model = ChildProfile
-        fields = ("first_name", "last_name", "birth_date", "city", "gender", "ball")
+        fields = (
+            "first_name",
+            "last_name",
+            "birth_date",
+            "city",
+            "gender",
+            "ball",
+            "photo",
+        )
         widgets = {
-            "birth_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+            "birth_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "photo": forms.FileInput(
+                attrs={"accept": "image/jpeg,image/png,image/webp"}
+            ),
         }
         help_texts = {
             "birth_date": "Нужна для проверки возраста. Публично не показывается.",
+            "photo": "JPG, PNG или WebP, до 5 МБ. Фото видно только в семейном кабинете.",
             "ball": "Текущая ступень подготовки. Возрастные условия турниров проверяются отдельно.",
         }
 
@@ -70,6 +93,34 @@ class ChildForm(forms.ModelForm):
 
     def clean_last_name(self) -> str:
         return str(self.cleaned_data["last_name"]).strip()
+
+    remove_photo = forms.BooleanField(label="Удалить фото", required=False)
+    photo_accepted = forms.BooleanField(
+        label="Я разрешаю хранить фото ребёнка и показывать его только в семейном кабинете",
+        required=False,
+    )
+
+    def clean_photo(self) -> Any:
+        from .photos import prepare_photo
+
+        photo = self.cleaned_data.get("photo")
+        if photo and photo != self.instance.photo:
+            return prepare_photo(photo)
+        return photo
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        if self.files.get("photo") and not data.get("photo_accepted"):
+            self.add_error(
+                "photo_accepted",
+                "Подтвердите разрешение на фото для семейного кабинета.",
+            )
+        if self.files.get("photo") and data.get("remove_photo"):
+            self.add_error(
+                "photo",
+                "Выберите одно действие: загрузить новое фото или удалить текущее.",
+            )
+        return data
 
 
 class VerificationForm(forms.Form):
@@ -130,8 +181,8 @@ class ResultForm(forms.Form):
         label="Основание / причина исправления", max_length=255, required=False
     )
 
-    def clean(self):
-        data = super().clean()
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
         scores = []
         if not data.get("walkover"):
             try:
@@ -236,8 +287,8 @@ class TournamentFilterForm(forms.Form):
     )
     available = forms.BooleanField(label="Есть свободные места", required=False)
 
-    def clean(self):
-        data = super().clean()
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
         if (
             data.get("date_from")
             and data.get("date_to")

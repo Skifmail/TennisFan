@@ -49,3 +49,5 @@ media/
 .planning/
 AGENTS.md
 htmlcov/
+
+private_media/

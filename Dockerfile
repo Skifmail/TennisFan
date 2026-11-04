@@ -47,7 +47,8 @@ RUN python scripts/build_css_bundle.py \
        USE_S3=False USE_REDIS=False TELEGRAM_ENABLED=False \
        python manage.py collectstatic --noinput \
     && useradd --uid 10001 --create-home app \
-    && chown -R app:app /app/logs /app/staticfiles
+    && mkdir -p /app/private_media/juniors \
+    && chown -R app:app /app/logs /app/staticfiles /app/private_media
 
 EXPOSE 8000
 

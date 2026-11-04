@@ -57,6 +57,8 @@ def create_child(*, actor: User, data: dict[str, Any], relation: str) -> ChildPr
     )
     child.full_clean()
     child.save()
+    _update_photo(child, data, actor)
+    child.save()
     link = GuardianLink.objects.create(child=child, user=actor, relation=relation)
     ChildConsent.objects.create(
         guardian=link,
@@ -85,27 +87,74 @@ def create_child(*, actor: User, data: dict[str, Any], relation: str) -> ChildPr
 
 @transaction.atomic
 def update_draft(*, actor: User, child_id: int, data: dict[str, Any]) -> ChildProfile:
-    """Позволяет исправить собственный черновик до проверки документов."""
-    declarations = _declarations(data)
+    """Редактирует профиль семьи, сохраняя проверенные сведения и допуск по мячу."""
     child = ChildProfile.objects.select_for_update(of=("self",)).get(pk=child_id)
     link = guardian_for(actor, child, verified=False)
-    if (
-        child.status != ChildProfile.Status.DRAFT
-        or link.status == GuardianLink.Status.VERIFIED
+    if child.status == ChildProfile.Status.ARCHIVED:
+        raise ValidationError("Архивный профиль нельзя редактировать.")
+    locked = (
+        bool(child.birth_verified_at)
+        or child.status != "draft"
+        or link.status == "verified"
+    )
+    identity = ("first_name", "last_name", "birth_date", "gender")
+    if locked and any(
+        key in data and data[key] != getattr(child, key) for key in identity
     ):
-        raise ValidationError("Данные проверенного профиля изменяются через поддержку.")
-    for field in ("first_name", "last_name", "birth_date", "city", "gender", "ball"):
-        if field in data:
+        raise ValidationError(
+            "ФИО, дату рождения и пол после проверки исправляет администратор. Напишите на tennis@tennisfan.ru."
+        )
+    if (
+        data.get("ball", child.ball) != child.ball
+        and child.entries.filter(
+            status__in=["confirmed", "payment", "waitlist"],
+            tournament__status__in=["open", "closed", "active"],
+        ).exists()
+    ):
+        raise ValidationError(
+            "Нельзя менять мяч, пока есть действующая заявка на турнир. Сначала снимите заявку или обратитесь к организатору."
+        )
+    changed = []
+    for field in (*identity, "city", "ball"):
+        if field in data and data[field] != getattr(child, field):
             setattr(child, field, data[field])
+            changed.append(field)
+    _update_photo(child, data, actor)
     child.full_clean()
     child.save()
     AuditEvent.objects.create(
-        actor=actor,
-        child=child,
-        action="child.updated",
-        details={"declarations": declarations},
+        actor=actor, child=child, action="child.updated", details={"fields": changed}
     )
     return cast(ChildProfile, child)
+
+
+def _update_photo(child: ChildProfile, data: dict[str, Any], actor: User) -> None:
+    """Сохраняет закрытое фото и подтверждение, удаляет заменённый файл после транзакции."""
+    from .photos import prepare_photo
+
+    old_name = child.photo.name
+    photo = data.get("photo")
+    if data.get("remove_photo"):
+        child.photo = ""
+    elif photo and photo != child.photo:
+        if data.get("photo_accepted") is not True:
+            raise ValidationError(
+                "Подтвердите разрешение на фото для семейного кабинета."
+            )
+        child.photo = prepare_photo(photo)
+        AuditEvent.objects.create(
+            actor=actor,
+            child=child,
+            action="photo.accepted",
+            details={
+                "text": "Я разрешаю хранить фото ребёнка и показывать его только в семейном кабинете"
+            },
+        )
+    else:
+        return
+    if old_name:
+        storage = child.photo.storage
+        transaction.on_commit(lambda: storage.delete(old_name))
 
 
 @transaction.atomic

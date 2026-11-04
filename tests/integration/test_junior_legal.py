@@ -218,7 +218,8 @@ def test_simple_profile_form_separates_confirmations_and_creates_closed_profile(
     html = response.content.decode()
     for name in ("representative", "accurate", "processing_accepted"):
         assert html.count(f'name="{name}"') == 1
-    assert 'type="file"' not in html
+    assert html.count('type="file"') == 1
+    assert 'name="photo"' in html
     assert 'name="publication"' not in html
     response = client.post(
         "/kids/family/add/",

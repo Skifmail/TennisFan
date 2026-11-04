@@ -65,3 +65,5 @@ test-results/
 backups/
 .ssh/
 .aws/
+
+private_media/

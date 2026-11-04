@@ -31,6 +31,7 @@ class JuniorDevelopmentMiddleware(MiddlewareMixin):
             "tournament",
             "family",
             "child",
+            "child_photo",
             "adult_history",
             "payments",
         }

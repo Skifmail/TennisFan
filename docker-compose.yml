@@ -73,6 +73,8 @@ services:
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
       GUNICORN_GRACEFUL_TIMEOUT: ${GUNICORN_GRACEFUL_TIMEOUT:-30}
       GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
+    volumes:
+      - junior_private_media:/app/private_media
     expose:
       - "8000"
     deploy:
@@ -133,3 +135,6 @@ services:
       replicas: 1
       restart_policy:
         condition: any
+
+volumes:
+  junior_private_media:

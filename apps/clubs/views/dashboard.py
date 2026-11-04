@@ -17,6 +17,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from apps.core.sports import Sport
 from apps.tournaments.models import (
+    MANUAL_PAIRING_FORMATS_NOTE,
     Match,
     MatchResultProposal,
     Tournament,
@@ -1633,6 +1634,7 @@ def tournament_create(request: HttpRequest, slug: str) -> HttpResponse:
             "can_create": can_create,
             "is_pro": is_pro,
             "page_mode": "create",
+            "manual_pairing_note": MANUAL_PAIRING_FORMATS_NOTE,
         },
     )
 
@@ -1716,6 +1718,7 @@ def tournament_edit(
                             "can_create": True,
                             "is_pro": is_pro,
                             "page_mode": "edit",
+                            "manual_pairing_note": MANUAL_PAIRING_FORMATS_NOTE,
                             "tournament": tournament,
                             "structure_locked": structure_locked,
                         },
@@ -1751,6 +1754,7 @@ def tournament_edit(
             "can_create": True,
             "is_pro": is_pro,
             "page_mode": "edit",
+            "manual_pairing_note": MANUAL_PAIRING_FORMATS_NOTE,
             "tournament": tournament,
             "structure_locked": structure_locked,
         },

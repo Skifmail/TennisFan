@@ -13,7 +13,14 @@ from .fan import (
     ensure_consolation_created,
     finalize_tournament,
 )
-from .models import Match, MatchResultProposal, Tournament, TournamentTeam
+from .manual_pairing import maybe_autoadvance_manual
+from .models import (
+    Match,
+    MatchResultProposal,
+    Tournament,
+    TournamentFormat,
+    TournamentTeam,
+)
 from .olympic_consolation import (
     _is_olympic,
     advance_winner_olympic,
@@ -36,6 +43,38 @@ from .tvd import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _handle_manual_bracket_completion(
+    tournament: Tournament | None,
+    match: Match,
+    *,
+    skip_points: bool,
+    mutual_no_show: bool,
+) -> bool:
+    """Продолжить турнир с ручным формированием пар после результата матча.
+
+    Args:
+        tournament: Турнир матча.
+        match: Завершённый матч.
+        skip_points: Не начислять очки за победу.
+        mutual_no_show: Обе стороны не явились.
+
+    Returns:
+        bool: True, если турнир использует ручной режим и обработан здесь.
+    """
+    if tournament is None or not tournament.uses_manual_pairing():
+        return False
+    if match.is_consolation:
+        return True
+    if tournament.format == TournamentFormat.SINGLE_ELIMINATION:
+        if not mutual_no_show:
+            advance_winner_and_award_loser(match, skip_points=skip_points)
+        maybe_autoadvance_manual(tournament)
+    elif tournament.format == TournamentFormat.ROUND_ROBIN:
+        check_and_finalize_if_complete(tournament)
+    return True
+
 
 _MATCH_RESULT_FIELDS: tuple[str, ...] = (
     "winner_id",
@@ -168,6 +207,8 @@ def notify_telegram_match_created(sender, instance, created, **kwargs):
     if not created:
         return
     if not instance.player1_id and not instance.team1_id:
+        return
+    if instance.is_bye_match():
         return
     try:
         from apps.telegram_bot.notifications import notify_match_created
@@ -370,6 +411,13 @@ def update_player_stats(sender, instance, created, **kwargs):
         skip_season_points = True
         if match.is_sparring():
             return
+        if _handle_manual_bracket_completion(
+            t,
+            match,
+            skip_points=skip_season_points,
+            mutual_no_show=mutual_no_show,
+        ):
+            return
         if t and _is_olympic(t):
             advance_winner_olympic(match, skip_points=skip_season_points)
             if match.round_index >= 1 and not match.is_consolation:
@@ -500,6 +548,14 @@ def update_player_stats(sender, instance, created, **kwargs):
     if match.is_sparring():
         # Спарринговые матчи не участвуют в турнирной логике
         logger.debug("Match %s: sparring match, skipping tournament logic", match.pk)
+        return
+
+    if _handle_manual_bracket_completion(
+        t,
+        match,
+        skip_points=skip_season_points,
+        mutual_no_show=mutual_no_show,
+    ):
         return
 
     if t and _is_olympic(t):

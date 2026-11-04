@@ -921,32 +921,6 @@
     border-radius: 12px;
 }
 
-.jlh-empty__art span {
-    position: absolute;
-    border: 1px solid rgb(166 130 74 / 48%);
-}
-
-.jlh-empty__art span:nth-child(1) {
-    inset: 16% 8%;
-    border-radius: 2px;
-}
-
-.jlh-empty__art span:nth-child(2) {
-    top: 50%;
-    right: 8%;
-    left: 8%;
-    height: 0;
-    border-width: 1px 0 0;
-}
-
-.jlh-empty__art span:nth-child(3) {
-    top: 16%;
-    bottom: 16%;
-    left: 50%;
-    width: 0;
-    border-width: 0 0 0 1px;
-}
-
 .jlh-empty__art--calendar {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -955,9 +929,8 @@
 }
 
 .jlh-empty__art--calendar span {
-    position: static;
+    border: 1px solid rgb(166 130 74 / 22%);
     border-radius: 6px;
-    border-color: rgb(166 130 74 / 22%);
     background: rgb(166 130 74 / 4%);
 }
 
@@ -970,31 +943,49 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    gap: 10px;
-    padding: 0 12%;
+    gap: 12px;
+    padding: 0 10%;
     aspect-ratio: 1.6;
     border: 0;
     background: none;
 }
 
+.jlh-empty__art--podium::before {
+    content: "";
+    position: absolute;
+    right: 8%;
+    bottom: 0;
+    left: 8%;
+    height: 1px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgb(166 130 74 / 38%),
+        transparent
+    );
+}
+
 .jlh-empty__art--podium span {
     position: static;
-    width: 26%;
-    border-radius: 6px 6px 0 0;
-    background: linear-gradient(180deg, rgb(166 130 74 / 30%), rgb(166 130 74 / 6%));
+    width: 28%;
+    border: 1px solid rgb(166 130 74 / 32%);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: linear-gradient(180deg, rgb(166 130 74 / 32%), rgb(166 130 74 / 5%));
 }
 
 .jlh-empty__art--podium span:nth-child(1) {
-    height: 40%;
+    height: 42%;
 }
 
 .jlh-empty__art--podium span:nth-child(2) {
-    height: 64%;
+    height: 68%;
 }
 
 .jlh-empty__art--podium span:nth-child(3) {
     height: 100%;
-    border-color: rgb(166 130 74 / 60%);
+    border-color: rgb(166 130 74 / 62%);
+    background: linear-gradient(180deg, rgb(166 130 74 / 46%), rgb(166 130 74 / 7%));
 }
 
 .jlh-board {

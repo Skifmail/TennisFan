@@ -6248,6 +6248,37 @@
     line-height: 1.5;
 }
 
+.club-tournament-create__note {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 var(--spacing-lg);
+    padding: 12px 14px;
+    border: 1px solid rgba(201, 168, 76, 0.28);
+    border-radius: 14px;
+    background: rgba(201, 168, 76, 0.08);
+    color: rgba(226, 232, 240, 0.86);
+    font-size: 0.84rem;
+    line-height: 1.55;
+}
+
+.club-tournament-create__note-mark {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    border-radius: 50%;
+    background: rgba(201, 168, 76, 0.22);
+    color: #e8d9a8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 1;
+}
+
 .club-tournament-create__error {
     margin: 7px 0 0;
     color: #fca5a5;

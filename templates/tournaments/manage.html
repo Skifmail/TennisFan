@@ -65,11 +65,45 @@
             <h2 class="section-title mb-3">Действия</h2>
             <div class="manage-page__actions">
                 {% if can_generate_primary_structure %}
-                <form action="{% url 'tournament_manage_generate_bracket' slug=tournament.slug %}" method="post" class="d-inline">
+                <form action="{% url 'tournament_manage_generate_bracket' slug=tournament.slug %}" method="post" class="manage-start-form">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">{{ generate_primary_structure_label }}</button>
+                    {% if supports_manual_pairing %}
+                    <fieldset class="manage-start-mode">
+                        <legend class="manage-start-mode__legend">Как запустить турнир?</legend>
+                        <label class="manage-start-mode__option">
+                            <input type="radio" name="pairing_mode" value="auto" {% if not tournament.uses_manual_pairing %}checked{% endif %}>
+                            <span class="manage-start-mode__body">
+                                <span class="manage-start-mode__title">Автоматически</span>
+                                <span class="manage-start-mode__hint">
+                                    {% if tournament.format == 'round_robin' %}
+                                    Система сама составит расписание туров без повторных пар.
+                                    {% else %}
+                                    Система сама распределит пары по силе и построит сетку.
+                                    {% endif %}
+                                </span>
+                            </span>
+                        </label>
+                        <label class="manage-start-mode__option">
+                            <input type="radio" name="pairing_mode" value="manual" {% if tournament.uses_manual_pairing %}checked{% endif %}>
+                            <span class="manage-start-mode__body">
+                                <span class="manage-start-mode__title">Вручную</span>
+                                <span class="manage-start-mode__hint">Вы составите пары из зарегистрированных участников. Удобно для контроля пар.</span>
+                            </span>
+                        </label>
+                    </fieldset>
+                    {% else %}
+                    <input type="hidden" name="pairing_mode" value="auto">
+                    {% endif %}
+                    <div class="manage-start-submit">
+                        <button type="submit" class="btn btn-primary">{{ generate_primary_structure_label }}</button>
+                        <span class="text-secondary small">Можно запустить с текущим составом, не дожидаясь минимума.</span>
+                    </div>
                 </form>
-                <span class="text-secondary small">Можно запустить с текущим составом, не дожидаясь минимума.</span>
+                {% endif %}
+                {% if can_manage_manual_pairs %}
+                <a href="{% url 'tournament_manage_pairs' slug=tournament.slug %}" class="btn btn-primary">
+                    {% if manual_pairs_have_matches %}Пары и результаты{% else %}Составить пары{% endif %}
+                </a>
                 {% endif %}
                 {% if can_generate_groups %}
                 <form action="{% url 'tournament_manage_generate_groups' slug=tournament.slug %}" method="post" class="d-inline">

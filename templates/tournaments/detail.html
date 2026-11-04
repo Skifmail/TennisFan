@@ -189,7 +189,7 @@
                         <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_match_format_display }}</span>
                         {% endif %}
                         {% elif tournament.format == 'weekend_day' %}
-                        <span class="tournament-card__chip tournament-card__chip--format" title="{{ tournament.get_format_display }}">ДНЕВНОЙ</span>
+                        <span class="tournament-card__chip tournament-card__chip--format" title="Групповой этап, затем плей-офф и утешительная сетка">ГРУППЫ</span>
                         {% endif %}
                         {% if tournament.allow_postpayment %}
                         <span
@@ -364,7 +364,7 @@
                             </span>
                         </div>
                         <div class="tournament-meta-row">
-                            <span class="tournament-meta-label">Формат проведения</span>
+                            <span class="tournament-meta-label">Длительность</span>
                             <span class="tournament-meta-value">
                                 {% if tournament.is_one_day %}
                                     Однодневный турнир

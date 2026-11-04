@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+
+{% block title %}Пары турнира: {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container pairs-page" style="padding-top: var(--spacing-2xl);">
+    <nav class="manage-crumbs mb-3" aria-label="Навигация">
+        <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="manage-crumbs__link">&larr; Управление</a>
+        <span class="manage-crumbs__sep" aria-hidden="true">/</span>
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="manage-crumbs__link manage-crumbs__name" title="{{ tournament.name }}">{{ tournament.name }}</a>
+        <span class="manage-crumbs__sep" aria-hidden="true">/</span>
+        <span class="manage-crumbs__current" aria-current="page">Пары</span>
+    </nav>
+
+    <header class="pairs-hero">
+        <div class="pairs-hero__main">
+            <p class="pairs-hero__eyebrow">{{ tournament.get_format_display }} · ручной запуск</p>
+            <h1 class="pairs-hero__title">Формирование пар</h1>
+            <p class="pairs-hero__subtitle">
+                {% if is_doubles %}Пары команд{% else %}Пары игроков{% endif %} отсортированы по силе — сильнейшие сверху.
+                {% if state.is_started %}Турнир уже запущен, участники получили уведомление.{% endif %}
+            </p>
+        </div>
+        <div class="pairs-hero__stats" aria-label="Сводка">
+            <div class="pairs-stat">
+                <span class="pairs-stat__value">{{ state.total_entities }}</span>
+                <span class="pairs-stat__label">участников</span>
+            </div>
+            <div class="pairs-stat">
+                <span class="pairs-stat__value">{{ state.rounds|length }}</span>
+                <span class="pairs-stat__label">кругов создано</span>
+            </div>
+            {% if state.open_round %}
+            <div class="pairs-stat">
+                <span class="pairs-stat__value">№{{ state.open_round }}</span>
+                <span class="pairs-stat__label">текущий круг</span>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if not state.is_started %}
+    <section class="pairs-card pairs-intro">
+        <div class="pairs-intro__icon" aria-hidden="true">{% if postpayment_pending %}₽{% else %}1{% endif %}</div>
+        <div>
+            {% if postpayment_pending %}
+            <h2 class="pairs-card__title">Идёт окно постоплаты</h2>
+            <p class="pairs-card__text">
+                Турнир запустится автоматически, когда взнос оплатят все участники или истечёт срок.
+                {% if postpayment_pending_count %}Ожидают оплату: {{ postpayment_pending_count }}.{% endif %}
+            </p>
+            <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="btn btn-outline-primary mt-3">Вернуться в управление</a>
+            {% else %}
+            <h2 class="pairs-card__title">Турнир ещё не запущен</h2>
+            <p class="pairs-card__text">
+                Запуск закроет регистрацию, переведёт турнир в статус «Активный» и отправит участникам
+                уведомление о начале. После этого вы составите пары первого круга.
+            </p>
+            <form action="{% url 'tournament_manage_pairs_start' slug=tournament.slug %}" method="post" class="mt-3">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary">Запустить турнир и составить пары</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+    {% elif state.is_complete %}
+    <section class="pairs-card pairs-complete">
+        <div class="pairs-intro__icon" aria-hidden="true">✓</div>
+        <div>
+            <h2 class="pairs-card__title">Турнир завершён</h2>
+            <p class="pairs-card__text">Все матчи сыграны, итоги подведены. Изменить пары больше нельзя.</p>
+            <a href="{% url 'tournament_manage' slug=tournament.slug %}" class="btn btn-outline-primary mt-3">Вернуться в управление</a>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if form_error %}
+    <div class="alert alert-error pairs-form-error" role="alert">
+        <strong>Пары не сохранены.</strong> {{ form_error }}
+    </div>
+    {% endif %}
+
+    {% if state.is_started and not state.is_complete %}
+    {% if state.rounds %}
+    <section class="pairs-rounds" aria-labelledby="pairs-rounds-title">
+        <div class="pairs-section-head">
+            <div>
+                <h2 class="pairs-section-title" id="pairs-rounds-title">Круги турнира</h2>
+                <p class="pairs-section-hint">Пару можно изменить, пока по матчу не внесён результат.</p>
+            </div>
+        </div>
+
+        {% for round in round_views %}
+        <article class="pairs-round" id="round-{{ round.index }}">
+            <header class="pairs-round__head">
+                <div class="pairs-round__title-wrap">
+                    <h3 class="pairs-round__title">{{ round.label }}</h3>
+                    {% if round.is_complete %}
+                    <span class="pairs-badge pairs-badge--done">Завершён</span>
+                    {% else %}
+                    <span class="pairs-badge">Идёт</span>
+                    {% endif %}
+                </div>
+                <span class="pairs-round__progress">{{ round.played_count }} из {{ round.total_count }} матчей сыграно</span>
+            </header>
+
+            <div class="pairs-round__matches">
+                {% for item in round.matches %}
+                <div class="pairs-match {% if item.is_bye %}pairs-match--bye{% endif %}">
+                    {% include 'includes/manage_bracket_match.html' with match=item.match tournament=tournament %}
+                    {% if item.is_bye %}
+                    <p class="pairs-match__note">Технический проход: участник автоматически идёт дальше.</p>
+                    {% elif item.editable %}
+                    <details class="pairs-edit">
+                        <summary class="pairs-edit__summary">Изменить пару</summary>
+                        <form
+                            action="{% url 'tournament_manage_pair_update' slug=tournament.slug pk=item.match.pk %}"
+                            method="post"
+                            class="pairs-edit__form"
+                            data-pair-form
+                            data-scope="round-{{ round.index }}"
+                        >
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ next_url }}">
+                            <div class="pairs-edit__fields">
+                                <label class="pairs-field">
+                                    <span class="pairs-field__label">Участник 1</span>
+                                    <select name="token_a" class="form-select pairs-select" data-pair-select required>
+                                        <option value="">— выберите —</option>
+                                        {% for entity in round.options %}
+                                        <option value="{{ entity.token }}" data-strength="{{ entity.strength_label }}" {% if entity.token == item.token_a %}selected{% endif %}>{{ entity.name }} · {{ entity.strength_label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <span class="pairs-edit__vs" aria-hidden="true">vs</span>
+                                <label class="pairs-field">
+                                    <span class="pairs-field__label">Участник 2</span>
+                                    <select name="token_b" class="form-select pairs-select" data-pair-select required>
+                                        <option value="">— выберите —</option>
+                                        {% for entity in round.options %}
+                                        <option value="{{ entity.token }}" data-strength="{{ entity.strength_label }}" {% if entity.token == item.token_b %}selected{% endif %}>{{ entity.name }} · {{ entity.strength_label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                            </div>
+                            <p class="pairs-edit__hint">Можно выбрать участника из другой пары этого круга — система поменяет их местами.</p>
+                            <div class="pairs-edit__actions">
+                                <label class="pairs-rematch-check" data-rematch-check hidden>
+                                    <input type="checkbox" name="allow_rematch" value="1">
+                                    <span>Да, повторная пара допустима</span>
+                                </label>
+                                <button type="submit" class="btn btn-sm btn-primary">Сохранить пару</button>
+                            </div>
+                            <p class="pairs-rematch-note" data-rematch-note hidden></p>
+                        </form>
+                    </details>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if state.open_round and not state.can_build %}
+    <div class="pairs-notice">
+        <span class="pairs-notice__icon" aria-hidden="true">i</span>
+        <p>
+            Сейчас идёт <strong>{{ state.open_round }}-й круг</strong>. Внесите результаты всех его матчей —
+            после этого здесь появится форма для следующего круга.
+        </p>
+    </div>
+    {% endif %}
+
+    {% if state.can_build %}
+    <section class="pairs-card pairs-builder" id="builder" aria-labelledby="builder-title">
+        <header class="pairs-builder__head">
+            <div>
+                <p class="pairs-builder__eyebrow">{% if state.rounds %}Следующий круг{% else %}Первый круг{% endif %}</p>
+                <h2 class="pairs-card__title" id="builder-title">{{ state.build_label }}</h2>
+                <p class="pairs-card__text">
+                    Выберите пары. Уже распределённые участники исчезают из остальных списков.
+                    {% if requires_leftover %}Один участник останется отдыхать — система покажет его автоматически.{% endif %}
+                </p>
+            </div>
+            <div class="pairs-builder__tools">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-fill-by-strength>Расставить по силе</button>
+                <button type="button" class="btn btn-sm btn-outline" data-clear-pairs>Очистить</button>
+            </div>
+        </header>
+
+        <div class="pairs-progress" aria-live="polite">
+            <div class="pairs-progress__bar"><span data-progress-bar></span></div>
+            <p class="pairs-progress__text" data-progress-text>
+                Распределено 0 из {{ state.eligible|length }}
+            </p>
+        </div>
+
+        <form action="{% url 'tournament_manage_pairs_save' slug=tournament.slug %}" method="post" class="pairs-form" id="pairs-form" data-pairs-form>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next_url }}">
+            <input type="hidden" name="allow_rematch" value="0" data-allow-rematch>
+            <input type="hidden" name="leftover_token" value="{{ initial_leftover }}" data-leftover-input>
+
+            <div class="pairs-rows" data-pairs-rows>
+                {% for row_index in builder_rows %}
+                <div class="pairs-row" data-pair-row>
+                    <span class="pairs-row__number" data-row-number>{{ forloop.counter }}</span>
+                    <label class="pairs-field">
+                        <span class="pairs-field__label">Участник 1</span>
+                        <select name="pair_{{ forloop.counter }}_a" class="form-select pairs-select" data-pair-select data-builder-select>
+                            <option value="">— выберите —</option>
+                            {% for entity in state.eligible %}
+                            <option value="{{ entity.token }}" data-strength="{{ entity.strength_label }}">{{ entity.name }} · {{ entity.strength_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <span class="pairs-row__vs" aria-hidden="true">vs</span>
+                    <label class="pairs-field">
+                        <span class="pairs-field__label">Участник 2</span>
+                        <select name="pair_{{ forloop.counter }}_b" class="form-select pairs-select" data-pair-select data-builder-select>
+                            <option value="">— выберите —</option>
+                            {% for entity in state.eligible %}
+                            <option value="{{ entity.token }}" data-strength="{{ entity.strength_label }}">{{ entity.name }} · {{ entity.strength_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button type="button" class="pairs-row__remove" data-remove-row aria-label="Убрать пару" title="Убрать пару">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button type="button" class="pairs-add-row" data-add-row>
+                <span aria-hidden="true">+</span> Добавить пару
+            </button>
+
+            {% if requires_leftover %}
+            <div class="pairs-leftover">
+                <label class="pairs-leftover__label" for="pairs-leftover-select">Кто отдыхает в этом круге?</label>
+                <select
+                    id="pairs-leftover-select"
+                    name="leftover_token"
+                    class="form-select pairs-select pairs-leftover__select"
+                    data-leftover-input
+                >
+                    <option value="">— выберите —</option>
+                    {% for entity in state.eligible %}
+                    <option value="{{ entity.token }}" {% if entity.token == initial_leftover %}selected{% endif %}>{{ entity.name }} · {{ entity.strength_label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="pairs-leftover__hint">Если оставить пустым, система выберет единственного свободного участника.</p>
+            </div>
+            {% else %}
+            <input type="hidden" name="leftover_token" value="">
+            {% endif %}
+
+            <p class="pairs-rematch-note pairs-rematch-note--builder" data-builder-rematch hidden></p>
+
+            <div class="pairs-form__footer">
+                <label class="pairs-switch">
+                    <input type="checkbox" name="auto_next" value="1" {% if auto_next %}checked{% endif %}>
+                    <span class="pairs-switch__track" aria-hidden="true"></span>
+                    <span class="pairs-switch__text">
+                        <strong>
+                            {% if tournament.format == 'round_robin' %}
+                            Автоматически составлять следующие туры
+                            {% else %}
+                            Автоматически продолжать сетку
+                            {% endif %}
+                        </strong>
+                        <small>
+                            {% if tournament.format == 'round_robin' %}
+                            После первого тура система сама построит расписание без повторных пар.
+                            {% else %}
+                            Следующий круг создастся сразу после результатов текущего.
+                            {% endif %}
+                        </small>
+                    </span>
+                </label>
+                <button type="submit" class="btn btn-primary pairs-submit">Проверить и сохранить круг</button>
+            </div>
+        </form>
+    </section>
+    {% endif %}
+
+    <section class="pairs-settings">
+        <div>
+            <h2 class="pairs-settings__title">Следующие круги</h2>
+            <p class="pairs-settings__text">
+                {% if tournament.manual_pairing_auto_next_rounds %}
+                    {% if tournament.format == 'round_robin' %}
+                    Туры расписаны автоматически без повторных пар — результаты матчей вы вносите вручную.
+                    {% else %}
+                    Сейчас система составляет следующие круги автоматически по результатам матчей.
+                    {% endif %}
+                {% else %}
+                Сейчас каждый следующий круг вы составляете вручную.
+                {% endif %}
+            </p>
+        </div>
+        <form action="{% url 'tournament_manage_pairs_settings' slug=tournament.slug %}" method="post" class="pairs-settings__form">
+            {% csrf_token %}
+            <label class="pairs-switch pairs-switch--compact">
+                <input type="checkbox" name="auto_next" value="1" {% if tournament.manual_pairing_auto_next_rounds %}checked{% endif %}>
+                <span class="pairs-switch__track" aria-hidden="true"></span>
+                <span class="pairs-switch__text"><strong>Автоматически</strong></span>
+            </label>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Сохранить</button>
+        </form>
+    </section>
+    {% endif %}
+</div>
+
+<dialog class="pairs-dialog" id="pairs-confirm-dialog" aria-labelledby="pairs-confirm-title">
+    <form method="dialog" class="pairs-dialog__body">
+        <p class="pairs-dialog__eyebrow">Проверьте круг</p>
+        <h2 class="pairs-dialog__title" id="pairs-confirm-title">Сохранить пары?</h2>
+        <p class="pairs-dialog__text">Матчи будут созданы, участники получат уведомления. Пары можно будет изменить до внесения результата.</p>
+        <ul class="pairs-dialog__list" data-summary-list></ul>
+        <p class="pairs-dialog__leftover" data-summary-leftover hidden></p>
+        <div class="pairs-dialog__warning" data-summary-warning hidden>
+            <strong>Есть повторные пары</strong>
+            <ul data-summary-rematches></ul>
+            <label class="pairs-rematch-check">
+                <input type="checkbox" value="1" data-confirm-rematch>
+                <span>Да, продолжить — повторные пары допустимы</span>
+            </label>
+        </div>
+        <div class="pairs-dialog__actions">
+            <button type="button" class="btn btn-outline" data-dialog-cancel>Вернуться</button>
+            <button type="button" class="btn btn-primary" data-dialog-confirm disabled>Сохранить круг</button>
+        </div>
+    </form>
+</dialog>
+
+{{ state.previously_played|json_script:"pairs-played" }}
+{{ initial_pairs|json_script:"pairs-initial" }}
+{{ initial_leftover|json_script:"pairs-leftover" }}
+{% endblock %}
+
+{% block extra_js %}
+<script defer src="{% static 'js/tournament-pairs.js' %}"></script>
+{% endblock %}

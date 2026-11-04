@@ -822,6 +822,13 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     total = main_matches.count()
     if total == 0:
         return False
+    if tournament.uses_manual_pairing():
+        from .manual_pairing import load_entities
+
+        entities_count = len(load_entities(tournament))
+        expected_matches = entities_count * (entities_count - 1) // 2
+        if total < expected_matches:
+            return False
     completed = (
         main_matches.filter(
             status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER]

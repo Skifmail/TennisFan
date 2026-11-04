@@ -23,6 +23,7 @@ from apps.users.skill_levels import skill_with_ntrp
 
 from .fan import generate_bracket
 from .models import (
+    MANUAL_PAIRING_FORMATS_NOTE,
     HeadToHead,
     Match,
     MatchResultProposal,
@@ -263,6 +264,8 @@ def _admin_generate_bracket_after_postpayment(
     if tournament.bracket_generated and not tournament_has_generated_matches(
         tournament
     ):
+        if tournament.manual_pairing_has_started():
+            return True
         tournament.bracket_generated = False
         tournament.save(update_fields=["bracket_generated", "updated_at"])
     ok, msg = generate_fn(tournament)
@@ -281,7 +284,7 @@ def generate_round_robin_bracket_action(modeladmin, request, queryset):
         )
 
 
-@admin.action(description="Сформировать группы (ТВД)")
+@admin.action(description="Сформировать группы")
 def generate_tvd_groups_action(modeladmin, request, queryset):
     for t in queryset:
         ok, msg = tvd_generate_groups(t)
@@ -291,7 +294,7 @@ def generate_tvd_groups_action(modeladmin, request, queryset):
             messages.warning(request, f"{t.name}: {msg}")
 
 
-@admin.action(description="Сформировать плей-офф (ТВД)")
+@admin.action(description="Сформировать плей-офф")
 def generate_tvd_playoffs_action(modeladmin, request, queryset):
     for t in queryset:
         ok, msg = tvd_generate_playoffs(t)
@@ -301,7 +304,7 @@ def generate_tvd_playoffs_action(modeladmin, request, queryset):
             messages.warning(request, f"{t.name}: {msg}")
 
 
-@admin.action(description="Завершить турнир (ТВД)")
+@admin.action(description="Завершить турнир")
 def finalize_tvd_action(modeladmin, request, queryset):
     for t in queryset:
         ok, msg = tvd_check_and_finalize(t)
@@ -311,9 +314,9 @@ def finalize_tvd_action(modeladmin, request, queryset):
             messages.warning(request, f"{t.name}: {msg}")
 
 
-@admin.action(description="Дозаполнить итоги ТВД (места 5+)")
+@admin.action(description="Дозаполнить итоги (места 5+)")
 def backfill_tvd_standings_action(modeladmin, request, queryset):
-    """Для уже завершённых ТВД: присвоить места 5–8 и 9+ всем участникам без результата."""
+    """Для завершённых турниров: присвоить места 5–8 и 9+ участникам без результата."""
     from .models import TournamentStatus
 
     for t in queryset.filter(status=TournamentStatus.COMPLETED):
@@ -358,6 +361,15 @@ class TournamentAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if "format" in self.fields:
+            details = mark_safe(
+                str(self.fields["format"].help_text or "").replace("\n", "<br>")
+            )
+            self.fields["format"].help_text = format_html(
+                "<strong>{}</strong><br><br>{}",
+                MANUAL_PAIRING_FORMATS_NOTE,
+                details,
+            )
         if self.instance and self.instance.pk:
             self.fields["allowed_categories"].initial = list(
                 self.instance.allowed_categories.values_list("category", flat=True)
@@ -426,7 +438,9 @@ class TournamentAdminForm(forms.ModelForm):
             if is_one_day:
                 raise ValidationError("Постоплата недоступна для однодневных турниров.")
             if tournament_format == "weekend_day":
-                raise ValidationError("Постоплата недоступна для формата ТВД.")
+                raise ValidationError(
+                    "Постоплата недоступна для формата «Группы + плей-офф»."
+                )
             if entry_fee is None or float(entry_fee or 0) <= 0:
                 raise ValidationError(
                     "Постоплата доступна только при вступительном взносе больше 0 ₽."
@@ -1355,7 +1369,7 @@ class TVDGroupInline(admin.TabularInline):
 
 
 class TVDTournamentAdminForm(TournamentAdminForm):
-    """Форма ТВД: format и is_one_day выставляются автоматически, добавлено поле «Бесплатный»."""
+    """Форма раздела «Группы + плей-офф»: format и is_one_day выставляются автоматически."""
 
     is_free = forms.BooleanField(
         required=False,
@@ -1423,10 +1437,18 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     fieldsets = (
         (
             "Базовая информация",
-            {"fields": ("name", "slug", "description", "regulation_extra", "image")},
+            {
+                "fields": ("name", "slug", "description", "regulation_extra", "image"),
+                "description": (
+                    "В этом разделе формат фиксирован: группы + плей-офф. "
+                    "Пары здесь всегда строятся автоматически. Полностью ручное "
+                    "управление доступно только в форматах «Олимпийский (до 1 "
+                    "поражения)» и «Круговой» при обычном создании турнира."
+                ),
+            },
         ),
         (
-            "ТВД (формат и участники)",
+            "Группы + плей-офф (формат и участники)",
             {
                 "fields": (
                     "sport",
@@ -1471,7 +1493,7 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
 
     def get_queryset(self, request):
         """
-        Только однодневные (ТВД) турниры платформы без клуба-организатора.
+        Только турниры «Группы + плей-офф» платформы без клуба-организатора.
 
         Args:
             request: HTTP-запрос админки.
@@ -1489,7 +1511,7 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         from .models import TournamentDuration, TournamentFormat
 
         obj.format = TournamentFormat.WEEKEND_DAY
-        obj.is_one_day = True  # ТВД всегда однодневный
+        obj.is_one_day = True  # Раздел создаёт однодневные турниры.
         obj.duration = TournamentDuration.SINGLE_DAY
         if form.cleaned_data.get("is_free"):
             obj.entry_fee = 0
@@ -2310,7 +2332,7 @@ class TournamentPlayerResultAdmin(admin.ModelAdmin):
 
 @admin.register(TVDGroup)
 class TVDGroupAdmin(admin.ModelAdmin):
-    """Группы ТВД. Участников можно редактировать во вкладке ниже."""
+    """Группы турнира «Группы + плей-офф». Участников можно редактировать ниже."""
 
     list_display = ("tournament", "name", "order", "is_completed")
     list_filter = ("tournament", "is_completed")
@@ -2321,7 +2343,7 @@ class TVDGroupAdmin(admin.ModelAdmin):
 
 @admin.register(TVDGroupMember)
 class TVDGroupMemberAdmin(admin.ModelAdmin):
-    """Участник группы ТВД (ручное редактирование мест и статистики)."""
+    """Участник группы (ручное редактирование мест и статистики)."""
 
     list_display = (
         "group",

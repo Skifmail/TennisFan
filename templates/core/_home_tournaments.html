@@ -111,7 +111,7 @@
                         {% elif tournament.format == 'round_robin' %}
                         <span class="badge badge-soft">Круговой</span>
                         {% elif tournament.format == 'weekend_day' %}
-                        <span class="badge badge-soft">OneDay</span>
+                        <span class="badge badge-soft" title="Групповой этап, затем плей-офф и утешительная сетка">Группы</span>
                         {% else %}
                         <span class="badge badge-soft">{{ tournament.get_format_display }}</span>
                         {% endif %}

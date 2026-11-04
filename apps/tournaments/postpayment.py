@@ -1225,6 +1225,8 @@ def finalize_postpayment_window(tournament: Tournament) -> tuple[bool, str]:
     if tournament.bracket_generated and not tournament_has_generated_matches(
         tournament
     ):
+        if tournament.manual_pairing_has_started():
+            return True, "Турнир запущен в ручном режиме — пары составляет организатор."
         logger.warning(
             "Турнир %s: флаг bracket_generated без матчей — сбрасываем и формируем сетку",
             tournament.slug,

@@ -544,6 +544,18 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         self.assertContains(response, 'name="sport"')
         self.assertContains(response, "Падел")
 
+    def test_create_form_explains_manual_control_formats(self) -> None:
+        """Клубный админ видит, в каких форматах доступно ручное управление."""
+        response = self.client.get(
+            reverse("clubs:tournament_create", kwargs={"slug": self.club.slug}),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Полностью ручное управление")
+        self.assertContains(
+            response, "В остальных форматах пары строятся автоматически"
+        )
+
     def test_club_tournament_list_filters_by_padel(self) -> None:
         tennis = Tournament.objects.create(
             name="Клубный теннис",

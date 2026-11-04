@@ -1,5 +1,5 @@
 """
-Турнир выходного дня (ТВД): группы (мини-круговой) + плей-офф (нокаут) + утешительная сетка.
+Формат «Группы + плей-офф»: группы (мини-круговой) + плей-офф (нокаут) + утешительная сетка.
 Поддержка 2–6 групп, посев змейкой по Elo, продвижение по сетке.
 """
 
@@ -151,7 +151,7 @@ def generate_groups(tournament: Tournament) -> tuple[bool, str]:
     Одиночный: участники — игроки. Парный: участники — полные команды (player2 не null).
     """
     if not _is_tvd(tournament):
-        return False, "Турнир не в формате ТВД."
+        return False, "Турнир не в формате «Группы + плей-офф»."
     if tournament.bracket_generated:
         return False, "Группы уже сформированы (сетка зафиксирована)."
 
@@ -167,7 +167,7 @@ def generate_groups(tournament: Tournament) -> tuple[bool, str]:
         )
         n = len(full_teams)
         if n < 4:
-            return False, "Нужно минимум 4 полные команды для формирования групп ТВД."
+            return False, "Нужно минимум 4 полные команды для формирования групп."
         sizes = calculate_group_structure(n)
         group_count = len(sizes)
         if group_count < 2 or group_count > 6:
@@ -219,7 +219,7 @@ def generate_groups(tournament: Tournament) -> tuple[bool, str]:
         )
         n = len(participants)
         if n < 4:
-            return False, "Нужно минимум 4 участника для формирования групп ТВД."
+            return False, "Нужно минимум 4 участника для формирования групп."
         sizes = calculate_group_structure(n)
         group_count = len(sizes)
         if group_count < 2 or group_count > 6:
@@ -651,7 +651,7 @@ def generate_main_bracket(
     bracket_format: "olympic" (нокаут) или "circular" (круговой).
     """
     if not _is_tvd(tournament):
-        return False, "Турнир не в формате ТВД."
+        return False, "Турнир не в формате «Группы + плей-офф»."
     if tournament.status == TournamentStatus.PLAYOFFS:
         return False, "Плей-офф уже сформирован."
     data = _collect_place_123(tournament)
@@ -690,7 +690,7 @@ def generate_consolation_bracket(
     Разрешается при любом числе третьих мест (2–6).
     """
     if not _is_tvd(tournament):
-        return False, "Турнир не в формате ТВД."
+        return False, "Турнир не в формате «Группы + плей-офф»."
     data = _collect_place_123(tournament)
     if not data:
         return False, "Не все группы завершены или неподдерживаемое число групп."
@@ -917,7 +917,7 @@ def generate_playoffs(
     skip_consolation: если True, создаётся только основная сетка (для generate_main_bracket).
     """
     if not _is_tvd(tournament):
-        return False, "Турнир не в формате ТВД."
+        return False, "Турнир не в формате «Группы + плей-офф»."
     if tournament.status == TournamentStatus.PLAYOFFS:
         return False, "Плей-офф уже сформирован."
     if not is_group_stage_complete(tournament):
@@ -1878,7 +1878,7 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
     Для 3 групп с круговой мини-сеткой: проверяем завершённость двух кругов (1–3 и 4–6 места).
     """
     if not _is_tvd(tournament) or tournament.status == TournamentStatus.COMPLETED:
-        return False, "Турнир не ТВД или уже завершён."
+        return False, "Турнир не в формате «Группы + плей-офф» или уже завершён."
 
     # 3 группы: круговая мини-сетка за 1–3 и 4–6 места (без финала)
     rr_1_3_matches = list(
@@ -2161,7 +2161,7 @@ def check_and_finalize(tournament: Tournament) -> tuple[bool, str]:
 def process_overdue_match(match: Match) -> tuple[bool, str]:
     """Проставить Walkover обоим и уведомить администраторов о просрочке ТВД-матча."""
     if not match.tournament_id or not _is_tvd(match.tournament):
-        return False, "Не ТВД-матч."
+        return False, "Матч не относится к групповому этапу."
     from .overdue import notify_admins_match_deadline_overdue
 
     return notify_admins_match_deadline_overdue(match)

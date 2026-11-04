@@ -77,13 +77,29 @@ from .landing import (
     resolve_landing,
     variant_options,
 )
+from .manual_pairing import (
+    ManualPairingError,
+    ensure_round_robin_schedule,
+    get_round_winners,
+    load_entities,
+    match_entity_token,
+    maybe_autoadvance_manual,
+    pairing_state,
+    parse_pair_tokens,
+    save_manual_round,
+    start_manual_tournament,
+    supports_manual_pairing,
+    update_manual_pair,
+)
 from .models import (
     Match,
     MatchResultProposal,
+    PairingMode,
     SparringDeadlineExtension,
     Tournament,
     TournamentEntryPayment,
     TournamentEntryRefundRequest,
+    TournamentFormat,
     TournamentPhoto,
     TournamentPlayerResult,
     TournamentPostpaymentInvoice,
@@ -1555,6 +1571,9 @@ def _tournament_manage_get_any_tournament(request, slug):
 
 def _tournament_manual_generate(tournament: Tournament) -> tuple[bool, str, str]:
     """Ручной запуск турнира без ожидания дедлайна регистрации."""
+    if tournament.uses_manual_pairing() and supports_manual_pairing(tournament):
+        ok, msg = start_manual_tournament(tournament)
+        return ok, msg, "Перейти к парам"
     if _is_tvd(tournament):
         return (*tvd_generate_groups(tournament), "Сформировать группы")
     if _is_fan(tournament):
@@ -1572,6 +1591,8 @@ def _tournament_manage_primary_action(tournament: Tournament) -> tuple[bool, str
         return False, ""
     if tournament.bracket_generated:
         return False, ""
+    if supports_manual_pairing(tournament):
+        return True, "Запустить турнир"
     if _is_round_robin(tournament):
         return True, "Сформировать матчи"
     if _is_fan(tournament) or _is_olympic(tournament):
@@ -1911,6 +1932,16 @@ def tournament_manage(request, slug):
         "withdrawn_team_ids": withdrawn_team_ids,
         "can_withdraw_participants": can_withdraw_participants,
         "is_round_robin_manage": _is_round_robin(tournament),
+        "supports_manual_pairing": supports_manual_pairing(tournament),
+        "can_manage_manual_pairs": (
+            supports_manual_pairing(tournament)
+            and tournament.uses_manual_pairing()
+            and tournament.manual_pairing_has_started()
+            and tournament.status
+            not in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED)
+        ),
+        "manual_pairs_have_matches": bool(tvd_main_matches),
+        "next_url": "",
     }
     context["postpayment_progress"] = get_postpayment_progress(tournament)
     context["postpayment_invoices"] = list(
@@ -1930,7 +1961,10 @@ def _tournament_manage_get_tournament(request, slug):
     if t is None:
         return None
     if not _is_tvd(t):
-        messages.error(request, "Управление доступно только для турниров формата ТВД.")
+        messages.error(
+            request,
+            "Управление доступно только для турниров формата «Группы + плей-офф».",
+        )
         return None
     return t
 
@@ -1943,6 +1977,18 @@ def tournament_manage_generate_bracket(request, slug):
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
+    requested_mode = request.POST.get("pairing_mode")
+    if requested_mode in PairingMode.values and not tournament.bracket_generated:
+        if requested_mode == PairingMode.MANUAL and not supports_manual_pairing(
+            tournament
+        ):
+            messages.error(
+                request,
+                "Этот формат турнира не поддерживает ручное формирование пар.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        tournament.pairing_mode = requested_mode
+        tournament.save(update_fields=["pairing_mode", "updated_at"])
     pending_users = get_pending_postpayment_users(tournament)
     if (
         tournament.allow_postpayment
@@ -1976,6 +2022,8 @@ def tournament_manage_generate_bracket(request, slug):
                 messages.success(request, msg)
             else:
                 messages.warning(request, msg)
+            if ok and tournament.uses_manual_pairing():
+                return redirect("tournament_manage_pairs", slug=slug)
         else:
             messages.info(
                 request,
@@ -1985,9 +2033,378 @@ def tournament_manage_generate_bracket(request, slug):
     ok, msg, _ = _tournament_manual_generate(tournament)
     if ok:
         messages.success(request, msg)
+        if tournament.uses_manual_pairing():
+            return redirect("tournament_manage_pairs", slug=slug)
     else:
         messages.warning(request, msg)
     return redirect("tournament_manage", slug=slug)
+
+
+def _manual_pair_round_views(tournament: Tournament, state) -> tuple[list, list[dict]]:
+    """Собрать данные кругов для страницы ручных пар.
+
+    Args:
+        tournament: Турнир.
+        state: Состояние ручного формирования пар.
+
+    Returns:
+        tuple[list, list[dict]]: Все участники и представление кругов.
+    """
+    entities = load_entities(tournament)
+    rounds: list[dict] = []
+    for round_item in state.rounds:
+        if tournament.format == TournamentFormat.SINGLE_ELIMINATION:
+            options = (
+                entities
+                if round_item.index == 1
+                else get_round_winners(tournament, round_item.index - 1)
+            )
+        else:
+            options = entities
+        matches = []
+        for match in round_item.matches:
+            matches.append(
+                {
+                    "match": match,
+                    "editable": (
+                        match.status
+                        not in (
+                            Match.MatchStatus.COMPLETED,
+                            Match.MatchStatus.WALKOVER,
+                            Match.MatchStatus.CANCELLED,
+                        )
+                        and not match.is_bye_match()
+                    ),
+                    "token_a": match_entity_token(match, 1) or "",
+                    "token_b": match_entity_token(match, 2) or "",
+                    "is_bye": match.is_bye_match(),
+                }
+            )
+        rounds.append(
+            {
+                "index": round_item.index,
+                "label": round_item.label,
+                "is_complete": round_item.is_complete,
+                "matches": matches,
+                "options": options,
+                "played_count": sum(
+                    1
+                    for item in round_item.matches
+                    if item.status
+                    in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
+                ),
+                "total_count": len(round_item.matches),
+            }
+        )
+    return entities, rounds
+
+
+def _render_manual_pairs(
+    request,
+    tournament: Tournament,
+    *,
+    form_pairs: list[dict[str, str]] | None = None,
+    form_leftover: str = "",
+    form_error: str = "",
+    auto_next: bool | None = None,
+    status: int = 200,
+):
+    """Отрисовать страницу ручного формирования пар.
+
+    Args:
+        request: HTTP-запрос.
+        tournament: Турнир.
+        form_pairs: Пары из отправленной формы.
+        form_leftover: Отдыхающий участник из формы.
+        form_error: Текст ошибки формы.
+        auto_next: Значение переключателя автопродолжения.
+        status: HTTP-статус ответа.
+
+    Returns:
+        HttpResponse: Страница пар.
+    """
+    state = pairing_state(tournament)
+    entities, rounds = _manual_pair_round_views(tournament, state)
+    submitted = form_pairs or []
+    row_count = max(1, len(state.eligible) // 2, len(submitted))
+    left_over_required = bool(state.can_build and len(state.eligible) % 2 == 1)
+    postpayment_progress = (
+        get_postpayment_progress(tournament)
+        if tournament.postpayment_window_started_at is not None
+        else None
+    )
+    return render(
+        request,
+        "tournaments/manage_pairs.html",
+        {
+            "tournament": tournament,
+            "state": state,
+            "entities": entities,
+            "round_views": rounds,
+            "builder_rows": range(row_count),
+            "initial_pairs": submitted,
+            "initial_leftover": form_leftover,
+            "form_error": form_error,
+            "auto_next": (
+                tournament.manual_pairing_auto_next_rounds
+                if auto_next is None
+                else auto_next
+            ),
+            "requires_leftover": left_over_required,
+            "next_url": request.get_full_path(),
+            "is_doubles": tournament.is_doubles(),
+            "postpayment_pending": bool(
+                postpayment_progress and not postpayment_progress["completed"]
+            ),
+            "postpayment_pending_count": (
+                int(postpayment_progress["pending"])
+                if postpayment_progress and not postpayment_progress["completed"]
+                else 0
+            ),
+        },
+        status=status,
+    )
+
+
+@login_required
+def tournament_manage_pairs(request, slug):
+    """Страница ручного формирования пар турнира."""
+    if request.method != "GET":
+        return redirect("tournament_manage_pairs", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    if not supports_manual_pairing(tournament):
+        messages.error(
+            request,
+            "Ручное формирование пар доступно для олимпийской системы "
+            "и кругового турнира.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if not tournament.uses_manual_pairing() and tournament.bracket_generated:
+        messages.info(
+            request,
+            "Турнир запущен в автоматическом режиме — пары уже распределены системой.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    return _render_manual_pairs(request, tournament)
+
+
+@login_required
+def tournament_manage_pairs_start(request, slug):
+    """POST: запустить турнир в ручном режиме и перейти к составлению пар."""
+    if request.method != "POST":
+        return redirect("tournament_manage_pairs", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    if not supports_manual_pairing(tournament):
+        messages.error(
+            request,
+            "Этот формат турнира не поддерживает ручное формирование пар.",
+        )
+        return redirect("tournament_manage", slug=slug)
+    if not tournament.bracket_generated:
+        tournament.pairing_mode = PairingMode.MANUAL
+        tournament.save(update_fields=["pairing_mode", "updated_at"])
+    if tournament.postpayment_window_started_at is not None:
+        progress = get_postpayment_progress(tournament)
+        if not bool(progress["completed"]):
+            messages.info(
+                request,
+                "Сначала завершите окно постоплаты: турнир запустится "
+                "после оплаты или истечения срока.",
+            )
+            return redirect("tournament_manage", slug=slug)
+        ok, msg = finalize_postpayment_window(tournament)
+        if ok:
+            messages.success(request, msg)
+            return redirect("tournament_manage_pairs", slug=slug)
+        messages.warning(request, msg)
+        return redirect("tournament_manage", slug=slug)
+    ok, msg = start_manual_tournament(tournament)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage_pairs", slug=slug)
+
+
+@login_required
+def tournament_manage_pairs_save(request, slug):
+    """POST: сохранить круг пар и создать матчи."""
+    if request.method != "POST":
+        return redirect("tournament_manage_pairs", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    if not tournament.manual_pairing_has_started():
+        messages.error(request, "Сначала запустите турнир в ручном режиме.")
+        return redirect("tournament_manage_pairs", slug=slug)
+
+    submitted: list[dict[str, str]] = []
+    index = 1
+    while f"pair_{index}_a" in request.POST or f"pair_{index}_b" in request.POST:
+        submitted.append(
+            {
+                "a": (request.POST.get(f"pair_{index}_a") or "").strip(),
+                "b": (request.POST.get(f"pair_{index}_b") or "").strip(),
+            }
+        )
+        index += 1
+    submitted = [pair for pair in submitted if pair["a"] or pair["b"]]
+    incomplete = [pair for pair in submitted if not pair["a"] or not pair["b"]]
+    if not submitted:
+        return _render_manual_pairs(
+            request,
+            tournament,
+            form_pairs=[],
+            form_error="Добавьте хотя бы одну пару.",
+            status=400,
+        )
+    if incomplete:
+        return _render_manual_pairs(
+            request,
+            tournament,
+            form_pairs=submitted,
+            form_error="В каждой паре должны быть выбраны оба участника.",
+            status=400,
+        )
+
+    auto_next = request.POST.get("auto_next") == "1"
+    allow_rematch = request.POST.get("allow_rematch") == "1"
+    leftover_token = (request.POST.get("leftover_token") or "").strip()
+    try:
+        flat_tokens = [token for pair in submitted for token in (pair["a"], pair["b"])]
+        entities = parse_pair_tokens(tournament, flat_tokens)
+        pairs = [
+            (entities[position], entities[position + 1])
+            for position in range(0, len(entities), 2)
+        ]
+        leftover = (
+            parse_pair_tokens(tournament, [leftover_token])[0]
+            if leftover_token
+            else None
+        )
+    except ManualPairingError as exc:
+        return _render_manual_pairs(
+            request,
+            tournament,
+            form_pairs=submitted,
+            form_leftover=leftover_token,
+            form_error=str(exc),
+            auto_next=auto_next,
+            status=400,
+        )
+
+    try:
+        ok, msg = save_manual_round(
+            tournament,
+            pairs=pairs,
+            leftover=leftover,
+            auto_next=auto_next,
+            allow_rematch=allow_rematch,
+        )
+    except ManualPairingError as exc:
+        return _render_manual_pairs(
+            request,
+            tournament,
+            form_pairs=submitted,
+            form_leftover=leftover_token,
+            form_error=str(exc),
+            auto_next=auto_next,
+            status=400,
+        )
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage_pairs", slug=slug)
+
+
+@login_required
+def tournament_manage_pair_update(request, slug, pk):
+    """POST: изменить участников ещё не сыгранной пары."""
+    if request.method != "POST":
+        return redirect("tournament_manage_pairs", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    tokens = [
+        (request.POST.get("token_a") or "").strip(),
+        (request.POST.get("token_b") or "").strip(),
+    ]
+    if not all(tokens):
+        messages.error(request, "Выберите обоих участников пары.")
+        return redirect("tournament_manage_pairs", slug=slug)
+    try:
+        entity_a, entity_b = parse_pair_tokens(tournament, tokens)
+    except ManualPairingError as exc:
+        messages.error(request, str(exc))
+        return redirect("tournament_manage_pairs", slug=slug)
+    try:
+        ok, msg = update_manual_pair(
+            tournament,
+            match=match,
+            entity_a=entity_a,
+            entity_b=entity_b,
+            allow_rematch=request.POST.get("allow_rematch") == "1",
+        )
+    except ManualPairingError as exc:
+        messages.error(request, str(exc))
+        return redirect("tournament_manage_pairs", slug=slug)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    return redirect("tournament_manage_pairs", slug=slug)
+
+
+@login_required
+def tournament_manage_pairs_settings(request, slug):
+    """POST: переключить автоматическое продолжение ручных кругов."""
+    if request.method != "POST":
+        return redirect("tournament_manage_pairs", slug=slug)
+    tournament = _tournament_manage_get_any_tournament(request, slug)
+    if tournament is None:
+        return redirect("tournament_list")
+    if not tournament.manual_pairing_has_started():
+        messages.error(request, "Ручной режим ещё не запущен.")
+        return redirect("tournament_manage_pairs", slug=slug)
+    auto_next = request.POST.get("auto_next") == "1"
+    tournament.manual_pairing_auto_next_rounds = auto_next
+    tournament.save(update_fields=["manual_pairing_auto_next_rounds", "updated_at"])
+    if (
+        auto_next
+        and tournament.format == TournamentFormat.ROUND_ROBIN
+        and tournament.bracket_generated
+    ):
+        ok, msg = ensure_round_robin_schedule(tournament)
+        if ok:
+            messages.success(request, "Настройка сохранена. " + msg)
+        elif "уже созданы" in msg:
+            messages.success(request, "Настройка сохранена.")
+        else:
+            tournament.manual_pairing_auto_next_rounds = False
+            tournament.save(
+                update_fields=["manual_pairing_auto_next_rounds", "updated_at"]
+            )
+            messages.warning(
+                request,
+                "Автоматическое продолжение не включено: "
+                f"{msg} Составьте следующие туры вручную.",
+            )
+        return redirect("tournament_manage_pairs", slug=slug)
+    if auto_next and tournament.format == TournamentFormat.SINGLE_ELIMINATION:
+        maybe_autoadvance_manual(tournament)
+        messages.success(
+            request,
+            "Настройка сохранена. Следующий круг создастся автоматически.",
+        )
+        return redirect("tournament_manage_pairs", slug=slug)
+    messages.success(request, "Настройка следующих кругов сохранена.")
+    return redirect("tournament_manage_pairs", slug=slug)
 
 
 @login_required
@@ -2139,7 +2556,9 @@ def tournament_manage_compose_pair(request, slug):
         return redirect("tournament_manage", slug=slug)
     tournament = _tournament_manage_get_tournament(request, slug)
     if tournament is None or not tournament.is_doubles():
-        messages.error(request, "Действие доступно только для парного ТВД.")
+        messages.error(
+            request, "Действие доступно только для парного турнира с группами."
+        )
         return redirect("tournament_manage", slug=slug)
     if tournament.bracket_generated:
         messages.warning(request, "Группы уже сформированы, менять команды нельзя.")
@@ -2920,8 +3339,12 @@ def tournament_manage_match_result(request, slug, pk):
 
     from .proposal_service import notify_participants_match_result_confirmed
 
+    fallback_url = _get_safe_next_url(
+        request, reverse("tournament_manage", kwargs={"slug": slug})
+    )
+
     if request.method != "POST":
-        return redirect("tournament_manage", slug=slug)
+        return redirect(fallback_url)
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
@@ -2931,7 +3354,7 @@ def tournament_manage_match_result(request, slug, pk):
             request,
             "В отмененном или завершенном турнире изменение результатов недоступно.",
         )
-        return redirect("tournament_manage", slug=slug)
+        return redirect(fallback_url)
     is_walkover = request.POST.get("walkover") in ("1", "on", "true", "yes")
     score1 = _parse_int_post(request, "score1")
     score2 = _parse_int_post(request, "score2")
@@ -2945,7 +3368,7 @@ def tournament_manage_match_result(request, slug, pk):
     if is_doubles_match:
         if not winner_team_id or winner_team_id not in (match.team1_id, match.team2_id):
             messages.warning(request, "Укажите победившую команду.")
-            return redirect("tournament_manage", slug=slug)
+            return redirect(fallback_url)
         winner_team = get_object_or_404(
             TournamentTeam, pk=winner_team_id, tournament=tournament
         )
@@ -2954,7 +3377,7 @@ def tournament_manage_match_result(request, slug, pk):
     else:
         if not winner_id and match.player1_id and match.player2_id:
             messages.warning(request, "Укажите победителя.")
-            return redirect("tournament_manage", slug=slug)
+            return redirect(fallback_url)
         winner = None
         if winner_id:
             winner = get_object_or_404(Player, pk=winner_id)
@@ -2962,7 +3385,7 @@ def tournament_manage_match_result(request, slug, pk):
                 messages.warning(
                     request, "Победитель должен быть одним из игроков матча."
                 )
-                return redirect("tournament_manage", slug=slug)
+                return redirect(fallback_url)
         match.winner = winner
     if is_walkover:
         match.status = Match.MatchStatus.WALKOVER
@@ -3047,7 +3470,7 @@ def tournament_manage_match_result(request, slug, pk):
                 "Проверьте порядок полей: слева — первый игрок (сверху), справа — второй (снизу). "
                 "Если вы ввели счёт верно, но перепутали колонки — внесите снова, поменяв числа местами.",
             )
-            return redirect("tournament_manage", slug=slug)
+            return redirect(fallback_url)
         match.status = Match.MatchStatus.COMPLETED
         match.completed_datetime = timezone.now()
         match.rating_status = Match.RatingCalcStatus.PENDING
@@ -3063,7 +3486,7 @@ def tournament_manage_match_result(request, slug, pk):
         messages.success(
             request, "Результат сохранён. Участникам отправлены уведомления."
         )
-    return redirect("tournament_manage", slug=slug)
+    return redirect(fallback_url)
 
 
 @login_required

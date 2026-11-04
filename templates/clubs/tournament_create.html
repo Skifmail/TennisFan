@@ -126,6 +126,12 @@
                     <h2 class="club-tournament-create__section-title">Формат и допуск</h2>
                     <p class="club-tournament-create__section-text">Тип турнира, дисциплина, пол, уровень игроков и ключевые настройки структуры.</p>
                 </div>
+                {% if manual_pairing_note %}
+                <p class="club-tournament-create__note">
+                    <span class="club-tournament-create__note-mark" aria-hidden="true">i</span>
+                    <span>{{ manual_pairing_note }}</span>
+                </p>
+                {% endif %}
                 <div class="club-tournament-create__grid club-tournament-create__grid--triple">
                     <div class="club-tournament-create__field">
                         <label for="{{ form.sport.id_for_label }}" class="form-label">{{ form.sport.label }}</label>
@@ -136,6 +142,7 @@
                     <div class="club-tournament-create__field">
                         <label for="{{ form.format.id_for_label }}" class="form-label">{{ form.format.label }}</label>
                         {{ form.format }}
+                        {% if form.format.help_text %}<p class="club-tournament-create__help">{{ form.format.help_text|linebreaksbr }}</p>{% endif %}
                         {% for error in form.format.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}
                     </div>
                     <div class="club-tournament-create__field">

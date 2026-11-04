@@ -122,6 +122,7 @@
     {% include 'includes/manage_match_walkover_form.html' with match=match tournament=tournament %}
     <form action="{% url 'tournament_manage_match_result' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-form">
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next_url }}">
         <div class="bracket-match-players">
             <div class="bracket-match-player bracket-match-player--input">
                 <span class="bracket-player-name">{{ match.get_player1_display|default:"TBD" }}</span>

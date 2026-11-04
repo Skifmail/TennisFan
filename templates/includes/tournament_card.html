@@ -50,7 +50,7 @@
                     <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_match_format_display }}</span>
                     {% endif %}
                     {% elif tournament.format == 'weekend_day' %}
-                    <span class="tournament-card__chip tournament-card__chip--format">OneDay</span>
+                    <span class="tournament-card__chip tournament-card__chip--format" title="Групповой этап, затем плей-офф и утешительная сетка">Группы</span>
                     {% endif %}
                     {% if tournament.duration == 'multi' and tournament.entry_fee and tournament.entry_fee > 0 %}
                     <span class="tournament-card__chip tournament-card__chip--fee">Взнос {{ tournament.entry_fee|floatformat:0|intcomma }} ₽</span>

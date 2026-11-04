@@ -984,7 +984,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             if tournament_format == TournamentFormat.WEEKEND_DAY:
                 self.add_error(
                     "allow_postpayment",
-                    "Постоплата недоступна для формата ТВД.",
+                    "Постоплата недоступна для формата «Группы + плей-офф».",
                 )
             if float(entry_fee or 0) <= 0:
                 self.add_error(

@@ -35,7 +35,7 @@ RULES_SECTION_TITLES: dict[str, str] = {
     "rules_olympic": "Олимпийская система (утешительная сетка)",
     "rules_doubles": "Парные турниры",
     "rules_seeding": "Правила посева",
-    "rules_tvd": "Турнир выходного дня (ТВД)",
+    "rules_tvd": "Группы + плей-офф",
     "rating_rules": "Рейтинг и очки",
     "rules_rating_algorithm": "Алгоритм расчета рейтинга",
     "site_usage_rules": "Правила пользования сайтом",

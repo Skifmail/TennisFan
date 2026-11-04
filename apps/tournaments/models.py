@@ -61,7 +61,21 @@ class TournamentFormat(models.TextChoices):
         "Олимпийский (за все места)",
     )
     ROUND_ROBIN = "round_robin", "Круговой"
-    WEEKEND_DAY = "weekend_day", "Однодневный турнир"
+    WEEKEND_DAY = "weekend_day", "Группы + плей-офф"
+
+
+MANUAL_PAIRING_FORMATS_NOTE = (
+    "Полностью ручное управление (составление пар вручную) доступно только "
+    "для форматов «Олимпийский (до 1 поражения)» и «Круговой». "
+    "В остальных форматах пары строятся автоматически."
+)
+
+
+class PairingMode(models.TextChoices):
+    """Способ формирования пар в турнире."""
+
+    AUTO = "auto", "Автоматический"
+    MANUAL = "manual", "Ручной"
 
 
 class MatchFormat(models.TextChoices):
@@ -226,7 +240,11 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     is_one_day = models.BooleanField(
         "Однодневный турнир",
         default=False,
-        help_text="Если отмечено, взнос платный для всех (с учетом скидок)",
+        help_text=(
+            "Влияет только на длительность и оплату: взнос платный для всех "
+            "(с учетом скидок), постоплата недоступна. Сетку не меняет — "
+            "формат выбирается выше."
+        ),
     )
     allow_postpayment = models.BooleanField(
         "Постоплата",
@@ -285,7 +303,15 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         max_length=20,
         choices=TournamentFormat.choices,
         default=TournamentFormat.SINGLE_ELIMINATION,
-        help_text="Одноэтапная сетка: турнир на выбывание с подвалом, посев по рейтингу, очки при вылете. \nКруговой: все играют со всеми, итоговая таблица по очкам.",
+        help_text=(
+            "Олимпийский (до 1 поражения): сетка на выбывание, посев по рейтингу, "
+            "очки при вылете.\n"
+            "Олимпийский (за все места): сетка с утешительным турниром.\n"
+            "Круговой: все играют со всеми, итоговая таблица по очкам.\n"
+            "Группы + плей-офф: групповой этап, затем плей-офф и утешительная сетка. "
+            "Это отдельная структура, её нельзя получить, просто сделав турнир "
+            "однодневным."
+        ),
     )
     sport = models.CharField(
         "Вид спорта",
@@ -369,6 +395,35 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=False,
         help_text="Сетка создана, участники зафиксированы, регистрация закрыта.",
     )
+    pairing_mode = models.CharField(
+        "Режим формирования пар",
+        max_length=10,
+        choices=PairingMode.choices,
+        default=PairingMode.AUTO,
+        editable=False,
+        help_text=(
+            "Автоматический — система сама строит сетку и распределяет пары. "
+            "Ручной — организатор запускает турнир и сам составляет пары "
+            "из зарегистрированных участников."
+        ),
+    )
+    manual_pairing_auto_next_rounds = models.BooleanField(
+        "Следующие круги распределять автоматически",
+        default=True,
+        help_text=(
+            "Только для ручного режима: если включено, после первого круга "
+            "система сама составит следующие пары по результатам матчей."
+        ),
+    )
+    manual_started_at = models.DateTimeField(
+        "Ручной запуск турнира",
+        null=True,
+        blank=True,
+        help_text=(
+            "Заполняется, когда организатор запускает турнир в ручном режиме. "
+            "Матчи появляются после сохранения первого круга пар."
+        ),
+    )
     match_days_per_round = models.PositiveSmallIntegerField(
         "Дней на раунд (дедлайн матча)",
         default=7,
@@ -445,6 +500,22 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     def is_doubles(self) -> bool:
         """Check if tournament is doubles (2v2)."""
         return getattr(self, "variant", "singles") == TournamentVariant.DOUBLES
+
+    def uses_manual_pairing(self) -> bool:
+        """Проверить, выбран ли ручной режим формирования пар.
+
+        Returns:
+            bool: True, если организатор составляет пары сам.
+        """
+        return getattr(self, "pairing_mode", PairingMode.AUTO) == PairingMode.MANUAL
+
+    def manual_pairing_has_started(self) -> bool:
+        """Проверить, запущен ли турнир в ручном режиме.
+
+        Returns:
+            bool: True, если ручной запуск уже произошёл.
+        """
+        return self.uses_manual_pairing() and self.manual_started_at is not None
 
     def is_mixed_doubles(self) -> bool:
         """Check if tournament is mixed doubles (парный микст: мужчина + женщина в команде)."""
@@ -1045,12 +1116,12 @@ class TournamentPostpaymentCallLog(models.Model):
 
 
 class TVDTournament(Tournament):
-    """Прокси-модель для раздела однодневных турниров в админке."""
+    """Прокси-модель для раздела турниров «Группы + плей-офф» в админке."""
 
     class Meta:
         proxy = True
-        verbose_name = "Однодневный турнир"
-        verbose_name_plural = "Однодневные турниры"
+        verbose_name = "Турнир «Группы + плей-офф»"
+        verbose_name_plural = "Турниры «Группы + плей-офф»"
 
 
 class TournamentTeam(models.Model):
@@ -1103,7 +1174,7 @@ class TournamentTeam(models.Model):
 
 
 class TVDGroup(models.Model):
-    """Группа в турнире выходного дня (ТВД)."""
+    """Группа турнира формата «Группы + плей-офф»."""
 
     tournament = models.ForeignKey(
         Tournament,
@@ -1116,8 +1187,8 @@ class TVDGroup(models.Model):
     is_completed = models.BooleanField("Группа завершена", default=False)
 
     class Meta:
-        verbose_name = "Группа ТВД"
-        verbose_name_plural = "Группы ТВД"
+        verbose_name = "Группа турнира «Группы + плей-офф»"
+        verbose_name_plural = "Группы турниров «Группы + плей-офф»"
         unique_together = [("tournament", "name")]
         ordering = ["tournament", "order", "name"]
 
@@ -1127,7 +1198,7 @@ class TVDGroup(models.Model):
 
 class TVDGroupMember(models.Model):
     """
-    Участник группы в ТВД-турнире.
+    Участник группы турнира формата «Группы + плей-офф».
     Одиночный: group + player (team=null). Парный: group + team (player=null, для совместимости можно player=team.player1).
     """
 
@@ -1144,7 +1215,7 @@ class TVDGroupMember(models.Model):
         verbose_name="Игрок",
         null=True,
         blank=True,
-        help_text="Для одиночного ТВД. Для парного — используйте team.",
+        help_text="Для одиночного турнира. Для парного — используйте team.",
     )
     team = models.ForeignKey(
         "TournamentTeam",
@@ -1153,7 +1224,7 @@ class TVDGroupMember(models.Model):
         verbose_name="Команда",
         null=True,
         blank=True,
-        help_text="Для парного ТВД. Для одиночного — используйте player.",
+        help_text="Для парного турнира. Для одиночного — используйте player.",
     )
     seed = models.PositiveSmallIntegerField(
         "Посев",
@@ -1173,8 +1244,8 @@ class TVDGroupMember(models.Model):
     )
 
     class Meta:
-        verbose_name = "Участник группы ТВД"
-        verbose_name_plural = "Участники групп ТВД"
+        verbose_name = "Участник группы"
+        verbose_name_plural = "Участники групп"
         ordering = ["group", "final_place", "seed"]
         constraints = [
             models.UniqueConstraint(
@@ -1301,11 +1372,11 @@ class Match(models.Model):
         null=True,
         blank=True,
         related_name="matches",
-        verbose_name="Группа ТВД",
-        help_text="Для матчей группового этапа ТВД.",
+        verbose_name="Группа турнира",
+        help_text="Для матчей группового этапа.",
     )
     tvd_stage = models.CharField(
-        "Этап ТВД",
+        "Этап группового турнира",
         max_length=30,
         blank=True,
         help_text="group, main_qf, main_sf, main_final, third_place, consolation_sf, consolation_final",
@@ -1575,6 +1646,25 @@ class Match(models.Model):
     def get_side2_player(self):
         """Игрок стороны 2 для ссылки на профиль."""
         return self.team2.player1 if self.team2 else self.player2
+
+    def is_bye_match(self) -> bool:
+        """Проверить, что матч — технический проход служебного «Свободный круг».
+
+        Returns:
+            bool: True, если хотя бы одна сторона — служебный bye-игрок.
+        """
+        for player in (
+            self.player1,
+            self.player2,
+            self.partner1,
+            self.partner2,
+        ):
+            if player is not None and getattr(player, "is_bye", False):
+                return True
+        for team in (self.team1, self.team2):
+            if team is not None and getattr(team.player1, "is_bye", False):
+                return True
+        return False
 
     @property
     def score_display(self) -> str:

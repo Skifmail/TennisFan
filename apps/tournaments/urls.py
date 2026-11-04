@@ -94,6 +94,31 @@ urlpatterns = [
         name="tournament_manage_generate_bracket",
     ),
     path(
+        "<slug:slug>/manage/pairs/",
+        views.tournament_manage_pairs,
+        name="tournament_manage_pairs",
+    ),
+    path(
+        "<slug:slug>/manage/pairs/start/",
+        views.tournament_manage_pairs_start,
+        name="tournament_manage_pairs_start",
+    ),
+    path(
+        "<slug:slug>/manage/pairs/save/",
+        views.tournament_manage_pairs_save,
+        name="tournament_manage_pairs_save",
+    ),
+    path(
+        "<slug:slug>/manage/pairs/settings/",
+        views.tournament_manage_pairs_settings,
+        name="tournament_manage_pairs_settings",
+    ),
+    path(
+        "<slug:slug>/manage/pairs/match/<int:pk>/update/",
+        views.tournament_manage_pair_update,
+        name="tournament_manage_pair_update",
+    ),
+    path(
         "<slug:slug>/manage/cancel/",
         views.tournament_manage_cancel,
         name="tournament_manage_cancel",

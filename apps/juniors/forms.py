@@ -4,7 +4,8 @@ from django import forms
 
 from apps.users.forms import UserRegistrationForm
 
-from .models import ChildProfile, GuardianLink
+from .legal import ACCURACY_CONFIRMATION, REPRESENTATIVE_CONFIRMATION
+from .models import ChildProfile, GuardianLink, LegalRelease
 from .rules import Ball
 
 
@@ -24,15 +25,29 @@ class ParentRegistrationForm(UserRegistrationForm):
 
 
 class ChildForm(forms.ModelForm):
+    processing_accepted = forms.BooleanField(
+        label="Я согласен с обработкой данных ребёнка по приведённому тексту"
+    )
+    legal_release = forms.ModelChoiceField(
+        queryset=LegalRelease.objects.none(), widget=forms.HiddenInput
+    )
+
     relation = forms.ChoiceField(
         label="Кем вы приходитесь ребёнку", choices=GuardianLink.Relation.choices
     )
-    representative = forms.BooleanField(
-        label="Я совершеннолетний законный представитель ребёнка"
-    )
+    representative = forms.BooleanField(label=REPRESENTATIVE_CONFIRMATION)
+
+    accurate = forms.BooleanField(label=ACCURACY_CONFIRMATION)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields.pop("processing_accepted")
+            self.fields.pop("legal_release")
+        else:
+            releases = LegalRelease.objects.filter(reviewed=True, is_current=True)
+            self.fields["legal_release"].queryset = releases
+            self.fields["legal_release"].initial = releases.first()
         self.fields["gender"].choices = [
             ("", "Выберите пол"),
             ("male", "Мальчик"),

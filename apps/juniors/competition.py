@@ -99,6 +99,10 @@ def register(
         .select_related("season")
         .get(pk=tournament_id)
     )
+    if tournament.club_id and tournament.entry_fee:
+        raise ValidationError(
+            "Платная запись на детский турнир клуба пока недоступна. Обратитесь к организатору."
+        )
     child = ChildProfile.objects.select_for_update(of=("self",)).get(pk=child_id)
     link = guardian_for(actor, child)
     now = timezone.now()

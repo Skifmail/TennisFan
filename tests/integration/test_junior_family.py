@@ -29,6 +29,27 @@ from tests.support.factories import make_user
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture
+def live_family_client(client, settings):
+    # Только в тесте будущего запуска; отдельный набор проверяет реальную блокировку.
+    settings.MIDDLEWARE = [
+        m
+        for m in settings.MIDDLEWARE
+        if m != "apps.juniors.middleware.JuniorDevelopmentMiddleware"
+    ]
+    return client
+
+
+def current_release():
+    return LegalRelease.objects.create(
+        version="test-form",
+        processing_text="Тест обработки",
+        publication_text="Тест публикации",
+        reviewed=True,
+        is_current=True,
+    )
+
+
 def child() -> ChildProfile:
     return ChildProfile.objects.create(
         first_name="Анна",
@@ -67,8 +88,10 @@ def test_all_junior_models_in_one_admin_app() -> None:
 
 
 @override_settings(JUNIOR_LEAGUE_ENABLED=True, SECURE_SSL_REDIRECT=False)
-def test_family_create_and_private_detail(client) -> None:
-    parent = make_user(email="family-ui@junior.test")
+def test_family_create_and_private_detail(live_family_client) -> None:
+    client = live_family_client
+    release = current_release()
+    parent = make_user(email="family-ui@junior.test", email_verified=True)
     client.force_login(parent)
     response = client.post(
         reverse("juniors:add_child"),
@@ -81,6 +104,9 @@ def test_family_create_and_private_detail(client) -> None:
             "ball": "red",
             "relation": "parent",
             "representative": "on",
+            "accurate": "on",
+            "processing_accepted": "on",
+            "legal_release": str(release.pk),
         },
     )
     assert response.status_code == 302
@@ -148,7 +174,10 @@ def test_verification_consent_and_publication_are_separate() -> None:
 
 
 @override_settings(JUNIOR_LEAGUE_ENABLED=True, SECURE_SSL_REDIRECT=False)
-def test_parent_registration_does_not_require_tennis_profile(client) -> None:
+def test_parent_registration_does_not_require_tennis_profile(
+    live_family_client,
+) -> None:
+    client = live_family_client
     with patch("apps.juniors.views.send_email_verification", return_value=True):
         response = client.post(
             reverse("juniors:parent_join"),
@@ -172,7 +201,9 @@ def test_parent_registration_does_not_require_tennis_profile(client) -> None:
 
 
 @override_settings(JUNIOR_LEAGUE_ENABLED=True, SECURE_SSL_REDIRECT=False)
-def test_child_creation_requires_verified_parent_contact(client) -> None:
+def test_child_creation_requires_verified_parent_contact(live_family_client) -> None:
+    client = live_family_client
+    release = current_release()
     parent = make_user(email="unverified-parent@junior.test", email_verified=False)
     client.force_login(parent)
     response = client.post(
@@ -186,6 +217,9 @@ def test_child_creation_requires_verified_parent_contact(client) -> None:
             "ball": "red",
             "relation": "parent",
             "representative": "on",
+            "accurate": "on",
+            "processing_accepted": "on",
+            "legal_release": str(release.pk),
         },
     )
     assert response.status_code == 200

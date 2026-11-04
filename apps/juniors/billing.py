@@ -41,6 +41,10 @@ def begin_payment(*, actor: User, entry_id: int, return_url: str) -> JuniorPayme
         tournament = JuniorTournament.objects.select_for_update(of=("self",)).get(
             pk=entry.tournament_id
         )
+        if tournament.club_id:
+            raise ValidationError(
+                "Оплата детских турниров клуба пока недоступна: платёжные реквизиты клуба ещё не подключены."
+            )
         child = ChildProfile.objects.select_for_update(of=("self",)).get(
             pk=entry.child_id
         )

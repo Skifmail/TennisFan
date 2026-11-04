@@ -15,11 +15,17 @@ pytestmark = pytest.mark.django_db
 
 
 @override_settings(JUNIOR_LEAGUE_ENABLED=True, SECURE_SSL_REDIRECT=False)
-def test_parent_to_tournament_results_through_real_views(client) -> None:
+def test_parent_to_tournament_results_through_real_views(client, settings) -> None:
+    # Только здесь моделируется будущий запуск для обычного родителя.
+    settings.MIDDLEWARE = [
+        m
+        for m in settings.MIDDLEWARE
+        if m != "apps.juniors.middleware.JuniorDevelopmentMiddleware"
+    ]
     organizer, tournament, release = setup_tournament()
     parents = []
     for index in range(2):
-        parent = make_user(email=f"journey-{index}@junior.test")
+        parent = make_user(email=f"journey-{index}@junior.test", email_verified=True)
         parents.append(parent)
         client.force_login(parent)
         response = client.post(
@@ -33,10 +39,20 @@ def test_parent_to_tournament_results_through_real_views(client) -> None:
                 "ball": "red",
                 "relation": "parent",
                 "representative": "on",
+                "accurate": "on",
+                "processing_accepted": "on",
+                "legal_release": str(release.pk),
             },
         )
         assert response.status_code == 302
         link = GuardianLink.objects.get(user=parent)
+        assert link.status == "pending"
+        blocked = client.post(
+            reverse("juniors:tournament", args=[tournament.pk]),
+            {"child": link.child_id, "regulation_version": 1, "accepted": "on"},
+        )
+        assert blocked.status_code == 200
+        assert not tournament.entries.filter(child_id=link.child_id).exists()
         client.force_login(organizer)
         review = client.post(
             reverse("admin:juniors_verify", args=[link.pk]),
@@ -89,6 +105,7 @@ def test_parent_to_tournament_results_through_real_views(client) -> None:
     tournament.refresh_from_db()
     assert tournament.status == "completed"
     assert tournament.awards.count() == 2
+    client.logout()
     public = client.get(reverse("juniors:ratings"))
     assert public.status_code == 200
     assert "СкрытаяФамилия" not in public.content.decode()

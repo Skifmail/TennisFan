@@ -24,6 +24,8 @@ class JuniorDevelopmentMiddleware(MiddlewareMixin):
         read_pages = {
             "home",
             "rules",
+            "documents",
+            "document",
             "ratings",
             "tournaments",
             "tournament",

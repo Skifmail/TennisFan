@@ -160,8 +160,8 @@ def test_documents_and_missing_release_page(client, settings):
     client.force_login(staff)
     response = client.get("/kids/family/add/")
     assert response.status_code == 200
-    assert 'name="first_name"' not in response.content.decode()
-    assert "после утверждения" in response.content.decode()
+    assert 'name="first_name"' in response.content.decode()
+    assert LegalRelease.objects.get(is_current=True).reviewed
 
 
 @pytest.mark.parametrize("field", ["representative", "accurate"])
@@ -178,8 +178,6 @@ def test_missing_declaration_cannot_create_profile(field):
 
 
 def test_closed_profile_and_declarations_are_recorded():
-    from django.core.exceptions import PermissionDenied
-
     from apps.juniors.competition import register
     from apps.juniors.services import public_child_label
 
@@ -191,13 +189,13 @@ def test_closed_profile_and_declarations_are_recorded():
     assert "18 лет" in event.details["declarations"]["representative"]
     assert public_child_label(child) == child.public_label
     assert child.birth_verified_at is None
-    with pytest.raises(PermissionDenied):
-        register(
-            actor=parent,
-            child_id=child.pk,
-            tournament_id=tournament.pk,
-            regulation_version=tournament.regulation_version,
-        )
+    entry = register(
+        actor=parent,
+        child_id=child.pk,
+        tournament_id=tournament.pk,
+        regulation_version=tournament.regulation_version,
+    )
+    assert entry.status == "preliminary"
 
 
 def test_simple_profile_form_separates_confirmations_and_creates_closed_profile(

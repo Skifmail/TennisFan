@@ -41,11 +41,12 @@ from .models import (
     JuniorTournament,
     LegalRelease,
 )
-from .permissions import account, guardian_for
+from .permissions import account, can_manage_competition, guardian_for
 from .rules import BALL_GUIDE, Ball
 from .services import (
     accept_consent,
     create_child,
+    ensure_default_legal_release,
     public_child_label,
     publication_is_allowed,
     update_draft,
@@ -262,7 +263,7 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
         link = guardian_for(account(request), child, verified=False)
     else:
         link = None
-    release = LegalRelease.objects.filter(reviewed=True, is_current=True).first()
+    release = ensure_default_legal_release()
     form = ChildForm(
         request.POST if request.method == "POST" else None,
         request.FILES or None,
@@ -312,12 +313,43 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
 @never_cache
 @login_required
 def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    from .context_processors import junior_context
     from .statistics import child_statistics
 
     child = get_object_or_404(ChildProfile, pk=pk)
     link = guardian_for(account(request), child, verified=False)
-    release = LegalRelease.objects.filter(reviewed=True, is_current=True).first()
+    release = ensure_default_legal_release()
     consents = link.consents.filter(withdrawn_at__isnull=True, release=release)
+    processing_accepted = consents.filter(kind="processing").exists()
+    processing_consent = (
+        link.consents.filter(kind="processing", withdrawn_at__isnull=True)
+        .select_related("release")
+        .order_by("-accepted_at")
+        .first()
+    )
+    publication_accepted = link.consents.filter(
+        kind="publication", withdrawn_at__isnull=True, release__reviewed=True
+    ).exists()
+    publication_visible = publication_is_allowed(child)
+    actions_allowed = junior_context(request)["junior_actions_allowed"]
+    can_allow_publication = bool(
+        link.status == "verified"
+        and child.status == "active"
+        and release
+        and release.publication_text.strip()
+    )
+    can_accept_processing = bool(
+        link.status == "verified"
+        and release
+        and release.processing_text.strip()
+        and not processing_accepted
+    )
+    show_publication_settings = actions_allowed and (
+        can_allow_publication or publication_visible or publication_accepted
+    )
+    show_processing_settings = bool(processing_consent) or (
+        actions_allowed and can_accept_processing
+    )
     return render(
         request,
         "juniors/child.html",
@@ -325,21 +357,17 @@ def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "child": child,
             "link": link,
             "release": release,
-            "processing_accepted": consents.filter(kind="processing").exists(),
-            "processing_consent": link.consents.filter(
-                kind="processing", withdrawn_at__isnull=True
-            )
-            .select_related("release")
-            .order_by("-accepted_at")
-            .first(),
-            "publication_accepted": link.consents.filter(
-                kind="publication", withdrawn_at__isnull=True, release__reviewed=True
-            ).exists(),
-            "publication_visible": publication_is_allowed(child),
+            "processing_accepted": processing_accepted,
+            "processing_consent": processing_consent,
+            "publication_accepted": publication_accepted,
+            "publication_visible": publication_visible,
             "public_label": public_child_label(child),
-            "can_allow_publication": link.status == "verified"
-            and child.status == "active"
-            and release is not None,
+            "can_allow_publication": can_allow_publication,
+            "can_accept_processing": can_accept_processing,
+            "show_publication_settings": show_publication_settings,
+            "show_processing_settings": show_processing_settings,
+            "profile_settings_editable": actions_allowed
+            and (show_publication_settings or show_processing_settings),
             "entries": child.entries.select_related("tournament"),
             "statistics": child_statistics(child),
             "appeals": JuniorAppeal.objects.filter(
@@ -436,7 +464,7 @@ def tournaments(request: HttpRequest) -> HttpResponse:
             qs = qs.annotate(
                 occupied=Count(
                     "entries",
-                    filter=Q(entries__status="confirmed")
+                    filter=Q(entries__status__in=["confirmed", "preliminary"])
                     | Q(
                         entries__status="payment",
                         entries__reserved_until__gt=timezone.now(),
@@ -517,6 +545,7 @@ def tournament_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "juniors/tournament.html",
         {
             "tournament": tournament,
+            "can_manage_tournament": can_manage_competition(request.user, tournament),
             "participants": participants,
             "form": form,
             "matches": matches,

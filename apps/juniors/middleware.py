@@ -1,5 +1,6 @@
 """Режим просмотра детской лиги до завершения разработки."""
 
+from django.conf import settings
 from django.http import HttpRequest
 from django.shortcuts import render
 from django.utils.deprecation import MiddlewareMixin
@@ -11,6 +12,8 @@ class JuniorDevelopmentMiddleware(MiddlewareMixin):
     def process_view(self, request: HttpRequest, view_func, view_args, view_kwargs):
         match = request.resolver_match
         if match is None or match.namespace != "juniors":
+            return None
+        if not settings.JUNIOR_LEAGUE_READ_ONLY:
             return None
         if match.url_name == "payment_webhook":
             # Уже начатые платежи должны получить подтверждение от шлюза.
@@ -34,6 +37,8 @@ class JuniorDevelopmentMiddleware(MiddlewareMixin):
             "child_photo",
             "adult_history",
             "payments",
+            "my_matches",
+            "match",
         }
         if (
             request.method in {"GET", "HEAD", "OPTIONS"}

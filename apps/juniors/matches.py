@@ -4,7 +4,7 @@ import random
 import secrets
 from typing import cast
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -12,8 +12,8 @@ from apps.users.models import User
 
 from .competition import eligibility, expire_reservations
 from .models import AuditEvent, ChildProfile, JuniorEntry, JuniorMatch, JuniorTournament
-from .notifications import notify_family
-from .permissions import guardian_for, require_organizer
+from .notifications import notify_family, notify_match
+from .permissions import guardian_for, match_guardians, require_organizer
 from .rules import validate_score
 
 
@@ -27,13 +27,22 @@ def _advance(match: JuniorMatch) -> None:
         position=match.position // 2,
     ).first()
     if target:
+        was_ready = bool(target.entry1_id and target.entry2_id)
         field = "entry1" if match.position % 2 == 0 else "entry2"
         setattr(target, field, match.winner)
-        target.save(update_fields=[field])
+        target.result_version += 1
+        target.save(update_fields=[field, "result_version"])
+        if not was_ready and target.entry1_id and target.entry2_id:
+            notify_match(
+                target,
+                f"Назначен следующий матч в «{target.tournament.name}». Откройте матч, чтобы посмотреть соперника и внести результат.",
+            )
 
 
 @transaction.atomic
-def start_tournament(*, actor: User, tournament_id: int) -> JuniorTournament:
+def start_tournament(
+    *, actor: User, tournament_id: int, entry_order: list[int] | None = None
+) -> JuniorTournament:
     """Повторно проверяет допуск всех участников и один раз формирует сетку."""
     tournament = JuniorTournament.objects.select_for_update(of=("self",)).get(
         pk=tournament_id
@@ -44,6 +53,10 @@ def start_tournament(*, actor: User, tournament_id: int) -> JuniorTournament:
     if timezone.now() < tournament.registration_ends_at:
         raise ValidationError("Сначала дождитесь окончания регистрации.")
     expire_reservations(tournament)
+    if tournament.entries.filter(status="preliminary").exists():
+        raise ValidationError(
+            "Сначала проверьте представителей по предварительным заявкам или снимите эти заявки."
+        )
     if tournament.entries.filter(status="payment").exists():
         raise ValidationError(
             "Есть неоплаченные действующие резервы. Дождитесь оплаты или окончания резерва."
@@ -64,7 +77,17 @@ def start_tournament(*, actor: User, tournament_id: int) -> JuniorTournament:
         guardian_for(entry.guardian.user, entry.child)
         eligibility(entry.child, entry.guardian, tournament)
     seed = secrets.randbits(32)
-    random.Random(seed).shuffle(entries)
+    if entry_order is None:
+        random.Random(seed).shuffle(entries)
+    else:
+        if len(entry_order) != len(entries) or set(entry_order) != {
+            entry.pk for entry in entries
+        }:
+            raise ValidationError(
+                "Состав участников изменился или один ребёнок выбран несколько раз. Проверьте пары заново."
+            )
+        by_id = {entry.pk: entry for entry in entries}
+        entries = [by_id[entry_id] for entry_id in entry_order]
     if tournament.format == "round_robin":
         position = 0
         for index, first in enumerate(entries):
@@ -104,13 +127,24 @@ def start_tournament(*, actor: User, tournament_id: int) -> JuniorTournament:
     tournament.status = "active"
     tournament.save(update_fields=["status"])
     for entry in entries:
-        notify_family(entry.child, f"Опубликована сетка «{tournament.name}».")
+        notify_family(
+            entry.child,
+            f"Опубликована сетка «{tournament.name}». Матчи ребёнка доступны в разделе «Матчи детей».",
+        )
+    for ready in tournament.matches.filter(
+        status="pending", entry1__isnull=False, entry2__isnull=False
+    ).select_related("entry1__child", "entry2__child", "tournament"):
+        notify_match(
+            ready,
+            f"Назначен матч в «{tournament.name}». Посмотрите соперника и расписание. После игры внесите результат.",
+        )
     AuditEvent.objects.create(
         actor=actor,
         action="tournament.started",
         details={
             "tournament_id": tournament.pk,
             "draw_seed": seed,
+            "draw_mode": "manual" if entry_order is not None else "random",
             "entries": [e.pk for e in entries],
         },
     )
@@ -141,25 +175,50 @@ def _invalidate_descendants(match: JuniorMatch, actor: User) -> None:
     target.scores = []
     target.status = "pending"
     target.completed_at = None
+    target.scheduled_at = None
+    target.result_version += 1
     target.save()
 
 
 @transaction.atomic
-def record_result(
+def _record_result(
     *,
     actor: User,
     match_id: int,
     scores: list[list[int]],
     walkover_side: int | None = None,
     reason: str = "",
+    parent: bool = False,
+    expected_version: int | None = None,
 ) -> JuniorMatch:
     """Сохраняет результат; исправления очищают зависимые матчи с журналом прежнего счёта."""
     match = JuniorMatch.objects.select_related("tournament").get(pk=match_id)
     tournament = JuniorTournament.objects.select_for_update(of=("self",)).get(
         pk=match.tournament_id
     )
-    require_organizer(actor, tournament)
+    match = JuniorMatch.objects.select_related(
+        "tournament", "entry1__child", "entry2__child"
+    ).get(pk=match_id)
+    if parent:
+        for child_id in sorted(
+            entry.child_id for entry in (match.entry1, match.entry2) if entry
+        ):
+            ChildProfile.objects.select_for_update().get(pk=child_id)
+        if not match_guardians(actor, match):
+            raise PermissionDenied(
+                "Вносить результат может проверенный представитель участника матча."
+            )
+    else:
+        require_organizer(actor, tournament)
     match = JuniorMatch.objects.select_for_update(of=("self",)).get(pk=match_id)
+    if parent and expected_version != match.result_version:
+        raise ValidationError(
+            "Матч изменился. Обновите страницу и проверьте участников и результат."
+        )
+    if parent and (tournament.status != "active" or match.status != "pending"):
+        raise ValidationError(
+            "Результат уже сохранён или матч недоступен. По ошибке в результате подайте возражение организатору."
+        )
     if (
         tournament.status not in ("active", "completed")
         or not match.entry1_id
@@ -203,6 +262,7 @@ def record_result(
     match.scores = scores
     match.reason = reason.strip()
     match.completed_at = timezone.now()
+    match.result_version += 1
     match.save()
     _advance(match)
     AuditEvent.objects.create(
@@ -211,13 +271,14 @@ def record_result(
         details=old
         | {"new_scores": scores, "new_winner": match.winner_id, "reason": reason},
     )
-    for entry in (match.entry1, match.entry2):
-        if entry is None:
-            continue
-        notify_family(
-            entry.child,
-            f"{'Исправлен' if correcting else 'Опубликован'} результат матча в «{tournament.name}».",
-        )
+    notify_match(
+        match,
+        f"{'Исправлен' if correcting else 'Сохранён'} результат матча в «{tournament.name}». Откройте матч, чтобы посмотреть счёт.",
+    )
+    from .ranking import finalize_if_complete
+
+    if not correcting:
+        finalize_if_complete(actor=actor, match_id=match.pk)
     return cast(JuniorMatch, match)
 
 
@@ -240,16 +301,58 @@ def schedule_match(*, actor: User, match_id: int, scheduled_at) -> JuniorMatch:
         )
     match.scheduled_at = scheduled_at
     match.save(update_fields=["scheduled_at"])
-    for entry in (match.entry1, match.entry2):
-        if entry is None:
-            continue
-        notify_family(
-            entry.child,
-            f"Расписание матча в «{match.tournament.name}» обновлено. Проверьте время в кабинете.",
-        )
+    notify_match(
+        match,
+        f"Расписание матча в «{match.tournament.name}» обновлено. Посмотрите время на странице матча.",
+    )
     AuditEvent.objects.create(
         actor=actor,
         action="match.scheduled",
         details={"match_id": match.pk, "scheduled_at": scheduled_at.isoformat()},
     )
     return cast(JuniorMatch, match)
+
+
+def record_result(
+    *,
+    actor: User,
+    match_id: int,
+    scores: list[list[int]],
+    walkover_side: int | None = None,
+    reason: str = "",
+) -> JuniorMatch:
+    """Позволяет организатору сохранить или исправить результат с журналом изменений."""
+    return cast(
+        JuniorMatch,
+        _record_result(
+            actor=actor,
+            match_id=match_id,
+            scores=scores,
+            walkover_side=walkover_side,
+            reason=reason,
+        ),
+    )
+
+
+def record_parent_result(
+    *,
+    actor: User,
+    match_id: int,
+    scores: list[list[int]],
+    expected_version: int,
+    walkover_side: int | None = None,
+    reason: str = "",
+) -> JuniorMatch:
+    """Сохраняет первый результат от проверенного родителя по правилам взрослых матчей."""
+    return cast(
+        JuniorMatch,
+        _record_result(
+            actor=actor,
+            match_id=match_id,
+            scores=scores,
+            walkover_side=walkover_side,
+            reason=reason,
+            parent=True,
+            expected_version=expected_version,
+        ),
+    )

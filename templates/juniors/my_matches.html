@@ -1,0 +1,11 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Матчи детей{% endblock %}
+{% block junior_content %}
+<header class="jl-heading"><div><p class="jl-eyebrow">Семейный кабинет</p><h1>Матчи детей</h1><p class="jl-muted">Расписание, соперники и результаты всех ваших детей.</p></div><a class="jl-link" href="{% url 'juniors:family' %}">Мои дети →</a></header>
+<nav class="jl-match-tabs" aria-label="Матчи по статусу"><a href="?state=upcoming" {% if state == 'upcoming' %}aria-current="page"{% endif %}>Предстоящие</a><a href="?state=completed" {% if state == 'completed' %}aria-current="page"{% endif %}>Завершённые</a></nav>
+<div class="jl-grid jl-match-grid">
+{% for row in rows %}<article class="jl-card jl-match-card"><div class="jl-card-top"><span class="jl-badge">{{ row.match.get_status_display }}</span><span class="jl-muted">Круг {{ row.match.round_number }}</span></div><p class="jl-eyebrow">{{ row.match.tournament.name }}</p><h2>{{ row.first }} <span class="jl-muted">—</span> {{ row.second }}</h2><p>{% if row.match.scheduled_at %}{{ row.match.scheduled_at|date:'d E, H:i' }}{% else %}Время матча ещё не назначено{% endif %}</p>{% if row.match.scores %}<p class="jl-match-score">{% for pair in row.match.scores %}{{ pair.0 }}:{{ pair.1 }} {% endfor %}</p>{% endif %}<a class="jl-button {% if row.match.status != 'pending' or not row.ready %}jl-button-outline{% endif %}" href="{% url 'juniors:match' pk=row.match.pk %}">{% if row.match.status == 'pending' and row.ready and junior_actions_allowed %}Открыть матч и внести результат{% else %}Открыть матч{% endif %} →</a></article>
+{% empty %}<section class="jl-empty"><h2>{% if state == 'completed' %}Завершённых матчей пока нет{% else %}Предстоящих матчей пока нет{% endif %}</h2><p>Матчи появятся здесь после запуска турнира. Доступ к ним есть у подтверждённых представителей ребёнка.</p><a href="{% url 'juniors:tournaments' %}">Календарь турниров →</a></section>{% endfor %}
+</div>
+{% if page.has_other_pages %}<nav class="jl-actions jl-note" aria-label="Страницы матчей">{% if page.has_previous %}<a href="?state={{ state }}&page={{ page.previous_page_number }}">← Назад</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a href="?state={{ state }}&page={{ page.next_page_number }}">Далее →</a>{% endif %}</nav>{% endif %}
+{% endblock %}

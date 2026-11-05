@@ -7,7 +7,7 @@ from django import forms
 from apps.users.forms import UserRegistrationForm
 
 from .legal import ACCURACY_CONFIRMATION, REPRESENTATIVE_CONFIRMATION
-from .models import ChildProfile, GuardianLink, LegalRelease
+from .models import ChildProfile, GuardianLink, JuniorTournament, LegalRelease
 from .rules import Ball
 
 
@@ -56,9 +56,13 @@ class ChildForm(forms.ModelForm):
                         "Для исправления проверенных данных напишите на tennis@tennisfan.ru."
                     )
         else:
-            releases = LegalRelease.objects.filter(reviewed=True, is_current=True)
-            self.fields["legal_release"].queryset = releases
-            self.fields["legal_release"].initial = releases.first()
+            from .services import ensure_default_legal_release
+
+            release = ensure_default_legal_release()
+            self.fields["legal_release"].queryset = LegalRelease.objects.filter(
+                pk=release.pk
+            )
+            self.fields["legal_release"].initial = release
         self.fields["gender"].choices = [
             ("", "Выберите пол"),
             ("male", "Мальчик"),
@@ -154,7 +158,9 @@ class RegistrationForm(forms.Form):
     def __init__(self, *args, user, tournament, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["child"].queryset = ChildProfile.objects.filter(
-            guardians__user=user, guardians__status="verified", status="active"
+            guardians__user=user,
+            guardians__status__in=["verified", "pending"],
+            status__in=["draft", "active"],
         )
         self.fields["regulation_version"].initial = tournament.regulation_version
 
@@ -295,4 +301,51 @@ class TournamentFilterForm(forms.Form):
             and data["date_from"] > data["date_to"]
         ):
             self.add_error("date_to", "Конец периода должен быть не раньше начала.")
+        return data
+
+
+class RegistrationDeadlineForm(forms.Form):
+    """Проверяет дату продления или повторного открытия регистрации."""
+
+    deadline = forms.DateTimeField(
+        label="Принимать заявки до",
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local"}),
+    )
+
+
+class ManualDrawForm(forms.Form):
+    """Выбирает каждого подтверждённого ребёнка ровно один раз для первого круга."""
+
+    def __init__(self, *args: Any, tournament: JuniorTournament, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        entries = list(
+            tournament.entries.filter(status="confirmed").select_related("child")
+        )
+        count = len(entries)
+        first_count = (1 << (count - 1).bit_length()) // 2 if count >= 2 else 0
+        choices = [(entry.pk, str(entry.child)) for entry in entries]
+        for pos in range(first_count):
+            for index, side in ((pos, 1), (first_count + pos, 2)):
+                if index < count:
+                    self.fields[f"slot_{index}"] = forms.TypedChoiceField(
+                        label=(
+                            f"Матч {pos + 1} · проходит без игры"
+                            if side == 1 and first_count + pos >= count
+                            else f"Матч {pos + 1} · участник {side}"
+                        ),
+                        choices=[("", "Выберите ребёнка"), *choices],
+                        coerce=int,
+                    )
+        self.entry_count = count
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        ids = [data.get(f"slot_{index}") for index in range(self.entry_count)]
+        if self.entry_count < 2:
+            raise forms.ValidationError(
+                "Для первого круга нужны минимум два подтверждённых участника."
+            )
+        if len(set(ids)) != len(ids):
+            raise forms.ValidationError("Каждого ребёнка выберите только один раз.")
+        data["entry_order"] = ids
         return data

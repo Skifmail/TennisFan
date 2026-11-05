@@ -3,9 +3,9 @@
 {% block title %}Детский профиль{% endblock %}
 {% block junior_content %}
 <header class="jl-heading"><div><p class="jl-eyebrow">МОИ ДЕТИ</p><h1>{% if child %}Редактировать профиль{% else %}Добавить ребёнка{% endif %}</h1><p class="jl-muted">{% if child %}Измените город, ступень подготовки или фото ребёнка.{% else %}Заполните сведения о ребёнке. Документы загружать не нужно.{% endif %}</p></div></header>
-{% if not child %}<aside class="jl-note">Профиль будет доступен вам в семейном кабинете. Перед первым участием уполномоченный организатор проверит представительство и возраст ребёнка. До проверки имя не публикуется и запись на турниры недоступна.</aside>{% endif %}
+{% if not child %}<aside class="jl-note">Профиль будет доступен вам в семейном кабинете. Перед первым участием уполномоченный организатор проверит представительство и возраст ребёнка. До проверки можно подать предварительную заявку. Оплата и допуск к игре откроются после подтверждения.</aside>{% endif %}
 {% if not child and not release %}
-<aside class="jl-note">Добавление профиля откроется после утверждения текста согласия. По вопросам участия напишите на tennis@tennisfan.ru.</aside>
+<aside class="jl-note">Не удалось подключить согласие для создания профиля. По вопросам участия напишите на tennis@tennisfan.ru.</aside>
 {% else %}{% if junior_actions_allowed %}
 <form method="post" enctype="multipart/form-data" class="jl-card jl-form jl-note" novalidate>{% csrf_token %}
 {% if form.errors %}<div class="jl-error" role="alert"><strong>Проверьте заполнение формы.</strong>{{ form.non_field_errors }}<ul>{% for field in form %}{% if field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ field.errors|striptags }}</a></li>{% endif %}{% endfor %}</ul></div>{% endif %}

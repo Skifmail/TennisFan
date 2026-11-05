@@ -17,23 +17,39 @@ from .models import (
     GuardianLink,
     JuniorEntry,
     JuniorTournament,
-    LegalRelease,
 )
-from .notifications import notify_family
+from .notifications import notify_entry
 from .permissions import guardian_for, require_organizer
 
 RESERVATION_MINUTES = 20
 
 
 def eligibility(
-    child: ChildProfile, link: GuardianLink, tournament: JuniorTournament
+    child: ChildProfile,
+    link: GuardianLink,
+    tournament: JuniorTournament,
+    *,
+    preliminary: bool = False,
 ) -> None:
     """Проверяет подтверждения и спортивные условия независимо от интерфейса."""
-    if child.status != ChildProfile.Status.ACTIVE or not child.birth_verified_at:
+    if link.status not in ("pending", "verified") or child.status not in (
+        "draft",
+        "active",
+    ):
+        raise ValidationError(
+            "Профиль или полномочия представителя недоступны для записи."
+        )
+    if not preliminary and (
+        link.status != "verified"
+        or child.status != ChildProfile.Status.ACTIVE
+        or not child.birth_verified_at
+    ):
         raise ValidationError(
             "Профиль ребёнка ещё не активирован или возраст не проверен."
         )
-    release = LegalRelease.objects.filter(reviewed=True, is_current=True).first()
+    from .services import ensure_default_legal_release
+
+    release = ensure_default_legal_release()
     if (
         release is None
         or not ChildConsent.objects.filter(
@@ -63,7 +79,9 @@ def eligibility(
 def expire_reservations(tournament: JuniorTournament) -> None:
     """Освобождает истёкшие резервы; поздняя оплата не подтверждает их повторно."""
     entries = JuniorEntry.objects.filter(
-        tournament=tournament, status="payment", reserved_until__lte=timezone.now()
+        Q(status="payment", reserved_until__lte=timezone.now())
+        | Q(status="preliminary", tournament__starts_at__lte=timezone.now()),
+        tournament=tournament,
     ).select_related("child")
     for entry in entries:
         entry.status = "withdrawn"
@@ -74,16 +92,16 @@ def expire_reservations(tournament: JuniorTournament) -> None:
             action="entry.expired",
             details={"entry_id": entry.pk},
         )
-        notify_family(
-            entry.child,
-            f"Резерв в «{tournament.name}» истёк. Место освобождено; не оплачивайте старую заявку.",
+        notify_entry(
+            entry,
+            f"Срок подтверждения заявки на «{tournament.name}» истёк. Место освобождено.",
         )
 
 
 def occupied_seats(tournament: JuniorTournament) -> int:
     return int(
         tournament.entries.filter(
-            Q(status="confirmed")
+            Q(status__in=["confirmed", "preliminary"])
             | Q(status="payment", reserved_until__gt=timezone.now())
         ).count()
     )
@@ -104,7 +122,7 @@ def register(
             "Платная запись на детский турнир клуба пока недоступна. Обратитесь к организатору."
         )
     child = ChildProfile.objects.select_for_update(of=("self",)).get(pk=child_id)
-    link = guardian_for(actor, child)
+    link = guardian_for(actor, child, verified=False)
     now = timezone.now()
     if (
         tournament.status != "open"
@@ -114,7 +132,7 @@ def register(
         raise ValidationError("Регистрация на турнир закрыта.")
     if regulation_version != tournament.regulation_version:
         raise ValidationError("Регламент изменился. Прочтите актуальную версию.")
-    eligibility(child, link, tournament)
+    eligibility(child, link, tournament, preliminary=True)
     expire_reservations(tournament)
     old = JuniorEntry.objects.filter(tournament=tournament, child=child).first()
     if old and old.status != "withdrawn":
@@ -133,14 +151,15 @@ def register(
     status = (
         "waitlist"
         if full or waiting
-        else ("payment" if tournament.entry_fee else "confirmed")
+        else admission_status(child, link, bool(tournament.entry_fee))
     )
     values = {
         "guardian": link,
         "status": status,
         "amount": tournament.entry_fee,
+        "reminder_sent_at": None,
         "reserved_until": (
-            now + timedelta(minutes=RESERVATION_MINUTES)
+            min(now + timedelta(minutes=RESERVATION_MINUTES), tournament.starts_at)
             if status == "payment"
             else None
         ),
@@ -174,7 +193,7 @@ def register(
         action="entry.created",
         details={"entry_id": entry.pk, "status": status},
     )
-    notify_family(child, f"{tournament.name}: {entry.get_status_display()}.")
+    notify_entry(entry, f"{tournament.name}: {entry.get_status_display()}.")
     return cast(JuniorEntry, entry)
 
 
@@ -186,7 +205,7 @@ def withdraw(*, actor: User, entry_id: int) -> JuniorEntry:
         pk=entry.tournament_id
     )
     child = ChildProfile.objects.select_for_update(of=("self",)).get(pk=entry.child_id)
-    guardian_for(actor, child)
+    guardian_for(actor, child, verified=False)
     entry = JuniorEntry.objects.select_for_update(of=("self",)).get(pk=entry_id)
     if tournament.status in ("active", "completed"):
         raise ValidationError(
@@ -201,7 +220,7 @@ def withdraw(*, actor: User, entry_id: int) -> JuniorEntry:
         action="entry.withdrawn",
         details={"entry_id": entry.pk},
     )
-    notify_family(child, f"Заявка на «{tournament.name}» снята.")
+    notify_entry(entry, f"Заявка на «{tournament.name}» снята.")
     return cast(JuniorEntry, entry)
 
 
@@ -239,7 +258,10 @@ def promote_waitlist(*, actor: User, entry_id: int) -> JuniorEntry:
         pk=entry.child_id
     )
     require_organizer(actor, tournament)
-    if tournament.status != "open" or tournament.registration_ends_at <= timezone.now():
+    if (
+        tournament.status not in ("open", "closed")
+        or tournament.starts_at <= timezone.now()
+    ):
         raise ValidationError("Регистрация уже закрыта.")
     expire_reservations(tournament)
     first = (
@@ -251,12 +273,15 @@ def promote_waitlist(*, actor: User, entry_id: int) -> JuniorEntry:
         raise ValidationError("Предложите место первому участнику листа ожидания.")
     if occupied_seats(tournament) >= tournament.capacity:
         raise ValidationError("Свободных мест пока нет.")
-    guardian_for(entry.guardian.user, entry.child)
-    eligibility(entry.child, entry.guardian, tournament)
-    entry.status = "payment" if entry.amount else "confirmed"
+    guardian_for(entry.guardian.user, entry.child, verified=False)
+    eligibility(entry.child, entry.guardian, tournament, preliminary=True)
+    entry.status = admission_status(entry.child, entry.guardian, bool(entry.amount))
     entry.reserved_until = (
-        timezone.now() + timedelta(minutes=RESERVATION_MINUTES)
-        if entry.amount
+        min(
+            timezone.now() + timedelta(minutes=RESERVATION_MINUTES),
+            tournament.starts_at,
+        )
+        if entry.status == "payment"
         else None
     )
     entry.save(update_fields=["status", "reserved_until"])
@@ -266,8 +291,75 @@ def promote_waitlist(*, actor: User, entry_id: int) -> JuniorEntry:
         action="entry.promoted",
         details={"entry_id": entry.pk},
     )
-    notify_family(
-        entry.child,
+    notify_entry(
+        entry,
         f"Освободилось место в «{tournament.name}». Проверьте заявку и срок оплаты.",
     )
     return cast(JuniorEntry, entry)
+
+
+def admission_status(child: ChildProfile, link: GuardianLink, paid: bool) -> str:
+    """Отделяет предварительную заявку от допуска к оплате и участию."""
+    if (
+        link.status != "verified"
+        or child.status != "active"
+        or not child.birth_verified_at
+    ):
+        return "preliminary"
+    return "payment" if paid else "confirmed"
+
+
+def refresh_preliminary_entries(*, actor: User, child_id: int) -> None:
+    """Обновляет заявки после проверки или согласия, сохраняя порядок блокировок."""
+    for entry_id in JuniorEntry.objects.filter(
+        child_id=child_id, status="preliminary"
+    ).values_list("pk", flat=True):
+        _refresh_preliminary_entry(actor=actor, entry_id=entry_id)
+
+
+@transaction.atomic
+def _refresh_preliminary_entry(*, actor: User, entry_id: int) -> None:
+    """Повторно проверяет допуск и открывает оплату только подтверждённой семье."""
+    source = JuniorEntry.objects.get(pk=entry_id)
+    tournament = JuniorTournament.objects.select_for_update().get(
+        pk=source.tournament_id
+    )
+    child = ChildProfile.objects.select_for_update().get(pk=source.child_id)
+    entry = (
+        JuniorEntry.objects.select_for_update()
+        .select_related("guardian")
+        .get(pk=entry_id)
+    )
+    if entry.status != "preliminary":
+        return
+    reason = ""
+    try:
+        if (
+            tournament.status not in ("open", "closed")
+            or tournament.starts_at <= timezone.now()
+        ):
+            raise ValidationError("Срок проверки перед турниром истёк.")
+        eligibility(child, entry.guardian, tournament, preliminary=True)
+    except ValidationError as error:
+        reason = " ".join(error.messages)
+        entry.status = "withdrawn"
+    else:
+        entry.status = admission_status(child, entry.guardian, bool(entry.amount))
+        if entry.status == "preliminary":
+            return
+    entry.reserved_until = (
+        min(
+            timezone.now() + timedelta(minutes=RESERVATION_MINUTES),
+            tournament.starts_at,
+        )
+        if entry.status == "payment"
+        else None
+    )
+    entry.save(update_fields=["status", "reserved_until"])
+    AuditEvent.objects.create(
+        actor=actor,
+        child=child,
+        action="entry.admitted" if not reason else "entry.withdrawn",
+        details={"entry_id": entry.pk, "reason": reason},
+    )
+    notify_entry(entry, f"{tournament.name}: {entry.get_status_display()}. {reason}")

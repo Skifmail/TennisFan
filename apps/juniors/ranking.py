@@ -113,6 +113,16 @@ def finalize(*, actor: User, tournament_id: int) -> JuniorTournament:
         .get(pk=tournament_id)
     )
     require_organizer(actor, tournament)
+    return _finalize_locked(actor=actor, tournament=tournament)
+
+
+def _finalize_locked(*, actor: User, tournament: JuniorTournament) -> JuniorTournament:
+    """Подводит итоги под блокировкой турнира после проверки вызывающей стороной прав."""
+    if (
+        hasattr(tournament, "appeals")
+        and tournament.appeals.filter(status="open").exists()
+    ):
+        raise ValidationError("Сначала рассмотрите возражения представителей.")
     if tournament.status == "completed":
         return cast(JuniorTournament, tournament)
     if (
@@ -121,11 +131,6 @@ def finalize(*, actor: User, tournament_id: int) -> JuniorTournament:
         or tournament.matches.filter(status="pending").exists()
     ):
         raise ValidationError("Все матчи должны быть завершены до подведения итогов.")
-    if (
-        hasattr(tournament, "appeals")
-        and tournament.appeals.filter(status="open").exists()
-    ):
-        raise ValidationError("Сначала рассмотрите возражения представителей.")
     tournament.awards.all().delete()
     season = tournament.season
     season = JuniorSeason.objects.select_for_update(of=("self",)).get(pk=season.pk)
@@ -220,3 +225,32 @@ def leaderboard(
         row["place"] = place
         previous = row["points"]
     return rows
+
+
+@transaction.atomic
+def finalize_if_complete(*, actor: User, match_id: int) -> None:
+    """Завершает турнир после последнего результата без отдельного действия администратора."""
+    from .models import JuniorMatch
+    from .permissions import can_manage_competition, match_guardians
+
+    source = JuniorMatch.objects.get(pk=match_id)
+    tournament = JuniorTournament.objects.select_for_update().get(
+        pk=source.tournament_id
+    )
+    match = JuniorMatch.objects.select_related("entry1__child", "entry2__child").get(
+        pk=match_id
+    )
+    if not can_manage_competition(actor, tournament) and not match_guardians(
+        actor, match
+    ):
+        from django.core.exceptions import PermissionDenied
+
+        raise PermissionDenied("Нет права подведения итогов этого матча.")
+    if (
+        tournament.status != "active"
+        or match.status not in ("completed", "walkover")
+        or tournament.matches.filter(status="pending").exists()
+        or tournament.appeals.filter(status="open").exists()
+    ):
+        return
+    _finalize_locked(actor=actor, tournament=tournament)

@@ -2,7 +2,7 @@
 
 from typing import Any, cast
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -107,7 +107,7 @@ def update_draft(*, actor: User, child_id: int, data: dict[str, Any]) -> ChildPr
     if (
         data.get("ball", child.ball) != child.ball
         and child.entries.filter(
-            status__in=["confirmed", "payment", "waitlist"],
+            status__in=["preliminary", "confirmed", "payment", "waitlist"],
             tournament__status__in=["open", "closed", "active"],
         ).exists()
     ):
@@ -158,7 +158,7 @@ def _update_photo(child: ChildProfile, data: dict[str, Any], actor: User) -> Non
 
 
 @transaction.atomic
-def verify_guardian(
+def _verify_guardian(
     *, actor: User, link_id: int, approved: bool, evidence: str, reason: str = ""
 ) -> GuardianLink:
     """Фиксирует очную проверку личности, совершеннолетия, полномочий и возраста ребёнка."""
@@ -218,7 +218,7 @@ def verify_guardian(
 
 
 @transaction.atomic
-def accept_consent(
+def _accept_consent(
     *, actor: User, child_id: int, release_id: int, kind: str
 ) -> ChildConsent:
     """Получает конкретное согласие без повторного запроса при входе."""
@@ -304,3 +304,108 @@ def publication_is_allowed(child: ChildProfile) -> bool:
 def public_child_label(child: ChildProfile) -> str:
     """Возвращает имя и фамилию только при действующем разрешении."""
     return str(child) if publication_is_allowed(child) else child.public_label
+
+
+@transaction.atomic
+def activate_legal_release(*, actor: User, expected_version: str) -> LegalRelease:
+    """Подключает готовую редакцию по решению владельца с сохранением прежних согласий."""
+    from .legal import document_bundle
+
+    if (
+        not actor.is_active
+        or not actor.is_staff
+        or not actor.has_perm("juniors.change_legalrelease")
+    ):
+        raise PermissionDenied("Нет права включения согласий.")
+    version, processing, publication = document_bundle()
+    if expected_version != version:
+        raise ValidationError(
+            "Документы обновились. Откройте страницу ещё раз и ознакомьтесь с новой редакцией."
+        )
+    if not processing.strip() or not publication.strip():
+        raise ValidationError("Не удалось получить полные тексты согласий.")
+    release, _ = LegalRelease.objects.get_or_create(
+        version=version,
+        defaults={"processing_text": processing, "publication_text": publication},
+    )
+    release = LegalRelease.objects.select_for_update().get(pk=release.pk)
+    if release.processing_text != processing or release.publication_text != publication:
+        raise ValidationError(
+            "Сохранённая редакция отличается от документов сайта. Обратитесь в поддержку."
+        )
+    if release.is_current and release.reviewed:
+        return cast(LegalRelease, release)
+    LegalRelease.objects.filter(is_current=True).exclude(pk=release.pk).update(
+        is_current=False
+    )
+    release.reviewed = True
+    release.is_current = True
+    release.full_clean()
+    release.save(update_fields=["reviewed", "is_current"])
+    AuditEvent.objects.create(
+        actor=actor,
+        action="legal.activated",
+        details={"version": version, "approval": "Утверждено платформой"},
+    )
+    return cast(LegalRelease, release)
+
+
+@transaction.atomic
+def ensure_default_legal_release() -> LegalRelease:
+    """Подключает документы поставки, если платформа ещё не назначила текущую редакцию."""
+    from .legal import document_bundle
+
+    current = LegalRelease.objects.filter(is_current=True, reviewed=True).first()
+    if current is not None:
+        return cast(LegalRelease, current)
+    version, processing, publication = document_bundle()
+    release, _ = LegalRelease.objects.get_or_create(
+        version=version,
+        defaults={"processing_text": processing, "publication_text": publication},
+    )
+    release = LegalRelease.objects.select_for_update().get(pk=release.pk)
+    current = LegalRelease.objects.filter(is_current=True, reviewed=True).first()
+    if current is not None:
+        return cast(LegalRelease, current)
+    if release.processing_text != processing or release.publication_text != publication:
+        raise ValidationError("Сохранённая редакция отличается от документов поставки.")
+    LegalRelease.objects.filter(is_current=True).exclude(pk=release.pk).update(
+        is_current=False
+    )
+    release.reviewed = True
+    release.is_current = True
+    release.full_clean()
+    release.save(update_fields=["reviewed", "is_current"])
+    AuditEvent.objects.create(action="legal.defaults", details={"version": version})
+    return cast(LegalRelease, release)
+
+
+def verify_guardian(
+    *, actor: User, link_id: int, approved: bool, evidence: str, reason: str = ""
+) -> GuardianLink:
+    """Подтверждает представителя, затем обновляет его предварительные заявки."""
+    link = _verify_guardian(
+        actor=actor,
+        link_id=link_id,
+        approved=approved,
+        evidence=evidence,
+        reason=reason,
+    )
+    from .competition import refresh_preliminary_entries
+
+    refresh_preliminary_entries(actor=actor, child_id=link.child_id)
+    return cast(GuardianLink, link)
+
+
+def accept_consent(
+    *, actor: User, child_id: int, release_id: int, kind: str
+) -> ChildConsent:
+    """Сохраняет личное согласие и обновляет допуск предварительных заявок."""
+    consent = _accept_consent(
+        actor=actor, child_id=child_id, release_id=release_id, kind=kind
+    )
+    if kind == ChildConsent.Kind.PROCESSING:
+        from .competition import refresh_preliminary_entries
+
+        refresh_preliminary_entries(actor=actor, child_id=child_id)
+    return cast(ChildConsent, consent)

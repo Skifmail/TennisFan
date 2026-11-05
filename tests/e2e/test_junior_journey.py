@@ -51,8 +51,8 @@ def test_parent_to_tournament_results_through_real_views(client, settings) -> No
             reverse("juniors:tournament", args=[tournament.pk]),
             {"child": link.child_id, "regulation_version": 1, "accepted": "on"},
         )
-        assert blocked.status_code == 200
-        assert not tournament.entries.filter(child_id=link.child_id).exists()
+        assert blocked.status_code == 302
+        assert tournament.entries.get(child_id=link.child_id).status == "preliminary"
         client.force_login(organizer)
         review = client.post(
             reverse("admin:juniors_verify", args=[link.pk]),
@@ -73,11 +73,7 @@ def test_parent_to_tournament_results_through_real_views(client, settings) -> No
         )
         kid = ChildProfile.objects.get(pk=link.child_id)
         assert kid.status == "active"
-        response = client.post(
-            reverse("juniors:tournament", args=[tournament.pk]),
-            {"child": kid.pk, "regulation_version": 1, "accepted": "on"},
-        )
-        assert response.status_code == 302
+        assert tournament.entries.get(child_id=kid.pk).status == "confirmed"
     # Симулируем окончание регистрации, не ожидая календарного дедлайна.
     JuniorTournament.objects.filter(pk=tournament.pk).update(
         registration_ends_at=timezone.now() - timedelta(minutes=1)

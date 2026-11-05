@@ -98,4 +98,7 @@ def resolve_appeal(*, actor: User, appeal_id: int, response: str) -> JuniorAppea
         appeal.guardian.child,
         "Возражение по результату рассмотрено. Решение доступно в кабинете.",
     )
+    from .ranking import finalize_if_complete
+
+    finalize_if_complete(actor=actor, match_id=appeal.match_id)
     return cast(JuniorAppeal, appeal)

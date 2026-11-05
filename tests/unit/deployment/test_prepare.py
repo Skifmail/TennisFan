@@ -21,7 +21,9 @@ def test_prepare_deployment_when_postgres_should_lock_migrations(
     mocker.patch.dict(
         "os.environ", {"DJANGO_SUPERUSER_EMAIL": "", "DJANGO_SUPERUSER_PASSWORD": ""}
     )
+    defaults = mocker.patch("apps.juniors.services.ensure_default_legal_release")
     call_command("prepare_deployment")
+    defaults.assert_called_once_with()
     migrate.assert_called_once_with("migrate", interactive=False)
     sql = [call.args[0] for call in cursor.execute.call_args_list]
     assert "SELECT pg_try_advisory_lock(%s)" in sql

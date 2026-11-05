@@ -17,7 +17,7 @@ from apps.juniors.models import (
     JuniorRefund,
     JuniorTournament,
 )
-from apps.juniors.notifications import notify_family
+from apps.juniors.notifications import notify_entry
 
 
 class Command(BaseCommand):
@@ -63,7 +63,7 @@ class Command(BaseCommand):
                 expire_reservations(tournament)
         now = timezone.now()
         for entry_id in JuniorEntry.objects.filter(
-            status="confirmed",
+            status__in=["confirmed", "preliminary"],
             reminder_sent_at__isnull=True,
             tournament__status__in=["open", "closed", "active"],
             tournament__starts_at__gt=now,
@@ -75,10 +75,18 @@ class Command(BaseCommand):
                     .select_related("child", "tournament")
                     .get(pk=entry_id)
                 )
-                if entry.reminder_sent_at is None and entry.status == "confirmed":
-                    notify_family(
-                        entry.child,
-                        f"Скоро турнир «{entry.tournament.name}». Проверьте время и место в кабинете.",
+                if entry.reminder_sent_at is None and entry.status in (
+                    "confirmed",
+                    "preliminary",
+                ):
+                    notify_entry(
+                        entry,
+                        f"Скоро турнир «{entry.tournament.name}». Проверьте время и место в кабинете."
+                        + (
+                            " До начала турнира подтвердите документы у организатора. Без проверки участие недоступно."
+                            if entry.status == "preliminary"
+                            else ""
+                        ),
                     )
                     entry.reminder_sent_at = now
                     entry.save(update_fields=["reminder_sent_at"])

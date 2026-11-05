@@ -1,0 +1,25 @@
+{% extends 'admin/change_list.html' %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/admin/junior-legal.css' %}">{% endblock %}
+{% block content_title %}<h1>Документы и согласия детской лиги</h1>{% endblock %}
+{% block object-tools %}{% endblock %}
+{% block content %}
+<section class="junior-legal-setup" aria-labelledby="junior-legal-title">
+    <h2 id="junior-legal-title">{% if documents_enabled %}Согласия включены{% elif documents_current %}Доступна новая редакция документов{% else %}Включите согласия для родителей{% endif %}</h2>
+    <p>{% if documents_enabled %}Готовые тексты подключены к формам. Копировать документы и создавать версии вручную не нужно.{% else %}Документы уже подготовлены. Ознакомьтесь с ними и нажмите кнопку ниже, чтобы подключить тексты к формам.{% endif %}</p>
+    <ul class="junior-legal-links">{% for title,url in document_links %}<li><a href="{{ url }}" target="_blank" rel="noopener">{{ title }} <span aria-hidden="true">↗</span></a></li>{% endfor %}</ul>
+    {% if can_enable_documents and not documents_enabled %}
+    <form method="post" action="{% url 'admin:juniors_activate_legal' %}">{% csrf_token %}
+        <input type="hidden" name="version" value="{{ prepared_version }}">
+        <p>Нажимая кнопку, вы утверждаете эту редакцию от имени платформы. Сохранённые согласия родителей останутся без изменений.</p>
+        <button type="submit" class="button junior-legal-enable">{% if documents_current %}Использовать новую редакцию{% else %}Включить согласия{% endif %}</button>
+    </form>
+    {% endif %}
+</section>
+<section class="junior-legal-flow" aria-labelledby="junior-legal-flow-title">
+    <h2 id="junior-legal-flow-title">Как активируется профиль ребёнка</h2>
+    <ol><li>Родитель заполняет профиль и подтверждает согласие на обработку данных.</li><li>Уполномоченный проверяющий подтверждает представителя.</li><li>Профиль становится активным автоматически.</li></ol>
+    <p>Если представитель уже подтверждён, родителю достаточно дать согласие в настройках профиля ребёнка. За родителя согласие не оформляется.</p>
+</section>
+{% if cl.result_count %}<h2>История редакций</h2>{{ block.super }}{% endif %}
+{% endblock %}

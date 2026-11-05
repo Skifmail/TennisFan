@@ -2,7 +2,7 @@
 
 from django.urls import path
 
-from . import organizer_views, payment_views, views
+from . import match_views, organizer_views, payment_views, views
 
 app_name = "juniors"
 urlpatterns = [
@@ -15,6 +15,8 @@ urlpatterns = [
     path("tournaments/", views.tournaments, name="tournaments"),
     path("tournaments/<int:pk>/", views.tournament_detail, name="tournament"),
     path("tournaments/<int:pk>/manage/", organizer_views.manage, name="manage"),
+    path("matches/", match_views.my_matches, name="my_matches"),
+    path("matches/<int:pk>/", match_views.match_detail, name="match"),
     path("matches/<int:pk>/result/", organizer_views.result, name="result"),
     path("entries/<int:pk>/withdraw/", views.withdraw_entry, name="withdraw"),
     path("entries/<int:pk>/pay/", payment_views.pay, name="pay"),

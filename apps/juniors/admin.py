@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import requests
 from django.contrib import admin
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -38,7 +38,11 @@ from .models import (
     LegalRelease,
 )
 from .permissions import accessible_competitions, require_verifier
-from .services import verify_guardian
+from .services import (
+    activate_legal_release,
+    ensure_default_legal_release,
+    verify_guardian,
+)
 
 
 @admin.register(ChildProfile)
@@ -273,8 +277,74 @@ class CompetitionReadOnlyAdmin(AuditEventAdmin):
 
 @admin.register(LegalRelease)
 class LegalReleaseAdmin(admin.ModelAdmin):
-    list_display: tuple[str, ...] = ("version", "reviewed", "is_current", "created_at")
-    readonly_fields = ("created_at",)
+    change_list_template = "admin/juniors/legal_releases.html"
+    list_display: tuple[str, ...] = ("created_at", "is_current", "reviewed")
+    list_display_links = None
+    readonly_fields = tuple(field.name for field in LegalRelease._meta.fields)
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_urls(self):
+        return [
+            path(
+                "activate/",
+                self.admin_site.admin_view(self.activate_view),
+                name="juniors_activate_legal",
+            )
+        ] + super().get_urls()
+
+    def changelist_view(self, request, extra_context=None):
+        from .legal import TITLES, document_bundle
+
+        version, _, _ = document_bundle()
+        current = ensure_default_legal_release()
+        return super().changelist_view(
+            request,
+            extra_context={
+                **(extra_context or {}),
+                "document_links": [
+                    (title, reverse("legal_junior_" + slug))
+                    for slug, title in TITLES.items()
+                ],
+                "prepared_version": version,
+                "documents_enabled": bool(current and current.version == version),
+                "documents_current": current,
+                "can_enable_documents": self.has_change_permission(request),
+            },
+        )
+
+    def activate_view(self, request):
+        from django.http import HttpResponseNotAllowed
+
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        try:
+            activate_legal_release(
+                actor=request.user, expected_version=request.POST.get("version", "")
+            )
+        except (ValidationError, OSError) as exc:
+            self.message_user(
+                request,
+                (
+                    " ".join(exc.messages)
+                    if isinstance(exc, ValidationError)
+                    else "Не удалось прочитать документы. Обратитесь в поддержку."
+                ),
+                level="error",
+            )
+        else:
+            self.message_user(
+                request,
+                "Согласия включены. Родители могут оформлять их при добавлении ребёнка. Для уже созданного профиля согласие доступно в его настройках.",
+            )
+        return redirect("admin:juniors_legalrelease_changelist")
 
 
 @admin.register(ChildConsent)

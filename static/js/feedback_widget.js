@@ -38,20 +38,32 @@
     var isPlatformAdmin = widget.getAttribute("data-is-platform-admin") === "1";
 
     var bugToggle = document.getElementById("feedback-bug-toggle");
+    var supportToggle = document.getElementById("feedback-support-toggle");
     var bugHelp = document.getElementById("feedback-bug-help");
     var attachmentsInput = document.getElementById("feedback-attachments");
     var attachmentsList = document.getElementById("feedback-attachments-list");
     var attachmentsClear = document.getElementById("feedback-attachments-clear");
     var bugMode = false;
     var sending = false;
-    if (bugToggle) bugToggle.addEventListener("click", function () {
-        bugMode = !bugMode;
+    function setComposerMode(isBug) {
+        if (sending) return;
+        bugMode = isBug;
         bugToggle.setAttribute("aria-expanded", String(bugMode));
+        bugToggle.setAttribute("aria-pressed", String(bugMode));
+        supportToggle.setAttribute("aria-pressed", String(!bugMode));
         bugHelp.hidden = !bugMode;
         messageInput.maxLength = bugMode ? 6000 : 2000;
         messageInput.placeholder = bugMode ? "Опишите подробно, что произошло…" : "Введите сообщение…";
+        messageInput.setAttribute("aria-label", bugMode ? "Описание ошибки" : "Сообщение в поддержку");
         messageInput.rows = bugMode ? 4 : 2;
+        sendBtn.setAttribute("aria-label", bugMode ? "Отправить сообщение об ошибке" : "Отправить сообщение");
         messageInput.focus();
+    }
+    if (bugToggle) bugToggle.addEventListener("click", function () {
+        setComposerMode(true);
+    });
+    if (supportToggle) supportToggle.addEventListener("click", function () {
+        setComposerMode(false);
     });
     if (attachmentsInput) attachmentsInput.addEventListener("change", function () {
         var files = Array.from(attachmentsInput.files || []);
@@ -309,10 +321,11 @@
         messageInput.disabled = true;
         attachmentsInput.disabled = true;
         bugToggle.disabled = true;
+        supportToggle.disabled = true;
         var xhr = new XMLHttpRequest();
         xhr.open("POST", submitUrl);
         xhr.setRequestHeader("X-CSRFToken", csrfToken || getCookie("csrftoken") || "");
-        function finish() { sending = false; sendBtn.disabled = !messageInput.value.trim(); messageInput.disabled = false; attachmentsInput.disabled = false; bugToggle.disabled = false; }
+        function finish() { sending = false; sendBtn.disabled = !messageInput.value.trim(); messageInput.disabled = false; attachmentsInput.disabled = false; bugToggle.disabled = false; supportToggle.disabled = false; }
         xhr.onload = function () {
             try {
                 var data = JSON.parse(xhr.responseText);

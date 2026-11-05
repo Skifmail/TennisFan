@@ -487,6 +487,10 @@
                     <h3 class="feedback-chat-widget__title">Обратная связь</h3>
                     <button type="button" class="feedback-chat-widget__close" id="feedback-chat-close" aria-label="Закрыть">&times;</button>
                 </div>
+                <div class="feedback-chat-modes" role="group" aria-label="Тип обращения">
+                    <button class="feedback-support-toggle" id="feedback-support-toggle" type="button" aria-pressed="true">Диалоги поддержки</button>
+                    <button class="feedback-bug-toggle" id="feedback-bug-toggle" type="button" aria-pressed="false" aria-expanded="false" aria-controls="feedback-bug-help">Сообщить об ошибке</button>
+                </div>
             </div>
 
             <!-- Область сообщений с прокруткой -->
@@ -516,7 +520,6 @@
 
             <!-- Сообщения и отчёты об ошибках используют один диалог. -->
             <div class="feedback-chat-widget__input-area">
-                <button class="feedback-bug-toggle" id="feedback-bug-toggle" type="button" aria-expanded="false" aria-controls="feedback-bug-help">Сообщить об ошибке</button>
                 <div id="feedback-bug-help" class="feedback-bug-help" hidden><strong>Что пошло не так?</strong><p>Опишите как можно подробнее: на какой странице возникла ошибка, что вы делали и что ожидали увидеть. Приложите скриншот, если он поможет. Не отправляйте пароли, документы и данные карты.</p></div>
                 <div class="feedback-chat-widget__input-wrapper">
                     <textarea id="feedback-message-input" class="feedback-chat-widget__input" placeholder="Введите сообщение..." maxlength="2000" rows="2" aria-label="Сообщение в поддержку"></textarea>

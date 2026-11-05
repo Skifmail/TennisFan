@@ -71,11 +71,10 @@ class Command(BaseCommand):
             )
         report = {
             "read_only_audit": True,
+            "league_access": "public",
             "database_vendor": connection.vendor,
             "pending_migrations": pending,
             "flags": {
-                "league_enabled": settings.JUNIOR_LEAGUE_ENABLED,
-                "actions_read_only": settings.JUNIOR_LEAGUE_READ_ONLY,
                 "payments_enabled": settings.JUNIOR_PAYMENTS_ENABLED,
                 "notification_center_enabled": settings.NOTIFICATION_CENTER_ENABLED,
             },

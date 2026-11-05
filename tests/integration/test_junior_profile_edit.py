@@ -258,13 +258,13 @@ def test_existing_processing_consent_can_be_withdrawn_without_current_release(
     assert LegalRelease.objects.get(is_current=True).reviewed
 
 
-def test_readonly_consent_is_not_called_settings(client, private_profile):
+def test_regular_parent_can_manage_consents(client, private_profile):
     parent, child, _, _, _ = private_profile
     parent.is_staff = False
     parent.save(update_fields=["is_staff"])
     html = client.get(reverse("juniors:child", args=[child.pk])).content.decode()
     assert html.count('id="profile-settings"') == 1
-    assert "<summary>Согласия</summary>" in html
-    assert "<summary>Настройки профиля</summary>" not in html
+    assert "<summary>Настройки профиля</summary>" in html
+    assert "<summary>Согласия</summary>" not in html
     assert "Посмотреть выданное согласие" in html
-    assert 'name="action" value="set_publication"' not in html
+    assert 'name="action" value="set_publication"' in html

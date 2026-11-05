@@ -159,13 +159,7 @@ INSTALLED_APPS = [
     "apps.juniors",
 ]
 
-# Детская лига открывается отдельно после миграций и проверки регламентов.
-JUNIOR_LEAGUE_ENABLED = (
-    os.environ.get("JUNIOR_LEAGUE_ENABLED", "False").lower() == "true"
-)
-JUNIOR_LEAGUE_READ_ONLY = (
-    os.environ.get("JUNIOR_LEAGUE_READ_ONLY", "True").lower() == "true"
-)
+# Онлайн-оплата включается отдельно от публичного доступа к детской лиге.
 JUNIOR_PAYMENTS_ENABLED = (
     os.environ.get("JUNIOR_PAYMENTS_ENABLED", "False").lower() == "true"
 )
@@ -193,7 +187,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "apps.juniors.middleware.JuniorDevelopmentMiddleware",
     "apps.notifications.middleware.PushDeviceLifetimeMiddleware",
     "apps.subscriptions.middleware.FreeSubscriptionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -850,5 +843,12 @@ SOCIAL_AUTH_PROVIDERS = {
 JUNIOR_PRIVATE_MEDIA_ROOT = Path(
     os.environ.get(
         "JUNIOR_PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media" / "juniors")
+    )
+)
+
+# Скриншоты поддержки доступны только через проверяющий права маршрут.
+SUPPORT_PRIVATE_MEDIA_ROOT = Path(
+    os.environ.get(
+        "SUPPORT_PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media" / "support")
     )
 )

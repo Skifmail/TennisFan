@@ -12,10 +12,7 @@
         <a href="{% url 'juniors:family' %}">Мои дети</a>
         {% if user.is_authenticated %}<a href="{% url 'juniors:my_matches' %}">Матчи детей</a><a href="{% url 'juniors:payments' %}">Оплаты</a>{% endif %}
     </nav>
-    {% if junior_read_only %}<aside class="jl-development" role="status">
-        <strong>Детская лига находится в разработке</strong>
-        <p>Мы готовим детскую лигу к запуску. Пока можно посмотреть, как всё устроено, но добавить ребёнка или записаться на турнир ещё нельзя.</p>
-    </aside>{% endif %}
+    <aside class="jl-launch-note" aria-label="О запуске детской лиги"><strong>Детская лига запущена</strong><p>Мы продолжаем тестировать и дорабатывать раздел. Если заметите ошибку, <a href="?open_support=1&amp;report_bug=1">сообщите в поддержку</a> — опишите, что произошло, и приложите скриншот.</p></aside>
     {% block junior_content %}{% endblock %}
 </main>
 {% endblock %}

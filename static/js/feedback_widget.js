@@ -37,6 +37,33 @@
     var isAuth = widget.getAttribute("data-is-authenticated") === "1";
     var isPlatformAdmin = widget.getAttribute("data-is-platform-admin") === "1";
 
+    var bugToggle = document.getElementById("feedback-bug-toggle");
+    var bugHelp = document.getElementById("feedback-bug-help");
+    var attachmentsInput = document.getElementById("feedback-attachments");
+    var attachmentsList = document.getElementById("feedback-attachments-list");
+    var attachmentsClear = document.getElementById("feedback-attachments-clear");
+    var bugMode = false;
+    var sending = false;
+    if (bugToggle) bugToggle.addEventListener("click", function () {
+        bugMode = !bugMode;
+        bugToggle.setAttribute("aria-expanded", String(bugMode));
+        bugHelp.hidden = !bugMode;
+        messageInput.maxLength = bugMode ? 6000 : 2000;
+        messageInput.placeholder = bugMode ? "Опишите подробно, что произошло…" : "Введите сообщение…";
+        messageInput.rows = bugMode ? 4 : 2;
+        messageInput.focus();
+    });
+    if (attachmentsInput) attachmentsInput.addEventListener("change", function () {
+        var files = Array.from(attachmentsInput.files || []);
+        attachmentsList.textContent = files.map(function (file) { return file.name; }).join(", ");
+        attachmentsClear.hidden = !files.length;
+    });
+    if (attachmentsClear) attachmentsClear.addEventListener("click", function () {
+        attachmentsInput.value = "";
+        attachmentsList.textContent = "";
+        attachmentsClear.hidden = true;
+    });
+
     // Состояние чата
     var chatState = {
         isOpen: false,
@@ -153,6 +180,9 @@
                                 isEdited: !!msg.is_edited,
                                 editedAt: msg.edited_at || null,
                                 canEdit: !!msg.can_edit,
+                                bugReport: msg.bug_report || null,
+                                bugReplyTo: msg.bug_reply_to || null,
+                                attachments: msg.attachments || [],
                             });
                             if (!chatState.lastMessageId || msg.id > chatState.lastMessageId) {
                                 chatState.lastMessageId = msg.id;
@@ -198,10 +228,22 @@
                 ? "background: rgba(0, 131, 116, 0.30); border: 1px solid rgba(0, 210, 180, 0.45); color: #ffffff;"
                 : "background: rgba(166, 130, 74, 0.28); border: 1px solid rgba(166, 130, 74, 0.55);";
             var canEdit = isUser && !!msg.canEdit;
+            if (msg.bugReport) messageClass += " support-message--bug";
 
             html += '<div class="feedback-chat-widget__message ' + messageClass + '" data-message-id="' + String(msg.id) + '" style="margin-bottom:12px;border-radius:12px;padding:10px 12px;border:1px solid rgba(255,255,255,0.12);background:rgba(4, 48, 43, 0.45);">';
             html += '<div class="feedback-chat-widget__message-time" style="margin-bottom:4px;font-weight:700;">' + authorLabel + "</div>";
+            if (msg.bugReport) html += '<strong class="support-bug-badge">Сообщение об ошибке №' + Number(msg.bugReport.id) + '</strong>';
+            if (msg.bugReplyTo) html += '<strong class="support-reply-label">Ответ на ошибку №' + Number(msg.bugReplyTo) + '</strong>';
             html += '<div class="feedback-chat-widget__message-bubble" style="' + bubbleStyle + '">' + escapeHtml(msg.text) + "</div>";
+            if (msg.attachments && msg.attachments.length) {
+                html += '<div class="support-attachments">';
+                msg.attachments.forEach(function (item) {
+                    // URL строится сервером из числового ID, произвольные ссылки не вставляются.
+                    var url = "/support/attachments/" + Number(item.id) + "/";
+                    html += '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '" alt="Скриншот к сообщению" loading="lazy"></a>';
+                });
+                html += '</div>';
+            }
             if (canEdit) {
                 html += '<button type="button" class="btn btn-ghost feedback-chat-widget__edit-btn" data-edit-message-id="' + String(msg.id) + '" style="margin-top:6px;padding:4px 8px;font-size:12px;">Редактировать</button>';
             }
@@ -244,113 +286,52 @@
     }
 
     function sendMessage() {
-        if (!messageInput || !submitUrl) return;
-
+        if (!messageInput || !submitUrl || sending) return;
         var message = (messageInput.value || "").trim();
         if (!message) return;
-
-        // Для гостей проверяем имя
-        if (!isAuth && !chatState.guestInfoCollected) {
-            if (!guestNameInput || !(guestNameInput.value || "").trim()) {
-                if (formError) {
-                    formError.textContent = "Введите ваше имя.";
-                    formError.style.display = "block";
-                }
-                return;
-            }
+        function showError(text) { if (formError) { formError.textContent = text; formError.style.display = "block"; } }
+        if (!isAuth && !chatState.guestInfoCollected && (!guestNameInput || !(guestNameInput.value || "").trim())) { showError("Введите ваше имя."); return; }
+        if (!isAuth && !chatState.guestInfoCollected && (!guestContactInput || !guestContactInput.validity.valid || !guestContactInput.value.trim())) { showError("Введите email для ответа."); return; }
+        var files = Array.from(attachmentsInput.files || []);
+        if (files.length > 3 || files.some(function (file) { return file.size > 5 * 1024 * 1024; })) { showError("Прикрепите до 3 изображений, не больше 5 МБ каждое."); return; }
+        var payload = new FormData();
+        payload.append("message", message);
+        payload.append("kind", bugMode ? "bug" : "message");
+        payload.append("page_url", window.location.pathname);
+        if (!isAuth) {
+            payload.append("guest_name", guestNameInput.value.trim());
+            payload.append("guest_contact", guestContactInput.value.trim());
         }
-
+        files.forEach(function (file) { payload.append("attachments", file); });
         if (formError) formError.style.display = "none";
-
-        // Optimistic update - добавляем сообщение сразу
-        addMessage(message, false);
-
-        // Очищаем поле ввода
-        messageInput.value = "";
-        if (sendBtn) sendBtn.disabled = true;
-
-        // Собираем данные для отправки
-        var payload = {
-            message: message,
-        };
-
-        // Данные гостя (только при первом сообщении)
-        if (!isAuth && !chatState.guestInfoCollected) {
-            if (guestNameInput) {
-                payload.guest_name = (guestNameInput.value || "").trim();
-            }
-            if (guestContactInput) {
-                payload.guest_contact = (guestContactInput.value || "").trim();
-            }
-            if (guestTelegramInput) {
-                var tgUsername = (guestTelegramInput.value || "").trim().replace(/^@/, "");
-                if (tgUsername) {
-                    payload.guest_telegram_username = tgUsername;
-                }
-            }
-            chatState.guestInfoCollected = true;
-            // Скрываем форму гостя
-            if (guestForm) {
-                guestForm.classList.remove("feedback-chat-widget__guest-form--visible");
-            }
-        }
-
-        // Отправка на сервер
-        var token = csrfToken || getCookie("csrftoken");
+        sending = true;
+        sendBtn.disabled = true;
+        messageInput.disabled = true;
+        attachmentsInput.disabled = true;
+        bugToggle.disabled = true;
         var xhr = new XMLHttpRequest();
         xhr.open("POST", submitUrl);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.setRequestHeader("X-CSRFToken", token || "");
+        xhr.setRequestHeader("X-CSRFToken", csrfToken || getCookie("csrftoken") || "");
+        function finish() { sending = false; sendBtn.disabled = !messageInput.value.trim(); messageInput.disabled = false; attachmentsInput.disabled = false; bugToggle.disabled = false; }
         xhr.onload = function () {
-            if (sendBtn) sendBtn.disabled = false;
             try {
                 var data = JSON.parse(xhr.responseText);
-                if (data.success) {
-                    // Обновляем последнее сообщение с реальным ID если есть
-                    if (data.message_id && chatState.messages.length > 0) {
-                        var lastMsg = chatState.messages[chatState.messages.length - 1];
-                        if (lastMsg && (!lastMsg.id || lastMsg.id >= Date.now() - 1000)) {
-                            lastMsg.id = data.message_id;
-                            if (!chatState.lastMessageId || data.message_id > chatState.lastMessageId) {
-                                chatState.lastMessageId = data.message_id;
-                            }
-                        }
-                    }
-
-                    // Начинаем polling для получения новых сообщений
-                    if (threadsUrl) {
-                        startPolling();
-                    }
-                } else {
-                    // Удаляем последнее сообщение при ошибке
-                    chatState.messages.pop();
+                if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                    chatState.messages.push({id:data.message_id,text:message,isFromAdmin:false,createdAt:new Date().toISOString(),canEdit:true,bugReport:data.bug_report,bugReplyTo:null,attachments:data.attachments || []});
+                    chatState.guestInfoCollected = true;
+                    if (guestForm) guestForm.classList.remove("feedback-chat-widget__guest-form--visible");
+                    messageInput.value = "";
+                    attachmentsInput.value = "";
+                    attachmentsList.textContent = "";
+                    attachmentsClear.hidden = true;
                     renderMessages();
-                    if (formError) {
-                        formError.textContent = data.error || "Ошибка отправки.";
-                        formError.style.display = "block";
-                    }
-                }
-            } catch (err) {
-                // Удаляем последнее сообщение при ошибке
-                chatState.messages.pop();
-                renderMessages();
-                if (formError) {
-                    formError.textContent = "Ошибка отправки.";
-                    formError.style.display = "block";
-                }
-            }
+                    startPolling();
+                } else showError(data.error || "Не удалось отправить сообщение.");
+            } catch (error) { showError("Не удалось отправить сообщение. Текст и вложения сохранены в форме."); }
+            finish();
         };
-        xhr.onerror = function () {
-            if (sendBtn) sendBtn.disabled = false;
-            // Удаляем последнее сообщение при ошибке
-            chatState.messages.pop();
-            renderMessages();
-            if (formError) {
-                formError.textContent = "Ошибка сети.";
-                formError.style.display = "block";
-            }
-        };
-        xhr.send(JSON.stringify(payload));
+        xhr.onerror = function () { showError("Не удалось связаться с сервером. Текст и вложения сохранены в форме."); finish(); };
+        xhr.send(payload);
     }
 
     function startPolling() {
@@ -388,6 +369,9 @@
                                 isEdited: !!msg.is_edited,
                                 editedAt: msg.edited_at || null,
                                 canEdit: !!msg.can_edit,
+                                bugReport: msg.bug_report || null,
+                                bugReplyTo: msg.bug_reply_to || null,
+                                attachments: msg.attachments || [],
                                     });
                         } else {
                             var existingMessage = chatState.messages.find(function (m) {
@@ -399,12 +383,15 @@
                                     existingMessage.text !== msg.text
                                     || existingMessage.isEdited !== !!msg.is_edited
                                     || existingMessage.canEdit !== !!msg.can_edit
+                                    || JSON.stringify(existingMessage.bugReport) !== JSON.stringify(msg.bug_report || null)
                                 )
                             ) {
                                 existingMessage.text = msg.text;
                                 existingMessage.isEdited = !!msg.is_edited;
                                 existingMessage.editedAt = msg.edited_at || null;
                                 existingMessage.canEdit = !!msg.can_edit;
+                                existingMessage.bugReport = msg.bug_report || null;
+                                existingMessage.attachments = msg.attachments || [];
                                 hasUpdates = true;
                             }
                                 }
@@ -519,7 +506,7 @@
     // Отправка по Enter
     if (messageInput) {
         messageInput.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !bugMode) {
                 e.preventDefault();
                 sendMessage();
             }
@@ -538,7 +525,7 @@
         sendBtn.disabled = true; // Начинаем с отключенной кнопки
     }
 
-    function openEditModal(initialText, onSubmit) {
+    function openEditModal(initialText, onSubmit, maxLength) {
         var overlay = document.createElement("div");
         overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:12000;padding:16px;";
 
@@ -551,7 +538,7 @@
 
         var textarea = document.createElement("textarea");
         textarea.value = initialText || "";
-        textarea.maxLength = 2000;
+        textarea.maxLength = maxLength || 2000;
         textarea.style.cssText = "width:100%;min-height:110px;resize:vertical;background:rgba(0,0,0,.2);color:#fff;border:1px solid rgba(255,255,255,.24);border-radius:10px;padding:10px;";
 
         var actions = document.createElement("div");
@@ -653,12 +640,15 @@
                     }
                 };
                 xhr.send(JSON.stringify({ message_id: messageId, text: newText }));
-            });
+            }, message.bugReport ? 6000 : 2000);
         });
     }
 
     if (!isPlatformAdmin && window.location.search.indexOf("open_support=1") !== -1) {
         openChat();
+        if (window.location.search.indexOf("report_bug=1") !== -1 && bugToggle && !bugMode) {
+            bugToggle.click();
+        }
     }
 
     startUnreadPolling();

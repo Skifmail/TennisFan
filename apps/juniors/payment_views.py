@@ -17,10 +17,8 @@ from loguru import logger
 from .billing import begin_payment, reconcile_payment, request_refund
 from .models import JuniorEntry, JuniorPayment
 from .permissions import account
-from .views import league_available
 
 
-@league_available
 @never_cache
 @login_required
 @require_POST

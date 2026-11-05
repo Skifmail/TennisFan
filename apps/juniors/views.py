@@ -1,11 +1,8 @@
 """Страницы детской лиги и приватного семейного кабинета."""
 
-from collections.abc import Callable
 from datetime import datetime
-from functools import wraps
-from typing import Any, TypeVar
+from typing import Any
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -14,7 +11,6 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
-from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import urlencode
@@ -61,23 +57,6 @@ def posted_id(request: HttpRequest, key: str) -> int:
             "Некорректный идентификатор. Обновите страницу и повторите действие."
         )
     return int(value)
-
-
-Response = TypeVar("Response", bound=HttpResponseBase)
-
-
-def league_available(view: Callable[..., Response]) -> Callable[..., Response]:
-    """Закрывает маршруты лиги до явного включения после миграций."""
-
-    @wraps(view)
-    def wrapped(request: HttpRequest, *args, **kwargs) -> Response:
-        if not settings.JUNIOR_LEAGUE_ENABLED and not (
-            request.user.is_authenticated and request.user.is_staff
-        ):
-            raise Http404
-        return view(request, *args, **kwargs)
-
-    return wrapped
 
 
 def upcoming_tournaments(*, now: datetime, limit: int = 3) -> list[dict[str, Any]]:
@@ -159,7 +138,6 @@ def rating_preview(season: JuniorSeason | None) -> dict[str, Any] | None:
     }
 
 
-@league_available
 @never_cache
 def home(request: HttpRequest) -> HttpResponse:
     season = current_season()
@@ -174,13 +152,11 @@ def home(request: HttpRequest) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 def rules(request: HttpRequest) -> HttpResponse:
     return render(request, "juniors/rules.html", {"ball_guide": BALL_GUIDE})
 
 
-@league_available
 @never_cache
 @require_http_methods(["GET", "POST"])
 def parent_join(request: HttpRequest) -> HttpResponse:
@@ -222,7 +198,6 @@ def parent_join(request: HttpRequest) -> HttpResponse:
     return render(request, "juniors/parent_join.html", {"form": form})
 
 
-@league_available
 @never_cache
 @login_required
 def family(request: HttpRequest) -> HttpResponse:
@@ -250,7 +225,6 @@ def adult_history(request: HttpRequest) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 @login_required
 def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
@@ -305,7 +279,6 @@ def child_form(request: HttpRequest, pk: int | None = None) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 @login_required
 def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
@@ -373,7 +346,6 @@ def child_detail(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 @login_required
 @require_http_methods(["GET", "HEAD"])
@@ -395,7 +367,6 @@ def child_photo(request: HttpRequest, pk: int) -> FileResponse:
     return response
 
 
-@league_available
 @never_cache
 @login_required
 @require_POST
@@ -440,7 +411,6 @@ def consent_action(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("juniors:child", pk=pk)
 
 
-@league_available
 @never_cache
 def tournaments(request: HttpRequest) -> HttpResponse:
     qs = JuniorTournament.objects.exclude(status="draft").select_related("season")
@@ -486,7 +456,6 @@ def tournaments(request: HttpRequest) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 def tournament_detail(request: HttpRequest, pk: int) -> HttpResponse:
     tournament = get_object_or_404(
@@ -547,7 +516,6 @@ def tournament_detail(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 def ratings(request: HttpRequest) -> HttpResponse:
     from .ranking import leaderboard
@@ -606,7 +574,6 @@ def ratings(request: HttpRequest) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 @login_required
 @require_POST
@@ -623,7 +590,6 @@ def withdraw_entry(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("juniors:child", pk=entry.child_id)
 
 
-@league_available
 @never_cache
 @login_required
 @require_POST

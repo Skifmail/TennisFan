@@ -63,7 +63,7 @@
                     <p class="club-dashboard-panel__eyebrow">Поддержка</p>
                     <h1 class="club-dashboard-panel__title">Диалоги поддержки</h1>
                 </div>
-                <div class="club-dashboard-panel__link">Непрочитано: {{ support_unread_count }}</div>
+                <div class="club-dashboard-panel__link"><a href="{% url 'admin:core_bugreport_changelist' %}">Сообщения об ошибках →</a> · Непрочитано: {{ support_unread_count }}</div>
             </div>
             {% if threads %}
             <div class="club-dashboard-table">
@@ -75,7 +75,7 @@
                     <span></span>
                 </div>
                 {% for thread in threads %}
-                <div class="club-dashboard-table__row">
+                <div class="club-dashboard-table__row{% if thread.bug_report_count %} support-thread--has-bug{% endif %}">
                     <div class="club-dashboard-table__cell">
                         {% if thread.user %}
                         {% if thread.user.player %}

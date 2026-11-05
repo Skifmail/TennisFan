@@ -31,12 +31,6 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def live_family_client(client, settings):
-    # Только в тесте будущего запуска; отдельный набор проверяет реальную блокировку.
-    settings.MIDDLEWARE = [
-        m
-        for m in settings.MIDDLEWARE
-        if m != "apps.juniors.middleware.JuniorDevelopmentMiddleware"
-    ]
     return client
 
 
@@ -120,8 +114,9 @@ def test_family_create_and_private_detail(live_family_client) -> None:
 
 
 @override_settings(JUNIOR_LEAGUE_ENABLED=False, SECURE_SSL_REDIRECT=False)
-def test_feature_disabled(client) -> None:
-    assert client.get(reverse("juniors:family")).status_code == 404
+def test_old_visibility_flag_does_not_close_public_league(client) -> None:
+    assert client.get(reverse("juniors:home")).status_code == 200
+    assert client.get(reverse("juniors:family")).status_code == 302
 
 
 def test_verification_consent_and_publication_are_separate() -> None:

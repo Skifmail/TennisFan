@@ -18,7 +18,7 @@ from .matches import record_parent_result
 from .models import JuniorMatch
 from .permissions import account, can_manage_competition, match_guardians
 from .services import public_child_label
-from .views import league_available, posted_id
+from .views import posted_id
 
 
 def match_row(match: JuniorMatch, child_ids: set[int]) -> dict[str, Any]:
@@ -47,7 +47,6 @@ def match_row(match: JuniorMatch, child_ids: set[int]) -> dict[str, Any]:
     }
 
 
-@league_available
 @never_cache
 @login_required
 @require_http_methods(["GET", "HEAD"])
@@ -85,7 +84,6 @@ def my_matches(request: HttpRequest) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 @login_required
 @require_http_methods(["GET", "POST", "HEAD"])

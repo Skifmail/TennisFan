@@ -264,7 +264,7 @@ def test_parent_post_requires_csrf():
     )
 
 
-def test_development_mode_preserves_read_only_access(client, settings):
+def test_old_read_only_flag_does_not_block_parent(client, settings):
     settings.JUNIOR_LEAGUE_READ_ONLY = True
     _, tournament = ready_tournament(2)
     match = tournament.matches.get()
@@ -272,8 +272,8 @@ def test_development_mode_preserves_read_only_access(client, settings):
     url = reverse("juniors:match", args=[match.pk])
     page = client.get(url)
     assert page.status_code == 200
-    assert "Сохранить результат" not in page.content.decode()
-    assert client.post(url, {"score": "4:1", "version": 1}).status_code == 403
+    assert "Сохранить результат" in page.content.decode()
+    assert client.post(url, {"score": "4:1", "version": 1}).status_code == 302
 
 
 def test_match_notifications_queue_all_enabled_channels(settings):

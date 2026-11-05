@@ -1,6 +1,28 @@
 {% extends 'juniors/base.html' %}
 {% block title %}Детские турниры{% endblock %}
-{% block junior_content %}<header class="jl-heading"><div><p class="jl-eyebrow">КАЛЕНДАРЬ ЛИГИ</p><h1>Следующий выход на корт.</h1><p class="jl-muted">Выберите соревнование по мячу, городу и категории.</p></div></header>
-<form class="jl-filter" method="get">{% for field in filter_form %}<label for="{{ field.id_for_label }}">{{ field.label }}{{ field }}{% for error in field.errors %}<small class="jl-error-text">{{ error }}</small>{% endfor %}</label>{% endfor %}<button class="jl-button" type="submit">Показать</button><a href="{% url 'juniors:tournaments' %}">Сбросить</a></form>
-<div class="jl-grid">{% for item in page %}<article class="jl-card"><div class="jl-card-top"><span class="jl-badge jl-ball-{{ item.ball }}">{{ item.get_ball_display }}</span><span class="jl-muted">{{ item.min_age }}–{{ item.max_age }} лет</span></div><h2><a href="{% url 'juniors:tournament' pk=item.pk %}">{{ item.name }}</a></h2><p>{{ item.starts_at|date:'d E, H:i' }}<br><span class="jl-muted">{{ item.city }} · {{ item.venue }}</span></p><hr><p>{{ item.get_status_display }} · {% if item.entry_fee %}{{ item.entry_fee }} ₽{% else %}Бесплатно{% endif %}</p><a class="jl-link" href="{% url 'juniors:tournament' pk=item.pk %}">Подробнее и записаться →</a></article>{% empty %}<section class="jl-empty"><h2>Соревнований пока нет</h2><p>Попробуйте изменить фильтры. Новые турниры появятся после публикации организатором.</p></section>{% endfor %}</div>
-{% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&{{ query }}">Назад</a>{% endif %}{% if page.has_next %}<a href="?page={{ page.next_page_number }}&{{ query }}">Далее</a>{% endif %}{% endblock %}
+{% block junior_content %}
+<header class="jl-heading"><div><p class="jl-eyebrow">КАЛЕНДАРЬ ЛИГИ</p><h1>Следующий выход на корт.</h1><p class="jl-muted">Выберите соревнование по мячу, городу и категории.</p></div></header>
+<form class="jl-filter jl-filter-panel" method="get" aria-label="Фильтры турниров">
+    {{ filter_form.non_field_errors }}
+    <div class="jl-filter-fields jl-tournament-filter-fields">
+        {% for field in filter_form %}{% if field.field.widget.input_type != 'checkbox' %}
+        <div class="jl-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<small class="jl-error-text">{{ error }}</small>{% endfor %}</div>
+        {% endif %}{% endfor %}
+    </div>
+    <div class="jl-filter-footer">
+        {% for field in filter_form %}{% if field.field.widget.input_type == 'checkbox' %}
+        <div><label class="jl-check" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>{% for error in field.errors %}<small class="jl-error-text">{{ error }}</small>{% endfor %}</div>
+        {% endif %}{% endfor %}
+        <div class="jl-filter-actions"><button class="jl-button" type="submit">Показать</button><a class="jl-button jl-button-outline" href="{% url 'juniors:tournaments' %}">Сбросить</a></div>
+    </div>
+</form>
+<div class="jl-grid jl-tournament-grid">
+{% for item in page %}<article class="jl-card jl-tournament-card">
+    <div class="jl-card-top"><span class="jl-badge jl-ball-{{ item.ball }}">{{ item.get_ball_display }}</span><span class="jl-muted">{{ item.min_age }}–{{ item.max_age }} лет</span></div>
+    <h2><a href="{% url 'juniors:tournament' pk=item.pk %}">{{ item.name }}</a></h2>
+    <p>{{ item.starts_at|date:'d E, H:i' }}<br><span class="jl-muted">{{ item.city }} · {{ item.venue }}</span></p>
+    <footer class="jl-tournament-footer"><p>{{ item.get_status_display }}<br><strong>{% if item.entry_fee %}{{ item.entry_fee }} ₽{% else %}Бесплатно{% endif %}</strong></p><a class="jl-link" href="{% url 'juniors:tournament' pk=item.pk %}">Подробнее и записаться →</a></footer>
+</article>{% empty %}<section class="jl-empty"><h2>Соревнований пока нет</h2><p>Попробуйте изменить фильтры. Новые турниры появятся после публикации организатором.</p></section>{% endfor %}
+</div>
+{% if page.has_other_pages %}<nav class="jl-actions" aria-label="Страницы турниров">{% if page.has_previous %}<a class="jl-button jl-button-outline" href="?page={{ page.previous_page_number }}&{{ query }}">← Назад</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="jl-button jl-button-outline" href="?page={{ page.next_page_number }}&{{ query }}">Далее →</a>{% endif %}</nav>{% endif %}
+{% endblock %}

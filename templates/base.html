@@ -165,7 +165,7 @@
     {% if is_club_panel and club %}
     {% include "clubs/_club_top_nav.html" %}
     {% else %}
-    <header class="header">
+    <header class="header header--main">
         <div class="container">
             <nav class="nav">
                 <!-- Mobile Menu Button (visible only on mobile) -->
@@ -186,7 +186,7 @@
                 <div class="nav-menu-desktop" id="nav-menu-desktop">
                     <div class="nav-menu-desktop__track" id="nav-menu-track">
                         {% for item in nav_menu_items %}
-                        <a href="{{ item.url }}" class="btn btn-ghost nav-menu-desktop__link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
+                        <a href="{{ item.url }}" class="btn btn-ghost nav-menu-desktop__link{% if item.is_active %} nav-menu-desktop__link--active{% endif %}"{% if item.is_active %} aria-current="page"{% endif %}{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
                         {% endfor %}
                     </div>
                     <div class="nav-more" id="nav-more" hidden>
@@ -201,7 +201,7 @@
                 <!-- Mobile Navigation Menu (hidden by default, shown on menu click) -->
                 <div class="nav-menu-mobile" id="nav-menu-mobile">
                     {% for item in nav_menu_items %}
-                    <a href="{{ item.url }}" class="nav-menu-link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
+                    <a href="{{ item.url }}" class="nav-menu-link{% if item.is_active %} nav-menu-link--active{% endif %}"{% if item.is_active %} aria-current="page"{% endif %}{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
                     {% endfor %}
                 </div>
                 

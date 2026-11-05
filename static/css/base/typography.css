@@ -48,7 +48,28 @@
     font-display: swap;
 }
 
-/* Заголовки и навигация: Roboto */
+/* Акцидентный шрифт для шапки сайта (переменный, вес 200–900). */
+@font-face {
+    font-family: Unbounded;
+    src: url('../../fonts/Unbounded-VariableFont_wght.ttf') format('truetype');
+    font-weight: 200 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Единый акцидентный шрифт для всех заголовков сайта. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    letter-spacing: 0;
+}
+
+/* Заголовки и навигация: Unbounded */
 .main h1,
 .main h2,
 .main h3,
@@ -65,6 +86,7 @@
 .legal-doc__body h1,
 .legal-doc__body h2 {
     font-family: var(--font-heading);
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }

@@ -50,7 +50,28 @@
     font-display: swap;
 }
 
-/* Заголовки и навигация: Roboto */
+/* Акцидентный шрифт для шапки сайта (переменный, вес 200–900). */
+@font-face {
+    font-family: Unbounded;
+    src: url('../fonts/Unbounded-VariableFont_wght.ttf') format('truetype');
+    font-weight: 200 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Единый акцидентный шрифт для всех заголовков сайта. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    letter-spacing: 0;
+}
+
+/* Заголовки и навигация: Unbounded */
 .main h1,
 .main h2,
 .main h3,
@@ -67,8 +88,9 @@
 .legal-doc__body h1,
 .legal-doc__body h2 {
     font-family: var(--font-heading);
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }
 
 /* END typography.css */
@@ -113,7 +135,8 @@
 
     /* Typography */
     --font-family: 'Open Sans', -apple-system, blinkmacsystemfont, 'Segoe UI', sans-serif;
-    --font-heading: 'Roboto', sans-serif;
+    --font-heading: 'Unbounded', 'Roboto', sans-serif;
+    --font-nav: 'Unbounded', 'Open Sans', sans-serif;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
@@ -385,10 +408,10 @@ button {
  * nav.css
  *
  * Описание: Шапка сайта и навигация (desktop/mobile), включая выпадающие меню и переключатели.
- * Компоненты: .header, .nav, .nav-toggle, .logo, .nav-menu-desktop, .nav-dropdown, .nav-link
+ * Компоненты: .header, .header--main, .nav, .nav-toggle, .logo, .nav-menu-desktop, .nav-dropdown, .nav-link
  * Используется на: базовый шаблон и все страницы с глобальной навигацией
  *
- * Последнее обновление: 2026-03
+ * Последнее обновление: 2026-11
  */
 
 /* ==========================================================================
@@ -1087,6 +1110,386 @@ button {
     .nav-dropdown-toggle {
         padding: 0.35rem 1.4rem 0.35rem 0.5rem;
         font-size: 0.75rem;
+    }
+}
+
+/* ==========================================================================
+   Main header — floating glass pill (2026 redesign)
+   Применяется только к основной шапке (.header--main), клубная шапка
+   (.header--club) сохраняет прежнее оформление.
+   ========================================================================== */
+.header--main {
+    padding: 14px 0 18px;
+    background: linear-gradient(
+        180deg,
+        rgb(1 25 17 / 94%) 0%,
+        rgb(1 25 17 / 58%) 55%,
+        rgb(1 25 17 / 0%) 100%
+    );
+    border-bottom: 0;
+}
+
+.header--main .nav {
+    position: relative;
+    min-height: 62px;
+    padding: 0.4rem 0.45rem 0.4rem 1.1rem;
+    gap: 1rem;
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgb(20 33 27 / 82%) 0%, rgb(6 15 11 / 88%) 100%);
+    box-shadow:
+        0 12px 34px rgb(0 0 0 / 38%),
+        inset 0 1px 0 rgb(255 255 255 / 7%);
+    backdrop-filter: blur(22px) saturate(140%);
+}
+
+.header--main .logo {
+    gap: 0.55rem;
+}
+
+.header--main .logo-text {
+    font-family: var(--font-nav);
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: #f4f1e8;
+}
+
+.header--main .logo-accent {
+    color: var(--color-primary);
+}
+
+.header--main .coin-logo {
+    width: 34px;
+    height: 34px;
+}
+
+.header--main .nav-menu-desktop {
+    gap: 0.1rem;
+    justify-content: center;
+}
+
+.header--main .nav-menu-desktop .btn {
+    padding: 0.55rem 0.78rem;
+    font-family: var(--font-nav);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: rgb(236 241 236 / 82%);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.header--main .nav-menu-desktop .btn::after {
+    display: none;
+}
+
+.header--main .nav-menu-desktop .btn:hover,
+.header--main .nav-menu-desktop .btn:focus-visible {
+    color: #fff;
+    background: rgb(255 255 255 / 8%);
+    border-color: rgb(255 255 255 / 10%);
+    box-shadow: none;
+    transform: none;
+}
+
+.header--main .nav-menu-desktop__link--active,
+.header--main .nav-menu-desktop__link--active:hover,
+.header--main .nav-menu-desktop__link--active:focus-visible {
+    color: #122016;
+    font-weight: 600;
+    background: linear-gradient(135deg, #d8bd82 0%, #a6824a 100%);
+    border-color: transparent;
+}
+
+.header--main .nav-auth {
+    gap: 0.5rem;
+}
+
+.header--main .nav-dropdown {
+    min-width: 0;
+    width: auto;
+    max-width: none;
+}
+
+.header--main .nav-dropdown-toggle {
+    gap: 0.55rem;
+    min-height: 44px;
+    padding: 0.3rem 0.85rem 0.3rem 0.35rem;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 999px;
+    font-family: var(--font-nav);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: rgb(240 244 240 / 88%);
+    background: rgb(255 255 255 / 6%);
+}
+
+.header--main .nav-dropdown-toggle:hover {
+    color: #fff;
+    background: rgb(255 255 255 / 10%);
+    border-color: rgb(255 255 255 / 22%);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+    transform: none;
+}
+
+.header--main .nav-user-avatar {
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgb(255 255 255 / 16%);
+}
+
+.header--main .nav-user-avatar--fallback {
+    background: linear-gradient(135deg, #d8bd82, #a6824a);
+    color: #0e1712;
+    font-family: var(--font-nav);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.header--main .user-name-text {
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+}
+
+.header--main .nav-dropdown-arrow {
+    position: static;
+    top: auto;
+    right: auto;
+    font-size: 0.5rem;
+    opacity: 0.7;
+}
+
+.header--main .nav-dropdown-content {
+    top: calc(100% + 10px);
+    left: auto;
+    right: 0;
+    width: auto;
+    min-width: 230px;
+    max-width: min(300px, calc(100vw - 32px));
+    padding: 0.4rem;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 16px;
+    background: rgb(8 17 13 / 97%);
+    box-shadow: 0 18px 44px rgb(0 0 0 / 50%);
+    backdrop-filter: blur(20px);
+}
+
+.header--main .nav-dropdown-content li a,
+.header--main .nav-dropdown-content li form button {
+    padding: 0.58rem 0.8rem;
+    border-radius: 10px;
+    font-family: var(--font-family);
+    font-size: 0.85rem;
+}
+
+.header--main .nav-login-btn {
+    padding: 0.62rem 1.15rem;
+    border-radius: 999px;
+    font-family: var(--font-nav);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #0c1710;
+    background: linear-gradient(135deg, #d8bd82 0%, #a6824a 100%);
+    box-shadow: 0 2px 14px rgb(166 130 74 / 25%);
+    animation: none;
+}
+
+.header--main .nav-login-btn::after {
+    display: none;
+}
+
+.header--main .nav-login-btn:hover {
+    color: #0a130d;
+    background: linear-gradient(135deg, #e4cb94 0%, #b58f52 100%);
+    box-shadow: 0 4px 18px rgb(166 130 74 / 38%);
+}
+
+/* Выпадающая панель «Ещё» */
+.header.header--main .nav-more__panel {
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 240px;
+    padding: 0.4rem;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 16px;
+    background: rgb(8 17 13 / 97%);
+    box-shadow: 0 18px 44px rgb(0 0 0 / 50%);
+    backdrop-filter: blur(20px);
+}
+
+.header.header--main .nav-more__panel .nav-menu-desktop__link {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.62rem 0.8rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-family: var(--font-nav);
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: rgb(236 241 236 / 82%);
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.header.header--main .nav-more__panel .nav-menu-desktop__link::after {
+    display: none;
+}
+
+.header.header--main .nav-more__panel .nav-menu-desktop__link:hover,
+.header.header--main .nav-more__panel .nav-menu-desktop__link:focus-visible {
+    color: #fff;
+    background: rgb(255 255 255 / 8%);
+    border-color: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.header.header--main .nav-more__panel .nav-menu-desktop__link--active,
+.header.header--main .nav-more__panel .nav-menu-desktop__link--active:hover {
+    color: #122016;
+    background: linear-gradient(135deg, #d8bd82 0%, #a6824a 100%);
+}
+
+/* На широких экранах пункты центрируются между логотипом и профилем. */
+@media (width >= 1025px) {
+    .header.header--main .nav-menu-desktop,
+    .header.header--main .nav-menu-desktop__track {
+        justify-content: center;
+    }
+
+    /* Небольшой запас внутри трека, чтобы скруглённая активная плашка
+       не обрезалась субпиксельным overflow: hidden. */
+    .header.header--main .nav-menu-desktop__track {
+        padding: 3px 2px;
+    }
+
+    .header.header--main .nav-menu-desktop .btn {
+        padding: 0.55rem 0.8rem;
+        font-size: 0.78rem;
+        letter-spacing: 0;
+    }
+}
+
+/* Мобильная шапка: та же пилюля, компактнее */
+@media (width <= 1024px) {
+    .header--main {
+        padding: 8px 0 12px;
+    }
+
+    .header.header--main .nav {
+        grid-template-columns: 40px minmax(0, 1fr) auto;
+        min-height: 56px;
+        padding: 0.35rem 0.5rem;
+        gap: 0.35rem;
+    }
+
+    .header--main .nav-toggle {
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgb(255 255 255 / 12%);
+        border-radius: 999px;
+        background: rgb(255 255 255 / 6%);
+    }
+
+    .header--main .nav-toggle span {
+        background: #eef2ec;
+    }
+
+    .header--main .coin-logo {
+        width: 32px;
+        height: 32px;
+    }
+
+    .header--main .logo-text {
+        font-size: 0.82rem;
+    }
+
+    .header.header--main .nav-dropdown {
+        width: auto;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .header.header--main .nav-dropdown-toggle {
+        padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+        font-size: 0.66rem;
+    }
+
+    .header.header--main .nav-dropdown.open .nav-dropdown-content {
+        top: calc(100% + 10px);
+        left: auto;
+        right: 0;
+        width: max-content;
+        min-width: 220px;
+        max-width: min(280px, calc(100vw - 24px));
+    }
+
+    .header.header--main .nav-menu-mobile {
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        padding: 0.45rem;
+        gap: 0.1rem;
+        border: 1px solid rgb(255 255 255 / 12%);
+        border-radius: 18px;
+        background: rgb(8 17 13 / 98%);
+        box-shadow: 0 18px 40px rgb(0 0 0 / 50%);
+        backdrop-filter: blur(20px);
+        max-height: calc(100dvh - 110px);
+    }
+
+    .header--main .nav-menu-link {
+        padding: 0.7rem 0.85rem;
+        border-radius: 12px;
+        font-family: var(--font-nav);
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0;
+        text-transform: none;
+        color: rgb(236 241 236 / 82%);
+    }
+
+    .header--main .nav-menu-link:hover {
+        color: #fff;
+        background: rgb(255 255 255 / 8%);
+    }
+
+    .header--main .nav-menu-link--active,
+    .header--main .nav-menu-link--active:hover {
+        color: #122016;
+        font-weight: 600;
+        background: linear-gradient(135deg, #d8bd82 0%, #a6824a 100%);
+    }
+}
+
+@media (width <= 600px) {
+    .header--main .user-name-text {
+        display: none;
+    }
+
+    .header--main .nav-dropdown-toggle {
+        padding: 0.3rem;
+    }
+
+    .header--main .logo > .logo-text:last-child {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .header--main .nav-menu-desktop .btn,
+    .header--main .nav-dropdown-toggle,
+    .header--main .nav-menu-link {
+        transition: none;
     }
 }
 

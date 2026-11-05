@@ -1,4 +1,4 @@
-"""Email-уведомления для диалогов поддержки."""
+"""Уведомления поддержки в ЛК, push и по электронной почте."""
 
 from __future__ import annotations
 
@@ -8,11 +8,14 @@ from typing import cast
 
 from django.conf import settings
 from django.core.mail import get_connection
-from django.db import connection
+from django.db import connection, transaction
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 from apps.notifications.infrastructure.email import EventEmail as EmailMultiAlternatives
+from apps.notifications.services import create_notification
+from apps.users.models import User
 
 from .models import SupportMessage
 
@@ -68,8 +71,26 @@ def _send_with_timeout(message: EmailMultiAlternatives) -> int:
     return cast(int, message.send(fail_silently=False))
 
 
+@transaction.atomic
+def _notify_support_admins(message: SupportMessage) -> str:
+    """Создаёт ЛК и push всем активным сотрудникам, независимо от почтового адресата."""
+    report = getattr(message, "bug_report", None)
+    event_key = "support.bug_report" if report else "support.admin_message"
+    text = (
+        f"Новое сообщение об ошибке №{report.pk}. Откройте диалог поддержки."
+        if report
+        else f"Новое сообщение в диалоге поддержки №{message.thread_id}."
+    )
+    url = f"/platform/support/{message.thread_id}/"
+    for admin in User.objects.filter(is_active=True).filter(
+        Q(is_staff=True) | Q(is_superuser=True)
+    ):
+        create_notification(event_key=event_key, user=admin, message=text, url=url)
+    return event_key
+
+
 def send_admin_support_notification(message: SupportMessage) -> bool:
-    """Отправить письмо администратору о новом обращении.
+    """Уведомить всех сотрудников через центр и отправить письмо на адрес поддержки.
 
     Args:
         message (SupportMessage): Созданное сообщение пользователя.
@@ -77,6 +98,7 @@ def send_admin_support_notification(message: SupportMessage) -> bool:
     Returns:
         bool: True, если письмо отправлено успешно, иначе False.
     """
+    event_key = _notify_support_admins(message)
     admin_email = (getattr(settings, "ADMIN_NOTIFICATIONS_EMAIL", "") or "").strip()
     if not admin_email:
         return False
@@ -102,7 +124,8 @@ def send_admin_support_notification(message: SupportMessage) -> bool:
         body=text_content,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru"),
         to=[admin_email],
-        event_key="support.admin_message",
+        event_key=event_key,
+        capture_event=False,
     )
     msg.attach_alternative(html_content, "text/html")
     msg.outbound_category = "support"

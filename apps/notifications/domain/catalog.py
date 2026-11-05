@@ -218,7 +218,10 @@ EVENTS: Final[dict[str, EventDefinition]] = {
     "chat.invited": EventDefinition("Приглашение в чат", "Чаты", "inbox", False),
     "support.reply": EventDefinition("Ответ поддержки", "Поддержка", "email", False),
     "support.admin_message": EventDefinition(
-        "Новое обращение в поддержку", "Поддержка", "email", False
+        "Новое обращение в поддержку", "Поддержка", "inbox", False
+    ),
+    "support.bug_report": EventDefinition(
+        "Новое сообщение об ошибке", "Поддержка", "inbox"
     ),
     "training.enrollment": EventDefinition(
         "Заявка на тренировку", "Тренировки", "email", False
@@ -290,6 +293,7 @@ PRODUCER_EVENTS: Final[dict[str, str]] = {
     "apps.core.email_service:send_training_enrollment_email": "training.enrollment",
     "apps.core.email_service:send_welcome_email": "account.welcome",
     "apps.core.support_notifications:send_admin_support_notification": "support.admin_message",
+    "apps.core.support_notifications:_notify_support_admins": "support.bug_report",
     "apps.core.support_notifications:send_user_support_reply": "support.reply",
     "apps.core.telegram_notify:_send_admin_email": "platform.admin_message",
     "apps.player_ratings.notifications:notify_players_to_rate_match": "match.rate_players",
@@ -358,7 +362,6 @@ PRODUCER_EVENTS: Final[dict[str, str]] = {
 INBOX_ONLY_EVENTS: Final = frozenset(
     [
         "junior.updated",
-        "stringer.application_submitted",
         "chat.reply",
         "club.join_approved",
         "club.join_rejected",

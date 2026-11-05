@@ -151,7 +151,7 @@
     {% endif %}
 </head>
 
-<body class="{% if is_club_panel and club %}body--club-panel{% endif %}">
+<body class="{% if is_club_panel and club %}body--club-panel {% endif %}{% block body_class %}{% endblock %}">
     <script defer src="{% static 'js/loading-system.js' %}"></script>
     <script defer src="{% static 'js/main.js' %}"></script>
     <script defer src="{% static 'js/sport_switch.js' %}"></script>
@@ -188,7 +188,6 @@
                         {% for item in nav_menu_items %}
                         <a href="{{ item.url }}" class="btn btn-ghost nav-menu-desktop__link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
                         {% endfor %}
-                        {% if junior_league_visible %}<a href="{% url 'juniors:home' %}" class="btn btn-ghost nav-menu-desktop__link">Детская лига</a>{% endif %}
                     </div>
                     <div class="nav-more" id="nav-more" hidden>
                         <button type="button" class="btn btn-ghost nav-more__toggle" id="nav-more-toggle" aria-expanded="false" aria-haspopup="menu" aria-controls="nav-more-panel">
@@ -204,7 +203,6 @@
                     {% for item in nav_menu_items %}
                     <a href="{{ item.url }}" class="nav-menu-link"{% if item.is_external %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.title }}</a>
                     {% endfor %}
-                    {% if junior_league_visible %}<a href="{% url 'juniors:home' %}" class="nav-menu-link">Детская лига</a>{% endif %}
                 </div>
                 
                 <!-- Auth Actions (Always visible - right side) -->

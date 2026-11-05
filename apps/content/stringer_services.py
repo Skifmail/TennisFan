@@ -11,7 +11,7 @@ from django.utils import timezone
 from loguru import logger
 
 from apps.notifications.infrastructure.email import EventEmail
-from apps.notifications.services import center_enabled, create_notification
+from apps.notifications.services import create_notification
 from apps.users.models import User
 
 from .models import (
@@ -48,7 +48,6 @@ def notify_stringer_application(application: StringerApplication) -> None:
         for user in User.objects.filter(is_active=True, is_staff=True)
         if user.has_perm("content.change_stringerapplication")
     ]
-    addresses: set[str] = set()
     for user in recipients:
         create_notification(
             event_key="stringer.application_submitted",
@@ -56,12 +55,8 @@ def notify_stringer_application(application: StringerApplication) -> None:
             message=message,
             url=url,
         )
-        if user.email:
-            addresses.add(user.email.casefold())
-            if not center_enabled():
-                transaction.on_commit(partial(_send_email, user.email, message, url))
-    admin_email = settings.ADMIN_NOTIFICATIONS_EMAIL
-    if admin_email and admin_email.casefold() not in addresses:
+    admin_email = settings.STRINGER_APPLICATION_NOTIFICATION_EMAIL.strip()
+    if admin_email:
         transaction.on_commit(partial(_send_email, admin_email, message, url))
 
 

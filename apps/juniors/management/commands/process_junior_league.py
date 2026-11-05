@@ -18,6 +18,7 @@ from apps.juniors.models import (
     JuniorTournament,
 )
 from apps.juniors.notifications import notify_entry
+from apps.juniors.reminders import send_match_reminders
 
 
 class Command(BaseCommand):
@@ -90,3 +91,5 @@ class Command(BaseCommand):
                     )
                     entry.reminder_sent_at = now
                     entry.save(update_fields=["reminder_sent_at"])
+
+        send_match_reminders()

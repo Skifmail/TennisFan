@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 from django.conf import settings
 from django.contrib import messages
@@ -2627,11 +2628,12 @@ def rules(request):
 
 
 def _get_or_create_guest_session_key(request: HttpRequest) -> str:
-    """Вернуть ключ сессии гостя для привязки диалога."""
-    if request.session.session_key:
-        return str(request.session.session_key)
-    request.session.create()
-    return str(request.session.session_key or "")
+    """Возвращает постоянный идентификатор гостя внутри подписанной сессии."""
+    token = request.session.get("support_guest_token")
+    if not token:
+        token = uuid4().hex
+        request.session["support_guest_token"] = token
+    return str(token)
 
 
 def _build_support_author(
@@ -2705,6 +2707,20 @@ def support_feedback_submit(request):
             data = json.loads(request.body or "{}")
         else:
             data = request.POST
+        if not hasattr(data, "get") or any(
+            not isinstance(data.get(key, ""), str)
+            for key in (
+                "message",
+                "subject",
+                "guest_name",
+                "guest_contact",
+                "kind",
+                "page_url",
+            )
+        ):
+            return JsonResponse(
+                {"success": False, "error": "Неверный формат запроса."}, status=400
+            )
         message = (data.get("message") or "").strip()
         subject = (data.get("subject") or "").strip()
         guest_name = (data.get("guest_name") or "").strip()
@@ -2719,8 +2735,16 @@ def support_feedback_submit(request):
             {"success": False, "error": "Введите сообщение."}, status=400
         )
 
-    # Для гостей имя и email обязательны.
+    # Контакты уже известного гостя сохраняются при повторном открытии чата.
     if not request.user.is_authenticated:
+        previous_thread = SupportThread.objects.filter(
+            pk=request.session.get("feedback_thread_id"),
+            user__isnull=True,
+            guest_session_key=request.session.get("support_guest_token", ""),
+        ).first()
+        if previous_thread and previous_thread.guest_session_key:
+            guest_name = guest_name or previous_thread.guest_name
+            guest_contact = guest_contact or previous_thread.guest_email
         if not guest_name:
             return JsonResponse(
                 {"success": False, "error": "Введите ваше имя."}, status=400
@@ -2743,22 +2767,40 @@ def support_feedback_submit(request):
         guest_email=guest_contact,
     )
     try:
-        support_message = create_user_message(
+        from .support_reports import create_support_submission
+
+        support_message = create_support_submission(
             author=author,
             text=message,
             subject=subject,
+            files=request.FILES.getlist("attachments"),
+            is_bug=data.get("kind") == "bug",
+            page_url=str(data.get("page_url") or ""),
         )
         if not request.user.is_authenticated:
             request.session["feedback_thread_id"] = support_message.thread_id
             request.session.modified = True
-        send_admin_support_notification(support_message)
+    except ValidationError as exc:
+        return JsonResponse(
+            {"success": False, "error": " ".join(exc.messages)}, status=400
+        )
     except Exception as exc:
         logger.exception("support_feedback_submit failed: %s", exc)
         return JsonResponse({"success": False, "error": "Ошибка отправки."}, status=500)
 
+    try:
+        send_admin_support_notification(support_message)
+    except Exception:
+        logger.exception(
+            "Не удалось отправить уведомление о сохранённом обращении поддержки"
+        )
+
+    from .support_reports import message_details
+
     payload = {
         "success": True,
         "message_id": support_message.pk,
+        **message_details(support_message),
     }
     return JsonResponse(payload)
 
@@ -2783,6 +2825,8 @@ def feedback_threads(request):
     """
     API: список сообщений одного диалога для виджета.
     """
+    from .support_reports import message_details
+
     threads = []
     support_thread: SupportThread | None = None
 
@@ -2799,11 +2843,16 @@ def feedback_threads(request):
 
     current_thread = []
     if support_thread:
-        messages_qs = support_thread.messages.order_by("created_at")[:50]
-        for message in messages_qs:
+        messages_qs = (
+            support_thread.messages.select_related("bug_report")
+            .prefetch_related("attachments")
+            .order_by("-created_at", "-pk")[:200]
+        )
+        for message in reversed(list(messages_qs)):
             current_thread.append(
                 {
                     "id": message.pk,
+                    **message_details(message),
                     "text": message.text,
                     "is_from_admin": message.is_from_admin,
                     "created_at": message.created_at.isoformat(),
@@ -2890,7 +2939,11 @@ def support_admin_thread(request: HttpRequest, thread_id: int) -> HttpResponse:
         return redirect("support_admin_list")
 
     mark_thread_read_by_admin(thread)
-    messages_list = list(thread.messages.order_by("created_at"))
+    messages_list = list(
+        thread.messages.select_related("bug_report", "bug_reply_to")
+        .prefetch_related("attachments")
+        .order_by("created_at")
+    )
     for item in messages_list:
         item.can_edit = bool(item.is_from_admin and can_edit_support_message(item))
         item.can_delete = bool(item.is_from_admin and can_delete_support_message(item))
@@ -2914,9 +2967,12 @@ def support_admin_reply(request: HttpRequest) -> JsonResponse:
     except json.JSONDecodeError:
         payload = request.POST
 
-    thread_id = int(payload.get("thread_id") or 0)
-    text = str(payload.get("text") or "").strip()
-    if not thread_id or not text:
+    try:
+        thread_id = int(payload.get("thread_id") or 0)
+        text = str(payload.get("text") or "").strip()
+    except (AttributeError, TypeError, ValueError):
+        return JsonResponse({"success": False, "error": "Неверные данные."}, status=400)
+    if not thread_id or not text or len(text) > 6000:
         return JsonResponse({"success": False, "error": "Неверные данные."}, status=400)
 
     thread = SupportThread.objects.filter(pk=thread_id).first()
@@ -2925,7 +2981,34 @@ def support_admin_reply(request: HttpRequest) -> JsonResponse:
             {"success": False, "error": "Диалог не найден."}, status=404
         )
 
-    message = create_admin_reply(thread=thread, text=text)
+    report_id = payload.get("bug_report_id")
+    if report_id:
+        from .models import BugReport
+        from .support_reports import reply_to_report
+
+        if (
+            not str(report_id).isdecimal()
+            or not BugReport.objects.filter(
+                pk=report_id, message__thread=thread
+            ).exists()
+        ):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Сообщение об ошибке не найдено в этом диалоге.",
+                },
+                status=400,
+            )
+        try:
+            message = reply_to_report(
+                actor=request.user, report_id=int(report_id), text=text
+            )
+        except ValidationError as exc:
+            return JsonResponse(
+                {"success": False, "error": " ".join(exc.messages)}, status=400
+            )
+    else:
+        message = create_admin_reply(thread=thread, text=text)
     send_user_support_reply_async(message)
     return JsonResponse({"success": True, "message_id": message.pk})
 

@@ -27,10 +27,9 @@ from .matches import record_result, start_tournament
 from .models import JuniorAppeal, JuniorEntry, JuniorMatch, JuniorTournament
 from .permissions import account, require_organizer
 from .ranking import finalize
-from .views import league_available, posted_id
+from .views import posted_id
 
 
-@league_available
 @never_cache
 @login_required
 def manage(request: HttpRequest, pk: int) -> HttpResponse:
@@ -174,7 +173,6 @@ def manage(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@league_available
 @never_cache
 @login_required
 def result(request: HttpRequest, pk: int) -> HttpResponse:

@@ -514,10 +514,12 @@
             </div>
             {% endif %}
 
-            <!-- Поле ввода сообщения -->
+            <!-- Сообщения и отчёты об ошибках используют один диалог. -->
             <div class="feedback-chat-widget__input-area">
+                <button class="feedback-bug-toggle" id="feedback-bug-toggle" type="button" aria-expanded="false" aria-controls="feedback-bug-help">Сообщить об ошибке</button>
+                <div id="feedback-bug-help" class="feedback-bug-help" hidden><strong>Что пошло не так?</strong><p>Опишите как можно подробнее: на какой странице возникла ошибка, что вы делали и что ожидали увидеть. Приложите скриншот, если он поможет. Не отправляйте пароли, документы и данные карты.</p></div>
                 <div class="feedback-chat-widget__input-wrapper">
-                    <input type="text" id="feedback-message-input" class="feedback-chat-widget__input" placeholder="Введите сообщение..." maxlength="2000" autocomplete="off">
+                    <textarea id="feedback-message-input" class="feedback-chat-widget__input" placeholder="Введите сообщение..." maxlength="2000" rows="2" aria-label="Сообщение в поддержку"></textarea>
                     <button type="button" id="feedback-send-btn" class="feedback-chat-widget__send-btn" aria-label="Отправить">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -525,6 +527,7 @@
                         </svg>
                     </button>
                 </div>
+                <div class="feedback-attachments-control"><label for="feedback-attachments">Прикрепить фото или скриншот</label><input id="feedback-attachments" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>До 3 изображений, не больше 5 МБ каждое</small><button id="feedback-attachments-clear" type="button" hidden>Убрать вложения</button><span id="feedback-attachments-list" aria-live="polite"></span></div>
                 <p id="feedback-form-error" class="feedback-chat-widget__error" style="display:none;"></p>
             </div>
         </div>

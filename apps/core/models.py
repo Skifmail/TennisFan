@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from apps.core.geo import GeoRegion, normalize_geo_text
 from apps.core.localities import SettlementType, format_locality_label
+from apps.core.support_uploads import private_support_storage, support_image_path
 
 # ---------------------------------------------------------------------------
 # Новая система обратной связи через Telegram (пользователь ↔ админ в Telegram)
@@ -383,6 +384,14 @@ class SupportMessage(models.Model):
     is_from_admin = models.BooleanField("От администратора", default=False)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     edited_at = models.DateTimeField("Изменено", null=True, blank=True)
+    bug_reply_to = models.ForeignKey(
+        "BugReport",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replies",
+        verbose_name="Ответ на сообщение об ошибке",
+    )
 
     class Meta:
         ordering = ["created_at"]
@@ -393,6 +402,54 @@ class SupportMessage(models.Model):
         if self.user:
             return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} {self.user}"
         return f"#{self.pk} {'(админ)' if self.is_from_admin else ''} Гость: {self.guest_name or 'Без имени'}"
+
+
+class BugReport(models.Model):
+    """Обращение об ошибке, связанное с исходным сообщением диалога поддержки."""
+
+    class Status(models.TextChoices):
+        NEW = "new", "Новое"
+        IN_PROGRESS = "in_progress", "В работе"
+        RESOLVED = "resolved", "Исправлено"
+        CLOSED = "closed", "Закрыто"
+
+    message = models.OneToOneField(
+        SupportMessage,
+        on_delete=models.CASCADE,
+        related_name="bug_report",
+        verbose_name="Сообщение",
+    )
+    status = models.CharField(
+        "Статус", choices=Status.choices, default=Status.NEW, max_length=16
+    )
+    page_url = models.CharField("Страница ошибки", max_length=1000, blank=True)
+    created_at = models.DateTimeField("Получено", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        verbose_name = "сообщение об ошибке"
+        verbose_name_plural = "Сообщения об ошибках"
+
+    def __str__(self) -> str:
+        return f"Ошибка №{self.pk} · {self.get_status_display()}"
+
+
+class SupportAttachment(models.Model):
+    """Закрытое изображение сообщения, доступное автору и сотрудникам поддержки."""
+
+    message = models.ForeignKey(
+        SupportMessage, on_delete=models.CASCADE, related_name="attachments"
+    )
+    image = models.ImageField(
+        "Изображение", storage=private_support_storage, upload_to=support_image_path
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["pk"]
+        verbose_name = "вложение поддержки"
+        verbose_name_plural = "Вложения поддержки"
 
 
 class SupportConversation(SupportThread):

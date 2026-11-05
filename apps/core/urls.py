@@ -5,9 +5,13 @@ Core app URLs - main pages.
 from django.urls import path
 
 from . import views
+from .support_reports import support_attachment
 from .web_push import onesignal_worker, web_app_manifest
 
 urlpatterns = [
+    path(
+        "support/attachments/<int:pk>/", support_attachment, name="support_attachment"
+    ),
     path("OneSignalSDKWorker.js", onesignal_worker, name="onesignal_worker"),
     path("manifest.webmanifest", web_app_manifest, name="web_app_manifest"),
     path("", views.home, name="home"),

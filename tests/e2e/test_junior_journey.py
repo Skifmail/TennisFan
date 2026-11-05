@@ -16,12 +16,6 @@ pytestmark = pytest.mark.django_db
 
 @override_settings(JUNIOR_LEAGUE_ENABLED=True, SECURE_SSL_REDIRECT=False)
 def test_parent_to_tournament_results_through_real_views(client, settings) -> None:
-    # Только здесь моделируется будущий запуск для обычного родителя.
-    settings.MIDDLEWARE = [
-        m
-        for m in settings.MIDDLEWARE
-        if m != "apps.juniors.middleware.JuniorDevelopmentMiddleware"
-    ]
     organizer, tournament, release = setup_tournament()
     parents = []
     for index in range(2):

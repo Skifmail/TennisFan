@@ -2,7 +2,7 @@
 
 from html import escape
 
-import markdown  # type: ignore[import-untyped]
+import markdown
 from django import template
 from django.utils.safestring import SafeString, mark_safe
 

@@ -1,17 +1,13 @@
-"""Доступность детской лиги в общей навигации."""
+"""Публичная навигация детской лиги и действия авторизованного взрослого."""
 
-from django.conf import settings
 from django.http import HttpRequest
 
 
 def junior_context(request: HttpRequest) -> dict[str, bool]:
+    """Показывает лигу всем; конкретные полномочия проверяют представления и сервисы."""
     return {
         "junior_actions_allowed": bool(
-            request.user.is_authenticated
-            and request.user.is_active
-            and (request.user.is_staff or not settings.JUNIOR_LEAGUE_READ_ONLY)
+            request.user.is_authenticated and request.user.is_active
         ),
-        "junior_read_only": settings.JUNIOR_LEAGUE_READ_ONLY,
-        "junior_league_visible": settings.JUNIOR_LEAGUE_ENABLED
-        or bool(request.user.is_authenticated and request.user.is_staff),
+        "junior_league_visible": True,
     }

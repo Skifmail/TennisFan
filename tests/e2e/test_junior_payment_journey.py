@@ -18,12 +18,6 @@ def test_payment_and_refund_through_views(client, settings, cancellation):
     settings.SECURE_SSL_REDIRECT = False
     settings.JUNIOR_LEAGUE_ENABLED = True
     settings.JUNIOR_PAYMENTS_ENABLED = True
-    # Будущий запуск: реальная блокировка разработки проверяется отдельно.
-    settings.MIDDLEWARE = [
-        m
-        for m in settings.MIDDLEWARE
-        if m != "apps.juniors.middleware.JuniorDevelopmentMiddleware"
-    ]
     organizer, tournament, release = setup_tournament(fee="500")
     parent, child = participant(1, release)
     client.force_login(parent)

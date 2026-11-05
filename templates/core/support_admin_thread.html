@@ -24,14 +24,18 @@
                 <div class="feedback-chat-widget__messages-list">
                     {% for message in messages_list %}
                     <div
-                        class="feedback-chat-widget__message {% if message.is_from_admin %}feedback-chat-widget__message--admin{% else %}feedback-chat-widget__message--user{% endif %}"
+                        id="support-message-{{ message.pk }}" class="feedback-chat-widget__message {% if message.bug_report %}support-message--bug{% endif %} {% if message.is_from_admin %}feedback-chat-widget__message--admin{% else %}feedback-chat-widget__message--user{% endif %}"
                         style="margin-bottom: 12px; border-radius: 12px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(4, 48, 43, 0.45);"
                     >
                         <div class="feedback-chat-widget__message-time" style="margin-bottom: 6px; font-weight: 700;">
                             {% if message.is_from_admin %}Администратор{% else %}Пользователь{% endif %}
                         </div>
                         <div class="feedback-chat-widget__message-bubble" style="{% if message.is_from_admin %}background: rgba(166, 130, 74, 0.28); border: 1px solid rgba(166, 130, 74, 0.55);{% else %}background: rgba(0, 131, 116, 0.30); border: 1px solid rgba(0, 210, 180, 0.45); color: #ffffff;{% endif %}">
-                            {{ message.text }}
+                            {% if message.bug_report %}<strong class="support-bug-badge">Сообщение об ошибке №{{ message.bug_report.pk }}</strong>{% endif %}
+                            {% if message.bug_reply_to_id %}<strong>Ответ на ошибку №{{ message.bug_reply_to_id }}</strong><br>{% endif %}
+                            {{ message.text|linebreaksbr }}
+                            {% if message.attachments.all %}<div class="support-attachments">{% for attachment in message.attachments.all %}<a href="{% url 'support_attachment' pk=attachment.pk %}" target="_blank" rel="noopener"><img src="{% url 'support_attachment' pk=attachment.pk %}" alt="Скриншот к сообщению" loading="lazy"></a>{% endfor %}</div>{% endif %}
+                            {% if message.bug_report %}<div class="support-bug-actions"><a href="{% url 'admin:core_bugreport_change' message.bug_report.pk %}">{{ message.bug_report.get_status_display }} · Карточка ошибки →</a><button type="button" class="btn btn-ghost" data-reply-bug="{{ message.bug_report.pk }}">Ответить на ошибку</button></div>{% endif %}
                         </div>
                         {% if message.can_edit or message.can_delete %}
                         <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
@@ -67,6 +71,7 @@
                 </div>
             </div>
 
+            <p id="support-reply-context" class="support-bug-badge" hidden></p>
             <div class="feedback-chat-widget__input-area" style="margin-top: 16px;">
                 <div class="feedback-chat-widget__input-wrapper">
                     <input type="text" id="support-admin-reply-input" class="feedback-chat-widget__input" placeholder="Введите ответ..." maxlength="2000" autocomplete="off">
@@ -92,6 +97,17 @@
     var errorNode = document.getElementById("support-admin-reply-error");
     var editButtons = document.querySelectorAll(".js-support-admin-edit-btn");
     var deleteButtons = document.querySelectorAll(".js-support-admin-delete-btn");
+    var selectedBug = null;
+    var replyContext = document.getElementById("support-reply-context");
+    document.querySelectorAll("[data-reply-bug]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            selectedBug = Number(button.dataset.replyBug);
+            replyContext.hidden = false;
+            replyContext.textContent = "Ответ на ошибку №" + selectedBug + " · нажмите здесь для общего ответа";
+            input.focus();
+        });
+    });
+    replyContext.addEventListener("click", function () { selectedBug = null; replyContext.hidden = true; });
     var threadId = Number("{{ thread.id }}");
     if (!input || !button) return;
 
@@ -134,7 +150,7 @@
                 errorNode.style.display = "block";
             }
         };
-        xhr.send(JSON.stringify({ thread_id: threadId, text: text }));
+        xhr.send(JSON.stringify({ thread_id: threadId, text: text, bug_report_id: selectedBug }));
     }
 
     button.addEventListener("click", sendReply);

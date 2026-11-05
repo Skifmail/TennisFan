@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import cast
 
-from django.db.models import QuerySet, Sum
+from django.db.models import Count, QuerySet, Sum
 from django.utils import timezone
 
 from .models import SupportMessage, SupportThread
@@ -254,6 +254,7 @@ def get_threads_for_admin(*, limit: int = 50) -> QuerySet[SupportThread]:
     """
     return (
         SupportThread.objects.select_related("user")
+        .annotate(bug_report_count=Count("messages__bug_report", distinct=True))
         .prefetch_related("messages")
         .order_by("-last_message_at")[:limit]
     )

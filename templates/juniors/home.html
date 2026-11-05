@@ -10,7 +10,7 @@
             <h1>Турнир, к которому ребёнок готов</h1>
             <p class="jlh-hero__lead">Мяч, корт и соперники подбираются по возрасту и подготовке. Заявку и оплату берёт на себя родитель. Ребёнку остаётся игра и собственный рейтинг.</p>
             <div class="jlh-hero__actions">
-                <a class="jl-button" href="{% url 'juniors:family' %}">Семейный кабинет <span aria-hidden="true">→</span></a>
+                <a class="jl-button" href="{% if user.is_authenticated %}{% url 'juniors:family' %}{% else %}{% url 'juniors:parent_join' %}{% endif %}">Семейный кабинет <span aria-hidden="true">→</span></a>
                 <a class="jl-button jl-button--ghost" href="{% url 'juniors:tournaments' %}">Календарь турниров</a>
             </div>
             <ul class="jlh-facts">
@@ -77,7 +77,7 @@
                 <h3>Календарь сезона ещё собирается</h3>
                 <p>Организаторы готовят первые этапы. Опубликованный турнир появится здесь с датой, городом, мячом и числом свободных мест.</p>
                 <div class="jlh-empty__actions">
-                    <a class="jl-button" href="{% url 'juniors:family' %}">Семейный кабинет</a>
+                    <a class="jl-button" href="{% if user.is_authenticated %}{% url 'juniors:family' %}{% else %}{% url 'juniors:parent_join' %}{% endif %}">Семейный кабинет</a>
                     <a class="jlh-head__link" href="{% url 'juniors:rules' %}">Правила и допуск <span aria-hidden="true">→</span></a>
                 </div>
             </div>
@@ -195,7 +195,7 @@
             <p>Добавьте данные, подтвердите полномочия и выберите подходящий турнир, когда он появится в календаре.</p>
         </div>
         <div class="jlh-cta__actions">
-            <a class="jl-button" href="{% url 'juniors:family' %}">Перейти в кабинет <span aria-hidden="true">→</span></a>
+            <a class="jl-button" href="{% if user.is_authenticated %}{% url 'juniors:family' %}{% else %}{% url 'juniors:parent_join' %}{% endif %}">Перейти в кабинет <span aria-hidden="true">→</span></a>
             <a class="jl-button jl-button--ghost" href="{% url 'juniors:rules' %}">Правила и допуск</a>
         </div>
     </section>

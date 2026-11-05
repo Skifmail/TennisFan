@@ -2,6 +2,7 @@
 
 import random
 import secrets
+from datetime import datetime
 from typing import cast
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -31,7 +32,8 @@ def _advance(match: JuniorMatch) -> None:
         field = "entry1" if match.position % 2 == 0 else "entry2"
         setattr(target, field, match.winner)
         target.result_version += 1
-        target.save(update_fields=[field, "result_version"])
+        target.reminder_sent_at = None
+        target.save(update_fields=[field, "result_version", "reminder_sent_at"])
         if not was_ready and target.entry1_id and target.entry2_id:
             notify_match(
                 target,
@@ -176,6 +178,7 @@ def _invalidate_descendants(match: JuniorMatch, actor: User) -> None:
     target.status = "pending"
     target.completed_at = None
     target.scheduled_at = None
+    target.reminder_sent_at = None
     target.result_version += 1
     target.save()
 
@@ -283,15 +286,25 @@ def _record_result(
 
 
 @transaction.atomic
-def schedule_match(*, actor: User, match_id: int, scheduled_at) -> JuniorMatch:
+def schedule_match(
+    *, actor: User, match_id: int, scheduled_at: datetime
+) -> JuniorMatch:
     """Публикует расписание готового матча с уведомлением представителей."""
     match = JuniorMatch.objects.select_related(
         "tournament", "entry1__child", "entry2__child"
     ).get(pk=match_id)
-    JuniorTournament.objects.select_for_update(of=("self",)).get(pk=match.tournament_id)
-    require_organizer(actor, match.tournament)
+    tournament = JuniorTournament.objects.select_for_update(of=("self",)).get(
+        pk=match.tournament_id
+    )
+    match = (
+        JuniorMatch.objects.select_for_update(of=("self",))
+        .select_related("entry1__child", "entry2__child", "tournament")
+        .get(pk=match_id)
+    )
+    require_organizer(actor, tournament)
     if (
-        match.status != "pending"
+        tournament.status != "active"
+        or match.status != "pending"
         or not match.entry1_id
         or not match.entry2_id
         or scheduled_at < match.tournament.starts_at
@@ -299,8 +312,11 @@ def schedule_match(*, actor: User, match_id: int, scheduled_at) -> JuniorMatch:
         raise ValidationError(
             "Расписание задаётся готовому матчу не раньше начала турнира."
         )
+    if match.scheduled_at == scheduled_at:
+        return cast(JuniorMatch, match)
     match.scheduled_at = scheduled_at
-    match.save(update_fields=["scheduled_at"])
+    match.reminder_sent_at = None
+    match.save(update_fields=["scheduled_at", "reminder_sent_at"])
     notify_match(
         match,
         f"Расписание матча в «{match.tournament.name}» обновлено. Посмотрите время на странице матча.",

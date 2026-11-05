@@ -37299,6 +37299,44 @@ select.club-payments-form__control option {
     color: var(--color-error);
 }
 
+/* Обращения об ошибках: отдельный режим ввода в общем диалоге. */
+.feedback-bug-toggle { display:inline-flex; align-items:center; min-height:36px; padding:6px 0; margin-bottom:8px; background:none; border:0; color:var(--color-primary); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+.feedback-bug-toggle[aria-expanded="true"] { color:#ffb4b4; }
+.feedback-bug-help { padding:12px; margin-bottom:10px; border:1px solid #9e4848; border-radius:10px; background:rgb(132 35 35 / 16%); font-size:13px; }
+.feedback-bug-help p { margin:6px 0 0; line-height:1.5; }
+.feedback-chat-widget__input-area textarea.feedback-chat-widget__input { resize:vertical; min-height:48px; max-height:150px; line-height:1.5; font:inherit; font-size:14px; }
+.feedback-attachments-control { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:10px; font-size:12px; }
+.feedback-attachments-control label { color:var(--color-primary); cursor:pointer; font-weight:600; }
+.feedback-attachments-control input[type="file"] { max-width:100%; font-size:12px; }
+.feedback-attachments-control small, #feedback-attachments-list { flex-basis:100%; overflow-wrap:anywhere; }
+.feedback-attachments-control button { background:none; border:0; color:#ffb4b4; cursor:pointer; padding:6px 0; }
+.feedback-chat-widget__message.support-message--bug { border-color:#b44e4e !important; background:rgb(138 30 30 / 14%) !important; }
+.support-message--bug .feedback-chat-widget__message-bubble { background:rgb(138 30 30 / 20%) !important; border-color:#b44e4e !important; }
+.support-bug-badge { display:block; color:#ffb4b4; font-size:13px; padding-block:6px; }
+.support-reply-label { display:block; color:var(--color-primary); font-size:12px; margin-bottom:6px; }
+.support-attachments { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.support-attachments img { width:96px; height:80px; object-fit:cover; border-radius:8px; border:1px solid var(--color-border); }
+.support-bug-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:13px; }
+#support-reply-context { cursor:pointer; }
+.feedback-chat-widget { max-height:calc(100dvh - 100px); }
+.feedback-chat-widget__input-area { flex-shrink:0; }
+.feedback-chat-widget__messages { min-height:80px; }
+@media (width <= 480px) { .feedback-chat-widget { max-height:calc(100dvh - 90px); } .feedback-chat-widget__input-area { padding:12px; } }
+
+#feedback-bug-help[hidden], #feedback-attachments-clear[hidden], #support-reply-context[hidden] { display:none; }
+.feedback-chat-widget { overflow-y:auto; }
+.support-thread--has-bug { border-left:3px solid #b44e4e; }
+.feedback-attachments-control input::file-selector-button { padding:6px 10px; border:1px solid var(--color-border); border-radius:6px; background:transparent; color:var(--color-primary); cursor:pointer; }
+
+@media (width <= 480px) {
+    .feedback-chat-widget {
+        right: 12px;
+        left: 12px;
+        width: auto;
+        bottom: 80px;
+    }
+}
+
 /* END chat.css */
 
 

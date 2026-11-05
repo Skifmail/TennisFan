@@ -30,6 +30,7 @@ from .models import (
     TournamentOutboundEmail,
     UserConsent,
 )
+from .support_report_admin import BugReportAdmin as BugReportAdmin
 
 
 def _with_blank_link_target(html: str) -> str:

@@ -1,6 +1,6 @@
 """Допуск и регистрация детей с атомарным распределением мест."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import cast
 
 from django.core.exceptions import ValidationError
@@ -98,12 +98,17 @@ def expire_reservations(tournament: JuniorTournament) -> None:
         )
 
 
+def occupied_entry_filter(*, now: datetime, prefix: str = "") -> Q:
+    """Одинаково учитывает подтверждённые заявки, предварительные места и живые резервы."""
+    return Q(**{f"{prefix}status__in": ["confirmed", "preliminary"]}) | Q(
+        **{f"{prefix}status": "payment", f"{prefix}reserved_until__gt": now}
+    )
+
+
 def occupied_seats(tournament: JuniorTournament) -> int:
+    """Возвращает число занятых мест по общим правилам каталога и регистрации."""
     return int(
-        tournament.entries.filter(
-            Q(status__in=["confirmed", "preliminary"])
-            | Q(status="payment", reserved_until__gt=timezone.now())
-        ).count()
+        tournament.entries.filter(occupied_entry_filter(now=timezone.now())).count()
     )
 
 

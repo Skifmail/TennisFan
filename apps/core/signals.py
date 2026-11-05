@@ -20,3 +20,14 @@ def invalidate_footer_social_links_cache(**kwargs) -> None:
         None: Кэш обновляется через удаление ключа.
     """
     cache.delete(FOOTER_SOCIAL_LINKS_CACHE_KEY)
+
+
+@receiver(post_delete, sender="core.SupportAttachment")
+def delete_private_support_attachment(instance, **kwargs) -> None:
+    """Удаляет закрытый файл только после успешного удаления записи из базы."""
+    from django.db import transaction
+
+    name = instance.image.name
+    storage = instance.image.storage
+    if name:
+        transaction.on_commit(lambda: storage.delete(name))

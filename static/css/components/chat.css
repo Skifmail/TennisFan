@@ -272,8 +272,45 @@
 }
 
 /* Обращения об ошибках: отдельный режим ввода в общем диалоге. */
-.feedback-bug-toggle { display:inline-flex; align-items:center; min-height:36px; padding:6px 0; margin-bottom:8px; background:none; border:0; color:var(--color-primary); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
-.feedback-bug-toggle[aria-expanded="true"] { color:#ffb4b4; }
+.feedback-chat-modes {
+    display: flex;
+    gap: 8px;
+    padding: 0 var(--spacing-lg) var(--spacing-md);
+}
+.feedback-chat-modes button {
+    flex: 1;
+    min-height: 40px;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    cursor: pointer;
+}
+.feedback-chat-modes .feedback-support-toggle[aria-pressed="true"] {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-bg);
+}
+.feedback-chat-modes .feedback-bug-toggle {
+    border-color: #aa4343;
+    color: #ffb4b4;
+    background: rgb(138 30 30 / 14%);
+}
+.feedback-chat-modes .feedback-bug-toggle[aria-pressed="true"] {
+    background: #a52727;
+    border-color: #d35a5a;
+    color: #fff;
+}
+.feedback-chat-modes button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+.feedback-chat-modes button:disabled { opacity: .6; cursor: wait; }
 .feedback-bug-help { padding:12px; margin-bottom:10px; border:1px solid #9e4848; border-radius:10px; background:rgb(132 35 35 / 16%); font-size:13px; }
 .feedback-bug-help p { margin:6px 0 0; line-height:1.5; }
 .feedback-chat-widget__input-area textarea.feedback-chat-widget__input { resize:vertical; min-height:48px; max-height:150px; line-height:1.5; font:inherit; font-size:14px; }

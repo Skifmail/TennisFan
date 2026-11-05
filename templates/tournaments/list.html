@@ -14,8 +14,9 @@
 {% block content %}
 <div class="tournaments-catalog">
     <header class="tournaments-masthead">
-        <div class="container tournaments-masthead__inner">
+        <div class="container tournaments-masthead__inner{% if is_archive %} tournaments-masthead__inner--solo{% endif %}">
             <div class="tournaments-masthead__copy">
+                <p class="tournaments-masthead__eyebrow">{% if is_archive %}История{% else %}Каталог{% endif %}</p>
                 <h1 class="tournaments-masthead__title">{% if is_archive %}Архив турниров{% else %}{{ landing_heading|default:"Турниры" }}{% endif %}</h1>
                 <p class="tournaments-masthead__lede">{% if is_archive %}Завершённые турниры.{% else %}Играйте с соперниками своего уровня. Точное место проведения сообщим, когда завершится набор.{% endif %}</p>
             </div>
@@ -32,6 +33,7 @@
                 id="tournaments-filters-drawer"
                 class="tournaments-filters__drawer-check"
                 aria-controls="tournaments-filters-panel"
+                onchange="if (this.checked) this.form.scrollIntoView({block: 'start', behavior: 'instant'});"
             >
             <div class="tournaments-filters__toolbar">
                 <label for="tournaments-filters-drawer" class="tournaments-filters__toggle">
@@ -57,28 +59,6 @@
                 {% endif %}
             </div>
             <div class="tournaments-filters__panel" id="tournaments-filters-panel">
-            {% if show_moscow_geo_filters %}
-            <div class="tournaments-filters__field{% if current_region %} is-active{% endif %}">
-                <label class="tournaments-filters__label" for="tournament-filter-region">Регион</label>
-                <select name="region" id="tournament-filter-region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
-                    <option value="">Вся Россия</option>
-                    {% for option in region_options %}
-                    <option value="{{ option.slug }}" {% if current_region == option.slug %}selected{% endif %}>{{ option.label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% if area_options %}
-            <div class="tournaments-filters__field{% if current_area %} is-active{% endif %}">
-                <label class="tournaments-filters__label" for="tournament-filter-area">Район или город</label>
-                <select name="area" id="tournament-filter-area" class="form-control" onchange="this.form.submit()" aria-label="Район или город">
-                    <option value="">Все районы и города</option>
-                    {% for area in area_options %}
-                    <option value="{{ area.slug }}" {% if current_area == area.slug %}selected{% endif %}>{{ area.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-            {% endif %}
             <div class="tournaments-filters__field{% if current_sport and current_sport != 'tennis' %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-sport">Вид спорта</label>
                 <select name="sport" id="tournament-filter-sport" class="form-control" onchange="this.form.submit()" aria-label="Вид спорта">
@@ -117,6 +97,28 @@
                 </select>
             </div>
             {% endif %}
+            {% if show_moscow_geo_filters %}
+            <div class="tournaments-filters__field{% if current_region %} is-active{% endif %}">
+                <label class="tournaments-filters__label" for="tournament-filter-region">Регион</label>
+                <select name="region" id="tournament-filter-region" class="form-control" onchange="this.form.submit()" aria-label="Регион">
+                    <option value="">Вся Россия</option>
+                    {% for option in region_options %}
+                    <option value="{{ option.slug }}" {% if current_region == option.slug %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if area_options %}
+            <div class="tournaments-filters__field{% if current_area %} is-active{% endif %}">
+                <label class="tournaments-filters__label" for="tournament-filter-area">Район или город</label>
+                <select name="area" id="tournament-filter-area" class="form-control" onchange="this.form.submit()" aria-label="Район или город">
+                    <option value="">Все районы и города</option>
+                    {% for area in area_options %}
+                    <option value="{{ area.slug }}" {% if current_area == area.slug %}selected{% endif %}>{{ area.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            {% endif %}
             <div class="tournaments-filters__field{% if current_city %} is-active{% endif %}">
                 <label class="tournaments-filters__label" for="tournament-filter-city">Населённый пункт</label>
                 <input name="city" id="tournament-filter-city" class="form-control" placeholder="Любой населённый пункт России" value="{{ current_city }}" onchange="this.form.submit()">
@@ -132,7 +134,7 @@
             {% if tournaments_page.number == 1 and not tournaments.0.is_local %}
             <section class="tournaments-local-section">
                 <header class="tournaments-local-section__heading"><h2>Рядом с вами</h2><span>{{ viewer_city }}</span></header>
-                <p class="text-secondary">В вашем населённом пункте подходящих турниров пока нет.</p>
+                <p class="tournaments-empty">В вашем населённом пункте подходящих турниров пока нет.</p>
             </section>
             {% endif %}
             {% regroup tournaments by is_local as tournament_sections %}
@@ -146,13 +148,13 @@
                 </div>
             </section>
             {% endfor %}
-            {% if not tournaments %}<p class="text-secondary">Турниры не найдены.</p>{% endif %}
+            {% if not tournaments %}<p class="tournaments-empty">Турниры не найдены.</p>{% endif %}
         {% else %}
         <div class="tournament-list">
             {% for tournament in tournaments %}
                 {% include 'includes/tournament_card.html' with tournament=tournament %}
             {% empty %}
-            <p class="text-secondary">{% if is_archive %}Завершённые турниры не найдены.{% else %}Турниры не найдены.{% endif %}</p>
+            <p class="tournaments-empty">{% if is_archive %}Завершённые турниры не найдены.{% else %}Турниры не найдены.{% endif %}</p>
             {% endfor %}
         </div>
         {% endif %}

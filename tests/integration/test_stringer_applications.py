@@ -94,6 +94,7 @@ def settings_for_applications() -> Iterator[None]:
             EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
             NOTIFICATION_CENTER_ENABLED=True,
             ADMIN_NOTIFICATIONS_EMAIL="moderator@example.test",
+            STRINGER_APPLICATION_NOTIFICATION_EMAIL="admin@tennisfan.ru",
             SITE_URL="https://tennisfan.ru",
             ONESIGNAL_SITE_ORIGIN="https://tennisfan.ru",
             MEDIA_ROOT=media,
@@ -180,7 +181,7 @@ def test_submission_queues_admin_channels_and_hides_until_approved(
     )
     assert set(
         Delivery.objects.filter(notification=note).values_list("channel", flat=True)
-    ) == {"email", "push"}
+    ) == {"push"}
     assert "Струны тест" not in client.get(reverse("stringers")).content.decode()
     review_stringer_application(application.pk, actor=moderator, approve=True)
     review_stringer_application(application.pk, actor=moderator, approve=True)
@@ -298,7 +299,7 @@ def test_disabled_center_sends_email_after_commit(
     ):
         client.post(reverse("stringer_application"), application_data())
     assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [moderator.email]
+    assert mail.outbox[0].to == ["admin@tennisfan.ru"]
     assert "/change/" in mail.outbox[0].body
     assert Notification.objects.filter(user=moderator).exists()
     assert not Delivery.objects.exists()
@@ -346,4 +347,35 @@ def test_guest_submission_requires_csrf() -> None:
     assert (
         client.post(reverse("stringer_application"), application_data()).status_code
         == 403
+    )
+
+
+@pytest.mark.parametrize("center_enabled", [True, False])
+def test_only_shared_mailbox_receives_email_while_moderators_keep_inbox_and_push(
+    client, moderator, django_capture_on_commit_callbacks, center_enabled
+):
+    """Личные адреса модераторов и общий адрес других событий не получают заявку."""
+    other = User.objects.create_superuser(
+        email="tennis@tennisfan.ru", password="test-password"
+    )
+    NotificationPreference.objects.create(user=other, push_enabled=True)
+    with (
+        override_settings(
+            NOTIFICATION_CENTER_ENABLED=center_enabled,
+            ADMIN_NOTIFICATIONS_EMAIL="tennis@tennisfan.ru",
+        ),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        response = client.post(reverse("stringer_application"), application_data())
+    assert response.status_code == 302
+    assert [item.to for item in mail.outbox] == [["admin@tennisfan.ru"]]
+    assert set(
+        Notification.objects.filter(
+            event_key="stringer.application_submitted"
+        ).values_list("user_id", flat=True)
+    ) == {moderator.pk, other.pk}
+    deliveries = Delivery.objects.filter(event_key="stringer.application_submitted")
+    assert not deliveries.filter(channel="email").exists()
+    assert set(deliveries.filter(channel="push").values_list("user_id", flat=True)) == (
+        {moderator.pk, other.pk} if center_enabled else set()
     )

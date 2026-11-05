@@ -1,3 +1,16 @@
+/* Фон раздела применяется только к страницам детской лиги. */
+body.body--junior-league::before {
+    background-image: url("../../images/junior-league-bg.png");
+    background-position: center top;
+    background-size: cover;
+}
+
+@media (width <= 640px) {
+    body.body--junior-league::before {
+        background-position: 72% top;
+    }
+}
+
 
 .jl {
     --jl-bg: var(--color-bg);
@@ -1838,3 +1851,109 @@
 .jl-launch-note strong { color:var(--jl-accent); }
 .jl-launch-note p { margin:6px 0 0; font-size:14px; }
 .jl-launch-note a { text-decoration:underline; text-underline-offset:3px; }
+
+/* Навигация лиги: кнопки, активный раздел и равномерная сетка на телефоне. */
+.jl-nav {
+    gap: 16px;
+}
+
+.jl-nav-links {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    gap: 8px;
+    min-width: 0;
+}
+
+.jl .jl-nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 10px 13px;
+    border: 1px solid var(--jl-line-strong);
+    border-radius: 10px;
+    background: var(--jl-surface);
+    color: var(--jl-accent);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+    text-decoration: none;
+    transition: transform 180ms cubic-bezier(.23, 1, .32, 1),
+        background-color 180ms ease, border-color 180ms ease,
+        box-shadow 180ms ease, color 180ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.jl .jl-nav-link[aria-current] {
+    background: var(--jl-accent);
+    border-color: var(--jl-accent);
+    color: var(--color-bg);
+    box-shadow: 0 3px 12px rgb(166 130 74 / 16%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .jl .jl-nav-link:hover {
+        transform: translateY(-2px);
+        background-color: var(--color-bg-elevated);
+        border-color: var(--jl-accent);
+        box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
+    }
+
+    .jl .jl-nav-link[aria-current]:hover {
+        background-color: color-mix(in srgb, var(--jl-accent) 88%, white);
+    }
+}
+
+.jl .jl-nav-link:active {
+    transform: scale(.97);
+}
+
+.jl .jl-nav-link:focus-visible {
+    outline: 2px solid var(--jl-accent);
+    outline-offset: 3px;
+    transition: none;
+}
+
+@media (width <= 1100px) {
+    .jl-nav .jl-brand {
+        flex-basis: 100%;
+    }
+
+    .jl-nav-links {
+        width: 100%;
+        grid-auto-flow: row;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+    }
+
+    .jl-nav-links--guest {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (width <= 640px) {
+    .jl-nav-links {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .jl .jl-nav-link {
+        min-height: 48px;
+        padding: 10px 8px;
+        overflow-wrap: anywhere;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .jl .jl-nav-link {
+        transition: none;
+    }
+
+    .jl .jl-nav-link:hover,
+    .jl .jl-nav-link:active {
+        transform: none;
+    }
+}

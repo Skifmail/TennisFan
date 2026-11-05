@@ -657,10 +657,20 @@
         });
     }
 
-    if (!isPlatformAdmin && window.location.search.indexOf("open_support=1") !== -1) {
+    document.addEventListener("click", function (event) {
+        var link = event.target.closest("a[data-support-report]");
+        if (!link || event.defaultPrevented || event.button !== 0 ||
+            event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
         openChat();
-        if (window.location.search.indexOf("report_bug=1") !== -1 && bugToggle && !bugMode) {
-            bugToggle.click();
+        setComposerMode(true);
+    });
+
+    var supportParams = new URLSearchParams(window.location.search);
+    if (supportParams.get("open_support") === "1") {
+        openChat();
+        if (supportParams.get("report_bug") === "1") {
+            setComposerMode(true);
         }
     }
 

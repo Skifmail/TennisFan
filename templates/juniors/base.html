@@ -1,18 +1,24 @@
 {% extends 'base.html' %}
 {% load static %}
+{% block body_class %}body--junior-league{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/pages/juniors.css' %}">{% endblock %}
 {% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
 <main class="jl container{% block main_class %}{% endblock %}">
     <nav class="jl-nav" aria-label="Детская лига">
         <a class="jl-brand" href="{% url 'juniors:home' %}"><span class="jl-mark" aria-hidden="true">↗</span> TennisFan <span>Детская лига</span></a>
-        <a href="{% url 'juniors:tournaments' %}">Турниры</a>
-        <a href="{% url 'juniors:ratings' %}">Рейтинги</a>
-        <a href="{% url 'juniors:rules' %}">Правила и родителям</a>
-        <a href="{% url 'juniors:family' %}">Мои дети</a>
-        {% if user.is_authenticated %}<a href="{% url 'juniors:my_matches' %}">Матчи детей</a><a href="{% url 'juniors:payments' %}">Оплаты</a>{% endif %}
+        <div class="jl-nav-links{% if not user.is_authenticated %} jl-nav-links--guest{% endif %}">
+            <a class="jl-nav-link" href="{% url 'juniors:tournaments' %}"{% if '/kids/tournaments/' in request.path %} aria-current="page"{% endif %}>Турниры</a>
+            <a class="jl-nav-link" href="{% url 'juniors:ratings' %}"{% if '/kids/ratings/' in request.path %} aria-current="page"{% endif %}>Рейтинги</a>
+            <a class="jl-nav-link" href="{% url 'juniors:rules' %}"{% if '/kids/rules/' in request.path %} aria-current="page"{% endif %}>Правила и родителям</a>
+            <a class="jl-nav-link" href="{% url 'juniors:family' %}"{% if '/kids/family/' in request.path %} aria-current="page"{% endif %}>Мои дети</a>
+            {% if user.is_authenticated %}
+            <a class="jl-nav-link" href="{% url 'juniors:my_matches' %}"{% if '/kids/matches/' in request.path %} aria-current="page"{% endif %}>Матчи детей</a>
+            <a class="jl-nav-link" href="{% url 'juniors:payments' %}"{% if '/kids/payments/' in request.path %} aria-current="page"{% endif %}>Оплаты</a>
+            {% endif %}
+        </div>
     </nav>
-    <aside class="jl-launch-note" aria-label="О запуске детской лиги"><strong>Детская лига запущена</strong><p>Мы продолжаем тестировать и дорабатывать раздел. Если заметите ошибку, <a href="?open_support=1&amp;report_bug=1">сообщите в поддержку</a> — опишите, что произошло, и приложите скриншот.</p></aside>
+    <aside class="jl-launch-note" aria-label="О запуске детской лиги"><strong>Детская лига запущена</strong><p>Мы продолжаем тестировать и дорабатывать раздел. Если заметите ошибку, <a href="?open_support=1&amp;report_bug=1" data-support-report>сообщите в поддержку</a> — опишите, что произошло, и приложите скриншот.</p></aside>
     {% block junior_content %}{% endblock %}
 </main>
 {% endblock %}

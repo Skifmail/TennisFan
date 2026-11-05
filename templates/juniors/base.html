@@ -2,7 +2,7 @@
 {% load static %}
 {% block body_class %}body--junior-league{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/pages/juniors.css' %}">{% endblock %}
-{% block extra_head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow"><link rel="preload" as="image" type="image/webp" href="{% static 'images/junior-league-bg.webp' %}">{% endblock %}
 {% block content %}
 <main class="jl container{% block main_class %}{% endblock %}">
     <nav class="jl-nav" aria-label="Детская лига">

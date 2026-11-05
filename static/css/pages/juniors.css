@@ -1957,3 +1957,54 @@ body.body--junior-league::before {
         transform: none;
     }
 }
+
+
+/* Эмблема и надпись Kids вместо текстового бренда внутри детской лиги. */
+.jl-nav .jl-brand {
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+}
+
+.jl-brand-emblem {
+    display: block;
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgb(0 12 7 / 25%));
+}
+
+.jl-brand-wordmark {
+    display: block;
+    flex: 0 0 72px;
+    width: 72px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.jl-nav .jl-brand > span:last-child {
+    white-space: nowrap;
+}
+
+@media (width <= 640px) {
+    .jl-nav .jl-brand {
+        gap: 8px;
+    }
+
+    .jl-brand-emblem {
+        flex-basis: 42px;
+        width: 42px;
+        height: 42px;
+    }
+
+    .jl-brand-wordmark {
+        flex-basis: 64px;
+        width: 64px;
+        height: 36px;
+    }
+
+    .jl-nav .jl-brand > span:last-child {
+        padding-left: 8px;
+    }
+}

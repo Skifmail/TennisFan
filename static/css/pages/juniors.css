@@ -1,6 +1,6 @@
 /* Фон раздела применяется только к страницам детской лиги. */
 body.body--junior-league::before {
-    background-image: url("../../images/junior-league-bg.png");
+    background-image: url("../../images/junior-league-bg.webp");
     background-position: center top;
     background-size: cover;
 }

@@ -683,6 +683,9 @@ class JuniorMatch(models.Model):
         "Основание технического результата / исправления", max_length=255, blank=True
     )
     scheduled_at = models.DateTimeField("Расписание", null=True, blank=True)
+    reminder_sent_at = models.DateTimeField(
+        "Напоминание перед матчем", null=True, blank=True, editable=False
+    )
     completed_at = models.DateTimeField("Результат зафиксирован", null=True, blank=True)
 
     class Meta:

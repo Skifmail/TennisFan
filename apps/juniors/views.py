@@ -23,7 +23,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.email_service import send_email_verification
 
-from .competition import register, withdraw
+from .competition import occupied_entry_filter, register, withdraw
 from .forms import (
     ChildForm,
     ParentRegistrationForm,
@@ -96,11 +96,7 @@ def upcoming_tournaments(*, now: datetime, limit: int = 3) -> list[dict[str, Any
         .annotate(
             occupied=Count(
                 "entries",
-                filter=Q(entries__status=JuniorEntry.Status.CONFIRMED)
-                | Q(
-                    entries__status=JuniorEntry.Status.PAYMENT,
-                    entries__reserved_until__gt=now,
-                ),
+                filter=occupied_entry_filter(now=now, prefix="entries__"),
             )
         )
         .order_by("starts_at", "pk")[:limit]
@@ -464,10 +460,8 @@ def tournaments(request: HttpRequest) -> HttpResponse:
             qs = qs.annotate(
                 occupied=Count(
                     "entries",
-                    filter=Q(entries__status__in=["confirmed", "preliminary"])
-                    | Q(
-                        entries__status="payment",
-                        entries__reserved_until__gt=timezone.now(),
+                    filter=occupied_entry_filter(
+                        now=timezone.now(), prefix="entries__"
                     ),
                 )
             ).filter(

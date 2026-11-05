@@ -9,8 +9,20 @@ from django.views.decorators.cache import never_cache
 
 from .appeals import resolve_appeal
 from .competition import promote_waitlist, publish_tournament
-from .forms import RescheduleForm, ResultForm, ScheduleForm
-from .lifecycle import cancel_tournament, reassign_entry, reschedule_tournament
+from .forms import (
+    ManualDrawForm,
+    RegistrationDeadlineForm,
+    RescheduleForm,
+    ResultForm,
+    ScheduleForm,
+)
+from .lifecycle import (
+    cancel_tournament,
+    reassign_entry,
+    remove_entry,
+    reschedule_tournament,
+    update_registration,
+)
 from .matches import record_result, start_tournament
 from .models import JuniorAppeal, JuniorEntry, JuniorMatch, JuniorTournament
 from .permissions import account, require_organizer
@@ -27,8 +39,51 @@ def manage(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         try:
             action = request.POST.get("action")
-            if action == "publish":
+            if action == "close_registration":
+                update_registration(
+                    actor=account(request), tournament_id=pk, close=True
+                )
+            elif action == "extend_registration":
+                deadline_form = RegistrationDeadlineForm(request.POST)
+                if not deadline_form.is_valid():
+                    raise ValidationError(
+                        "Укажите корректную дату окончания регистрации."
+                    )
+                update_registration(
+                    actor=account(request),
+                    tournament_id=pk,
+                    deadline=deadline_form.cleaned_data["deadline"],
+                )
+            elif action == "remove":
+                entry = get_object_or_404(
+                    JuniorEntry, pk=posted_id(request, "entry"), tournament=tournament
+                )
+                remove_entry(
+                    actor=account(request),
+                    entry_id=entry.pk,
+                    reason=request.POST.get("reason", ""),
+                )
+            elif action == "publish":
                 publish_tournament(actor=account(request), tournament_id=pk)
+            elif action == "start_manual":
+                if tournament.format != "elimination":
+                    raise ValidationError(
+                        "Ручные пары применяются к сетке на выбывание."
+                    )
+                draw_form = ManualDrawForm(request.POST, tournament=tournament)
+                if not draw_form.is_valid():
+                    raise ValidationError(
+                        " ".join(
+                            str(error)
+                            for errors in draw_form.errors.values()
+                            for error in errors
+                        )
+                    )
+                start_tournament(
+                    actor=account(request),
+                    tournament_id=pk,
+                    entry_order=draw_form.cleaned_data["entry_order"],
+                )
             elif action == "start":
                 start_tournament(actor=account(request), tournament_id=pk)
             elif action == "finalize":
@@ -96,7 +151,21 @@ def manage(request: HttpRequest, pk: int) -> HttpResponse:
         "juniors/manage.html",
         {
             "tournament": tournament,
-            "entries": tournament.entries.select_related("child", "guardian__user"),
+            "entries": tournament.entries.select_related(
+                "child", "guardian__user"
+            ).prefetch_related("child__guardians__user"),
+            "registration_form": RegistrationDeadlineForm(),
+            "manual_draw_form": (
+                ManualDrawForm(tournament=tournament)
+                if tournament.format == "elimination"
+                else None
+            ),
+            "entry_count": tournament.entries.exclude(status="withdrawn").count(),
+            "confirmed_count": tournament.entries.filter(status="confirmed").count(),
+            "preliminary_count": tournament.entries.filter(
+                status="preliminary"
+            ).count(),
+            "matches_left": tournament.matches.filter(status="pending").count(),
             "matches": tournament.matches.select_related(
                 "entry1__child", "entry2__child", "winner__child"
             ),

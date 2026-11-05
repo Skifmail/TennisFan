@@ -18,7 +18,7 @@ class ChildProfile(models.Model):
     """Спортивный профиль ребёнка без учётной записи для входа."""
 
     class Status(models.TextChoices):
-        DRAFT = "draft", "Черновик"
+        DRAFT = "draft", "Ожидает допуска"
         ACTIVE = "active", "Активен"
         SUSPENDED = "suspended", "Приостановлен"
         ARCHIVED = "archived", "Архив"
@@ -190,7 +190,7 @@ class LegalRelease(models.Model):
         "Отдельное согласие на публикацию имени и результатов"
     )
     reviewed = models.BooleanField(
-        "Проверено юристом, разрешено оформление согласий", default=False
+        "Утверждено платформой для получения согласий", default=False
     )
     is_current = models.BooleanField("Текущая версия", default=False)
     created_at = models.DateTimeField("Создана", default=timezone.now, editable=False)
@@ -209,7 +209,7 @@ class LegalRelease(models.Model):
     def clean(self) -> None:
         super().clean()
         if self.is_current and not self.reviewed:
-            raise ValidationError("Текущая версия должна быть проверена юристом.")
+            raise ValidationError("Текущая версия должна быть утверждена платформой.")
         if self.pk and self.consents.exists():
             previous = type(self).objects.get(pk=self.pk)
             if any(
@@ -488,7 +488,8 @@ class JuniorEntry(models.Model):
     """Одна заявка ребёнка, оформленная конкретным представителем."""
 
     class Status(models.TextChoices):
-        CONFIRMED = "confirmed", "Подтверждена"
+        PRELIMINARY = "preliminary", "Ожидает проверки представителя"
+        CONFIRMED = "confirmed", "Участие подтверждено"
         PAYMENT = "payment", "Ожидает оплаты"
         WAITLIST = "waitlist", "Лист ожидания"
         WITHDRAWN = "withdrawn", "Снята"
@@ -673,6 +674,9 @@ class JuniorMatch(models.Model):
             ("bye", "Свободный круг"),
         ],
         default="pending",
+    )
+    result_version = models.PositiveIntegerField(
+        "Версия матча", default=0, editable=False
     )
     scores = models.JSONField("Счёт", default=list, blank=True)
     reason = models.CharField(

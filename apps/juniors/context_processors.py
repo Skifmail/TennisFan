@@ -9,8 +9,9 @@ def junior_context(request: HttpRequest) -> dict[str, bool]:
         "junior_actions_allowed": bool(
             request.user.is_authenticated
             and request.user.is_active
-            and request.user.is_staff
+            and (request.user.is_staff or not settings.JUNIOR_LEAGUE_READ_ONLY)
         ),
+        "junior_read_only": settings.JUNIOR_LEAGUE_READ_ONLY,
         "junior_league_visible": settings.JUNIOR_LEAGUE_ENABLED
         or bool(request.user.is_authenticated and request.user.is_staff),
     }

@@ -1,5 +1,6 @@
 """Смена представителей, исправления, отмены и передача истории взрослому."""
 
+from datetime import datetime
 from typing import Any, cast
 
 from django.core.exceptions import ValidationError
@@ -18,7 +19,7 @@ from .models import (
     JuniorRefund,
     JuniorTournament,
 )
-from .notifications import notify_family
+from .notifications import notify_entry, notify_family
 from .permissions import require_organizer, require_verifier
 
 
@@ -65,7 +66,7 @@ def reassign_entry(
 
 
 @transaction.atomic
-def revoke_guardian(*, actor: User, link_id: int, reason: str) -> GuardianLink:
+def _revoke_guardian(*, actor: User, link_id: int, reason: str) -> GuardianLink:
     """Прекращает полномочия без удаления платежей и истории ребёнка."""
     require_verifier(actor)
     link = GuardianLink.objects.get(pk=link_id)
@@ -145,10 +146,15 @@ def correct_profile(
                     "Исправленная дата нарушает допуск к прошлому турниру. Сначала урегулируйте его результаты и рейтинг."
                 )
     for entry in child.entries.filter(
-        status__in=["confirmed", "payment"],
+        status__in=["confirmed", "payment", "preliminary"],
         tournament__status__in=["open", "closed", "active"],
     ).select_related("guardian", "tournament"):
-        eligibility(child, entry.guardian, entry.tournament)
+        eligibility(
+            child,
+            entry.guardian,
+            entry.tournament,
+            preliminary=entry.status == "preliminary",
+        )
     if "birth_date" in data:
         child.birth_verified_at = timezone.now()
     child.save()
@@ -190,7 +196,7 @@ def transfer_to_adult(
     if child.adult_user_id:
         raise ValidationError("История уже передана взрослому владельцу.")
     if child.entries.filter(
-        status__in=["confirmed", "payment"],
+        status__in=["confirmed", "payment", "preliminary"],
         tournament__status__in=["open", "closed", "active"],
     ).exists():
         raise ValidationError("Сначала урегулируйте действующие детские заявки.")
@@ -238,8 +244,8 @@ def cancel_tournament(
     if tournament.status == "cancelled":
         return cast(JuniorTournament, tournament)
     for entry in tournament.entries.select_related("child"):
-        notify_family(
-            entry.child,
+        notify_entry(
+            entry,
             f"Турнир «{tournament.name}» отменён. Оплаченные взносы переданы на возврат.",
         )
         for payment in entry.payments.filter(status__in=["paid", "refund_pending"]):
@@ -297,14 +303,19 @@ def reschedule_tournament(
     previous = tournament.starts_at
     tournament.starts_at = starts_at
     for entry in tournament.entries.filter(
-        status__in=["confirmed", "payment"]
+        status__in=["confirmed", "payment", "preliminary"]
     ).select_related("child", "guardian"):
-        eligibility(entry.child, entry.guardian, tournament)
+        eligibility(
+            entry.child,
+            entry.guardian,
+            tournament,
+            preliminary=entry.status == "preliminary",
+        )
     tournament.save(update_fields=["starts_at"])
     tournament.entries.update(reminder_sent_at=None)
     for entry in tournament.entries.exclude(status="withdrawn").select_related("child"):
-        notify_family(
-            entry.child,
+        notify_entry(
+            entry,
             f"Дата «{tournament.name}» изменена. Проверьте расписание и условия возврата.",
         )
     AuditEvent.objects.create(
@@ -318,3 +329,84 @@ def reschedule_tournament(
         },
     )
     return cast(JuniorTournament, tournament)
+
+
+def revoke_guardian(*, actor: User, link_id: int, reason: str) -> GuardianLink:
+    """Прекращает полномочия и освобождает предварительные места без доступа к чужим данным."""
+    link = _revoke_guardian(actor=actor, link_id=link_id, reason=reason)
+    from .competition import refresh_preliminary_entries
+
+    refresh_preliminary_entries(actor=actor, child_id=link.child_id)
+    return cast(GuardianLink, link)
+
+
+@transaction.atomic
+def update_registration(
+    *,
+    actor: User,
+    tournament_id: int,
+    deadline: datetime | None = None,
+    close: bool = False,
+) -> JuniorTournament:
+    """Закрывает приём или продлевает его до старта без перестроения готовой сетки."""
+    tournament = JuniorTournament.objects.select_for_update().get(pk=tournament_id)
+    require_organizer(actor, tournament)
+    if (
+        tournament.status not in ("open", "closed")
+        or tournament.matches.exists()
+        or tournament.starts_at <= timezone.now()
+    ):
+        raise ValidationError("Изменить приём заявок можно только до старта турнира.")
+    if close:
+        tournament.registration_ends_at = min(
+            tournament.registration_ends_at, timezone.now()
+        )
+        tournament.status = "closed"
+    else:
+        if deadline is None or not timezone.now() < deadline < tournament.starts_at:
+            raise ValidationError(
+                "Укажите окончание регистрации в будущем, до начала турнира."
+            )
+        tournament.registration_ends_at = deadline
+        tournament.status = "open"
+    tournament.save(update_fields=["registration_ends_at", "status"])
+    AuditEvent.objects.create(
+        actor=actor,
+        action="registration.closed" if close else "registration.extended",
+        details={
+            "tournament_id": tournament.pk,
+            "deadline": tournament.registration_ends_at.isoformat(),
+        },
+    )
+    return cast(JuniorTournament, tournament)
+
+
+@transaction.atomic
+def remove_entry(*, actor: User, entry_id: int, reason: str) -> JuniorEntry:
+    """Позволяет организатору снять заявку до старта с уведомлением и сохранением оплаты."""
+    source = JuniorEntry.objects.get(pk=entry_id)
+    tournament = JuniorTournament.objects.select_for_update().get(
+        pk=source.tournament_id
+    )
+    require_organizer(actor, tournament)
+    entry = JuniorEntry.objects.select_for_update().get(pk=entry_id)
+    if tournament.status not in ("draft", "open", "closed") or not reason.strip():
+        raise ValidationError(
+            "Укажите причину снятия заявки до старта. В начавшемся турнире используйте технический результат матча."
+        )
+    if entry.status == "withdrawn":
+        return cast(JuniorEntry, entry)
+    entry.status = "withdrawn"
+    entry.reserved_until = None
+    entry.save(update_fields=["status", "reserved_until"])
+    AuditEvent.objects.create(
+        actor=actor,
+        child=entry.child,
+        action="entry.removed",
+        details={"entry_id": entry.pk, "reason": reason.strip()[:255]},
+    )
+    notify_entry(
+        entry,
+        f"Заявка на «{tournament.name}» снята организатором: {reason.strip()[:120]}. Если взнос оплачен, обратитесь за возвратом в истории оплат.",
+    )
+    return cast(JuniorEntry, entry)

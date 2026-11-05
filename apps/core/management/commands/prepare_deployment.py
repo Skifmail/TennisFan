@@ -69,6 +69,9 @@ class Command(BaseCommand):
                         [f"{MIGRATION_DDL_LOCK_TIMEOUT_SECONDS}s"],
                     )
             call_command("migrate", interactive=False)
+            from apps.juniors.services import ensure_default_legal_release
+
+            ensure_default_legal_release()
             email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "")
             password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "")
             if email and password:

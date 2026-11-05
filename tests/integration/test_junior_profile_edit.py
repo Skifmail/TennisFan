@@ -10,7 +10,7 @@ from django.urls import reverse
 from PIL import Image
 
 from apps.juniors.competition import register
-from apps.juniors.models import AuditEvent, ChildProfile, GuardianLink
+from apps.juniors.models import AuditEvent, ChildProfile, GuardianLink, LegalRelease
 from apps.juniors.services import update_draft
 from tests.integration.test_junior_competition import participant, setup_tournament
 from tests.support.factories import make_user
@@ -218,3 +218,53 @@ def test_name_switch_withdraws_publication_but_keeps_processing(
     )
     child.refresh_from_db()
     assert child.status == "active"
+
+
+def test_settings_are_rendered_once_with_working_controls(client, private_profile):
+    _, child, _, _, _ = private_profile
+    html = client.get(reverse("juniors:child", args=[child.pk])).content.decode()
+    assert html.count('id="profile-settings"') == 1
+    assert html.count('id="name-visibility-title"') == 1
+    assert html.count('name="action" value="set_publication"') == 1
+    assert "Настройка станет доступна" not in html
+    assert "Оформление согласия пока недоступно" not in html
+
+
+def test_empty_settings_are_hidden_until_there_is_an_action(client, private_profile):
+    _, child, _, release, _ = private_profile
+    link = child.guardians.get()
+    link.consents.all().delete()
+    link.status = "pending"
+    link.save(update_fields=["status"])
+    release.is_current = False
+    release.save(update_fields=["is_current"])
+    child.status = "draft"
+    child.save(update_fields=["status"])
+    html = client.get(reverse("juniors:child", args=[child.pk])).content.decode()
+    assert 'id="profile-settings"' not in html
+    assert "Имя в результатах" not in html
+    assert "Оформление согласия пока недоступно" not in html
+
+
+def test_existing_processing_consent_can_be_withdrawn_without_current_release(
+    client, private_profile
+):
+    _, child, _, release, _ = private_profile
+    release.is_current = False
+    release.save(update_fields=["is_current"])
+    html = client.get(reverse("juniors:child", args=[child.pk])).content.decode()
+    assert html.count('id="profile-settings"') == 1
+    assert "Отозвать согласие на обработку" in html
+    assert LegalRelease.objects.get(is_current=True).reviewed
+
+
+def test_readonly_consent_is_not_called_settings(client, private_profile):
+    parent, child, _, _, _ = private_profile
+    parent.is_staff = False
+    parent.save(update_fields=["is_staff"])
+    html = client.get(reverse("juniors:child", args=[child.pk])).content.decode()
+    assert html.count('id="profile-settings"') == 1
+    assert "<summary>Согласия</summary>" in html
+    assert "<summary>Настройки профиля</summary>" not in html
+    assert "Посмотреть выданное согласие" in html
+    assert 'name="action" value="set_publication"' not in html

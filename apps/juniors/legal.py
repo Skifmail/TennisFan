@@ -1,4 +1,4 @@
-"""Версионируемые проекты документов детского раздела."""
+"""Документы и версии согласий детской лиги."""
 
 import hashlib
 from pathlib import Path
@@ -21,9 +21,17 @@ def document_text(slug: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def document_bundle() -> tuple[str, str, str]:
+    """Возвращает готовые тексты и устойчивую версию их содержимого."""
+    processing = document_text("processing")
+    publication = document_text("publication")
+    digest = hashlib.sha256((processing + "\n" + publication).encode()).hexdigest()[:12]
+    return "v-" + digest, processing, publication
+
+
 def release_version() -> str:
-    contents = document_text("processing") + "\n" + document_text("publication")
-    return "draft-" + hashlib.sha256(contents.encode()).hexdigest()[:12]
+    """Возвращает версию готовой редакции согласий."""
+    return document_bundle()[0]
 
 
 REPRESENTATIVE_CONFIRMATION = "Мне исполнилось 18 лет. Я родитель или законный представитель этого ребёнка и вправе действовать от его имени."

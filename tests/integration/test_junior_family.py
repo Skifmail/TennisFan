@@ -264,18 +264,13 @@ def test_profile_distinguishes_verification_from_activation(
     response = client.get(reverse("juniors:child", args=[kid.pk]))
     assert response.status_code == 200
     html = response.content.decode()
-    assert "Ожидает активации" in html
+    assert "Ожидает допуска" in html
     if verified:
         assert "Представитель подтверждён" in html
         assert "jl-badge--verified" in html
         assert "Представительство не проверено" not in html
         assert "организатор проверит ваши документы" not in html
-        if has_release:
-            assert "Для активации профиля оформите согласие" in html
-        else:
-            assert (
-                "Профиль пока не активирован: платформа готовит тексты согласий" in html
-            )
+        assert "Для активации профиля оформите согласие" in html
     else:
         assert "Представительство ожидает проверки" in html
         assert "организатор проверит ваши документы" in html

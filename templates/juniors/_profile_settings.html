@@ -1,8 +1,9 @@
 {% load legal_tags %}
+{% if show_publication_settings or show_processing_settings %}
 <details class="jl-profile-settings jl-note" id="profile-settings">
-    <summary>Настройки профиля</summary>
+    <summary>{% if profile_settings_editable %}Настройки профиля{% else %}Согласия{% endif %}</summary>
     <div class="jl-settings-body">
-        <section aria-labelledby="name-visibility-title">
+        {% if show_publication_settings %}<section aria-labelledby="name-visibility-title">
             <h2 id="name-visibility-title">Имя в результатах</h2>
             <p class="jl-muted">Без разрешения вместо имени используется номер участника. Это не влияет на участие и очки. Фото в открытых таблицах не показывается.</p>
             {% if junior_actions_allowed %}
@@ -16,20 +17,22 @@
             </form>
             {% elif publication_accepted %}
             <form method="post" action="{% url 'juniors:consent' pk=child.pk %}">{% csrf_token %}<input type="hidden" name="kind" value="publication"><input type="hidden" name="action" value="withdraw"><button class="jl-button" type="submit">Отозвать разрешение на публикацию</button></form>
-            {% else %}<p class="jl-muted">Настройка станет доступна после активации профиля и подготовки текста согласия.</p>{% endif %}
+            {% endif %}
             {% else %}<p>{% if publication_visible %}Имя и фамилия видны в результатах.{% else %}В результатах используется номер участника.{% endif %}</p>{% endif %}
             {% if publication_visible or publication_accepted %}<p class="jl-muted">При отключении имя скроется и в прошлых результатах. Отзыв прекращает разрешения на публикацию для этого ребёнка, включая разрешения другого представителя.</p>{% endif %}
-        </section>
-        <section aria-labelledby="processing-settings-title">
+        </section>{% endif %}
+        {% if show_processing_settings %}<section aria-labelledby="processing-settings-title">
             <h2 id="processing-settings-title">Обработка данных</h2>
             {% if processing_consent %}
             <details><summary>Посмотреть выданное согласие</summary><p class="jl-muted">Получено {{ processing_consent.accepted_at|date:'d.m.Y' }}.</p><div class="legal-text">{{ processing_consent.text_snapshot|legal_markdown }}</div></details>
             {% if junior_actions_allowed %}<form method="post" action="{% url 'juniors:consent' pk=child.pk %}">{% csrf_token %}<input type="hidden" name="kind" value="processing"><input type="hidden" name="action" value="withdraw"><p class="jl-muted">После отзыва новые заявки на турниры будут недоступны.</p><button class="jl-link" type="submit">Отозвать согласие на обработку</button></form>{% endif %}
             {% endif %}
-            {% if release and not processing_accepted and link.status == 'verified' %}
+            {% if can_accept_processing %}
             <details><summary>Согласие на обработку данных</summary><div class="legal-text">{{ release.processing_text|legal_markdown }}</div></details>
             {% if junior_actions_allowed %}<form method="post" action="{% url 'juniors:consent' pk=child.pk %}" class="jl-form">{% csrf_token %}<input type="hidden" name="kind" value="processing"><input type="hidden" name="release" value="{{ release.pk }}"><label class="jl-check"><input type="checkbox" name="accepted" value="yes" required><span>Я согласен с обработкой данных ребёнка по приведённому тексту</span></label><button class="jl-button" type="submit">Подтвердить согласие</button></form>{% endif %}
-            {% elif not processing_consent %}<p class="jl-muted">Оформление согласия пока недоступно. По вопросам профиля напишите на tennis@tennisfan.ru.</p>{% endif %}
-        </section>
+            {% endif %}
+        </section>{% endif %}
     </div>
 </details>
+
+{% endif %}

@@ -1783,3 +1783,19 @@
 @media (prefers-reduced-motion: reduce) {
     .jl-switch-track::before { transition: none; }
 }
+
+/* Матчи семьи: те же зелёные поверхности и золотые действия, что у платформы. */
+.jl-match-tabs, .jl-match-crumbs { display: flex; gap: 12px; flex-wrap: wrap; margin-block: 24px; }
+.jl-match-tabs a { padding: 10px 18px; border: 1px solid var(--jl-line); border-radius: 10px; text-decoration: none; }
+.jl-match-tabs a[aria-current="page"] { background: var(--jl-accent); color: var(--jl-gold-ink); font-weight: 700; }
+.jl-match-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.jl-match-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.jl-match-card h2, .jl-match-card p { margin: 0; }
+.jl-match-card .jl-button { margin-top: auto; }
+.jl-match-score { font-size: clamp(28px, 5vw, 48px); font-weight: 750; letter-spacing: -.03em; }
+.jl-match-entry { max-width: 760px; }
+.jl-match-crumbs a, .jl-match-tabs a, .jl-match-card .jl-button { min-height: 44px; display: inline-flex; align-items: center; }
+.jl-match-tabs a:focus-visible, .jl-match-crumbs a:focus-visible { outline: 2px solid var(--jl-accent); outline-offset: 4px; }
+@media (width <= 700px) { .jl-match-grid { grid-template-columns: minmax(0, 1fr); } .jl-match-card .jl-button { width: 100%; } }
+
+.jl-match-card h2, .jl-heading h1 { overflow-wrap: anywhere; }

@@ -57,8 +57,8 @@ def begin_payment(*, actor: User, entry_id: int, return_url: str) -> JuniorPayme
             entry.status != "payment"
             or not entry.reserved_until
             or entry.reserved_until <= timezone.now()
-            or tournament.status != "open"
-            or tournament.registration_ends_at <= timezone.now()
+            or tournament.status not in ("open", "closed")
+            or tournament.starts_at <= timezone.now()
         ):
             raise ValidationError(
                 "Резерв истёк или регистрация закрыта. Не оплачивайте эту заявку."

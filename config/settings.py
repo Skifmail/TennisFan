@@ -163,6 +163,9 @@ INSTALLED_APPS = [
 JUNIOR_LEAGUE_ENABLED = (
     os.environ.get("JUNIOR_LEAGUE_ENABLED", "False").lower() == "true"
 )
+JUNIOR_LEAGUE_READ_ONLY = (
+    os.environ.get("JUNIOR_LEAGUE_READ_ONLY", "True").lower() == "true"
+)
 JUNIOR_PAYMENTS_ENABLED = (
     os.environ.get("JUNIOR_PAYMENTS_ENABLED", "False").lower() == "true"
 )

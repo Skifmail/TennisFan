@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from django import forms
+from django.contrib import admin
+from django.contrib.admin.widgets import AutocompleteSelectMultiple
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
+
+from apps.training.models import Coach
+from apps.users.models import SkillLevel, User
 
 from .models import Camp, CampPackage, CampSession
 
@@ -74,6 +79,66 @@ def build_unique_slug(title: str, instance_pk: int | None = None) -> str:
     return candidate
 
 
+def build_level_choices(instance: Camp | None = None) -> list[tuple[str, str]]:
+    """Собирает уровни платформы и сохраняет ранее введённый свободный текст.
+
+    Значением варианта остаётся человекочитаемое название: публичные страницы
+    показывают поле «Уровень подготовки» как обычный текст. Если у старого кемпа
+    записан свободный уровень, он добавляется в список, чтобы его можно было
+    сохранить без потери данных.
+    """
+    choices: list[tuple[str, str]] = [("", "Не указан")]
+    choices.extend((str(label), str(label)) for _value, label in SkillLevel.choices)
+    known_values = {value for value, _label in choices}
+    current = str(getattr(instance, "levels", "") or "").strip()
+    if current and current not in known_values:
+        choices.append((current, current))
+    return choices
+
+
+class CampLevelsMixin(forms.ModelForm):
+    """Показывает уровень подготовки выпадающим списком уровней платформы."""
+
+    levels = forms.ChoiceField(
+        label="Уровень подготовки",
+        required=False,
+        choices=(),
+        help_text="Выберите уровень игры, для которого подходит кемп. Можно не указывать.",
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        levels_field = cast(forms.ChoiceField, self.fields["levels"])
+        levels_field.choices = build_level_choices(self.instance)
+
+
+class CampTeamMixin(forms.ModelForm):
+    """Позволяет выбрать действующих тренеров и организаторов платформы."""
+
+    coaches = forms.ModelMultipleChoiceField(
+        label="Тренеры",
+        queryset=Coach.objects.filter(is_active=True).order_by("name"),
+        required=False,
+        help_text=(
+            "Выберите действующих тренеров платформы. Они появятся "
+            "в блоке «Тренеры» на странице кемпа."
+        ),
+        widget=AutocompleteSelectMultiple(Camp._meta.get_field("coaches"), admin.site),
+    )
+    organizers = forms.ModelMultipleChoiceField(
+        label="Организаторы",
+        queryset=User.objects.filter(is_active=True).order_by("email"),
+        required=False,
+        help_text=(
+            "Выберите участников платформы, которые организуют кемп. "
+            "Они появятся в блоке «Организаторы» на странице кемпа."
+        ),
+        widget=AutocompleteSelectMultiple(
+            Camp._meta.get_field("organizers"), admin.site
+        ),
+    )
+
+
 class SlugFromTitleMixin(forms.ModelForm):
     """Разрешает оставить адрес пустым и создаёт его из названия."""
 
@@ -90,7 +155,7 @@ class SlugFromTitleMixin(forms.ModelForm):
         return build_unique_slug(title, self.instance.pk)
 
 
-class CampCreateForm(SlugFromTitleMixin):
+class CampCreateForm(CampTeamMixin, CampLevelsMixin, SlugFromTitleMixin):
     """Создаёт программу кемпа и сам придумывает адрес страницы."""
 
     class Meta:
@@ -102,6 +167,8 @@ class CampCreateForm(SlugFromTitleMixin):
             "audience",
             "description",
             "image",
+            "coaches",
+            "organizers",
             "levels",
             "program",
             "preparation",
@@ -118,7 +185,6 @@ class CampCreateForm(SlugFromTitleMixin):
             "audience": "Для кого программа: взрослые, дети или вся семья.",
             "description": "Что ждёт участников. Этот текст увидят на публичной странице.",
             "image": "Необязательно. Горизонтальная фотография до 2 МБ.",
-            "levels": "Необязательно. Например: «Новички и любители».",
             "program": "Необязательно. Расписание или программа по дням.",
             "preparation": "Необязательно. Что взять с собой и как подготовиться.",
         }
@@ -167,7 +233,7 @@ class CampSessionCreateForm(forms.ModelForm):
             "end_date": "Последний день заезда.",
             "registration_deadline": "Необязательно. Последний день, когда можно подать заявку. Не позже даты начала.",
             "country": "Страна проведения. По умолчанию Россия.",
-            "city": "Город, который увидят на сайте.",
+            "city": "Начните вводить название — платформа подскажет город из справочника.",
             "venue": "Площадка и адрес: корты, отель или сборный пункт.",
             "surface": "Необязательно. Покрытие кортов и условия.",
             "capacity": "Сколько игроков можно принять. Сопровождающие не занимают спортивные места.",
@@ -245,7 +311,7 @@ CampPackageFormSet = forms.modelformset_factory(
 )
 
 
-class CampAdminForm(SlugFromTitleMixin):
+class CampAdminForm(CampTeamMixin, CampLevelsMixin, SlugFromTitleMixin):
     """Редактор уже созданного кемпа с теми же подсказками."""
 
     class Meta:
@@ -259,7 +325,6 @@ class CampAdminForm(SlugFromTitleMixin):
             "description": "Что ждёт участников. Текст виден на публичной странице.",
             "image": "Горизонтальная фотография до 2 МБ.",
             "coaches": "Тренеры, которые ведут кемп.",
-            "levels": "Необязательно. Уровень подготовки.",
             "program": "Необязательно. Программа по дням.",
             "preparation": "Необязательно. Что взять с собой.",
             "is_published": "Показывает кемп на сайте. Заявки принимает заезд со статусом «Идёт набор» и активным пакетом.",
@@ -278,7 +343,7 @@ class CampSessionAdminForm(forms.ModelForm):
             "end_date": "Последний день заезда.",
             "registration_deadline": "Последний день приёма заявок. Не позже даты начала.",
             "country": "Страна проведения.",
-            "city": "Город на сайте.",
+            "city": "Начните вводить название — платформа подскажет город из справочника.",
             "venue": "Площадка и адрес.",
             "court": "Необязательно. Корт платформы.",
             "surface": "Необязательно. Покрытие и условия кортов.",

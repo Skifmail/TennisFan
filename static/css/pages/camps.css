@@ -585,6 +585,27 @@
   line-height: 1.55;
 }
 
+.camp-coach .camp-coach__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 6px 12px;
+  border: 1px solid var(--camp-line);
+  border-radius: 999px;
+  background: var(--camp-soft);
+  color: var(--camp-gold);
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.camp-coach:hover .camp-coach__more {
+  border-color: var(--camp-gold);
+  background: rgb(166 130 74 / 16%);
+}
+
 .camp-coach__contact {
   margin-top: auto;
   padding-top: 12px;

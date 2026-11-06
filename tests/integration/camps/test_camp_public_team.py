@@ -89,6 +89,29 @@ def test_coach_card_shows_brief_info_from_published_profile(
     assert "Помогает игрокам увереннее действовать у сетки." in content
 
 
+def test_coach_card_shows_more_button_only_for_truncated_bio(
+    client: Client, camp_session: CampSession
+) -> None:
+    """Кнопка «Подробнее» появляется только там, где биография обрезана."""
+    camp = camp_session.camp
+    short_coach = _coach(
+        name="Короткая биография",
+        slug="short-bio",
+        bio="Короткий текст о тренере.",
+    )
+    long_coach = _coach(
+        name="Длинная биография",
+        slug="long-bio",
+        bio=" ".join(["Подробный"] * 25),
+    )
+    camp.coaches.set([short_coach, long_coach])
+
+    content = client.get(camp.get_absolute_url()).content.decode()
+
+    assert "Подробнее →" in content
+    assert content.count("camp-coach__more") == 1
+
+
 def test_organizer_card_has_direct_chat_button_for_authenticated_user(
     client: Client, camp_session: CampSession
 ) -> None:

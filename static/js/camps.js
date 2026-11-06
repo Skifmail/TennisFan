@@ -1,3 +1,23 @@
+/* Показывает видео после загрузки, оставляя фото-заглушку до первого кадра. */
+(() => {
+    'use strict';
+    const video = document.querySelector('[data-camp-hero-video]');
+    if (!video) return;
+    const hero = video.closest('[data-camp-hero]');
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        video.removeAttribute('autoplay');
+        video.pause();
+        return;
+    }
+    const reveal = () => hero?.classList.add('is-ready');
+    if (video.readyState >= 2) reveal();
+    video.addEventListener('loadeddata', reveal, { once: true });
+    video.addEventListener('canplay', reveal, { once: true });
+    video.addEventListener('error', () => hero?.classList.remove('is-ready'), { once: true });
+    const playback = video.play();
+    if (playback) playback.catch(() => {});
+})();
+
 /* Динамический состав поездки и обратная связь формы без внешних зависимостей. */
 (() => {
     'use strict';

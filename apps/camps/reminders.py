@@ -24,6 +24,7 @@ def _active(app: CampApplication) -> bool:
         app.status in {"new", "contacted", "agreed", "confirmed", "waitlist"}
         and app.session.status in {"open", "closed"}
         and app.session.end_date >= timezone.localdate()
+        and not app.reservation_expired
         and not app.cancellation_requests.filter(status="pending").exists()
     )
 
@@ -33,9 +34,9 @@ def _candidate_kinds(app: CampApplication, today: date) -> list[tuple[str, str]]
     kinds: list[tuple[str, str]] = []
     if app.status == "new" and app.created_at <= timezone.now() - timedelta(hours=24):
         kinds.append(("unanswered", app.created_at.isoformat()))
-    if app.status == "confirmed":
+    if app.status == "confirmed" or app.has_active_reservation:
         days = (app.session.start_date - today).days
-        if days in {7, 1}:
+        if days in {7, 3, 1}:
             kinds.append((f"departure_{days}", app.session.start_date.isoformat()))
     if (
         app.status in {"agreed", "confirmed"}
@@ -62,7 +63,12 @@ def _message(app: CampApplication, kind: str) -> tuple[str, str, bool]:
     if kind.startswith("departure_"):
         return (
             "camp.departure_reminder",
-            f"Кемп начинается {app.session.start_date:%d.%m.%Y}. Программа и подготовка к поездке — в вашей заявке.",
+            f"Кемп начинается {app.session.start_date:%d.%m.%Y}. "
+            + (
+                "Вы уже подтвердили поездку. Ждём вас! Если планы изменились, свяжитесь с координатором."
+                if app.attendance_confirmed
+                else "Пожалуйста, подтвердите, что приедете, кнопкой в заявке. Подтверждение не требует оплаты."
+            ),
             False,
         )
     return (
@@ -80,10 +86,13 @@ def _still_relevant(row: CampReminder, app: CampApplication) -> bool:
     if row.kind == "unanswered":
         return bool(app.status == "new")
     if row.kind.startswith("departure_"):
-        if row.kind == "departure_7" and (app.session.start_date - today).days <= 1:
+        days = (app.session.start_date - today).days
+        if (row.kind == "departure_7" and days <= 3) or (
+            row.kind == "departure_3" and days <= 1
+        ):
             return False
         return bool(
-            app.status == "confirmed"
+            (app.status == "confirmed" or app.has_active_reservation)
             and row.basis == app.session.start_date.isoformat()
             and app.session.start_date >= today
         )

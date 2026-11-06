@@ -187,7 +187,7 @@ def test_camps_confirmation_reserves_whole_group(
     with pytest.raises(ValidationError, match="недостаточно"):
         update_application(application_id=second.pk, actor=manager, values=_values())
     second.refresh_from_db()
-    assert second.status == "new"
+    assert second.status == "waitlist"
     update_application(
         application_id=second.pk, actor=manager, values=_values("waitlist")
     )

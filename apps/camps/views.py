@@ -19,6 +19,7 @@ from django.views.decorators.http import require_http_methods
 
 from apps.users.models import User
 
+from .attendance import confirm_attendance, guest_attendance_application
 from .cancellations import decide_cancellation, request_cancellation
 from .forms import (
     ApplicationManagementForm,
@@ -28,6 +29,7 @@ from .forms import (
     GuestRecoveryForm,
     ParticipantFormSet,
     PaymentForm,
+    ReservationForm,
 )
 from .guest_access import consume_guest_link, request_guest_access, valid_guest_link
 from .models import (
@@ -37,6 +39,7 @@ from .models import (
     CampParticipant,
     CampSession,
 )
+from .reservations import default_reservation_deadline, reserve_application
 from .services import (
     can_manage,
     record_payment,
@@ -312,6 +315,31 @@ def manage_application(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
     form = ApplicationManagementForm(
         request.POST if action == "update" else None, initial=initial
     )
+    reservation_form = ReservationForm(
+        request.POST if action == "reserve" else None,
+        initial={
+            "expires_at": default_reservation_deadline(
+                app.session,
+                current=(
+                    app.reservation_expires_at if app.has_active_reservation else None
+                ),
+            )
+        },
+    )
+    if action == "reserve" and reservation_form.is_valid():
+        try:
+            reserve_application(
+                application_id=app.pk,
+                actor=cast(User, request.user),
+                **reservation_form.cleaned_data,
+            )
+        except ValidationError as exc:
+            reservation_form.add_error(None, exc)
+        else:
+            messages.success(
+                request, "Временная бронь сохранена. Предоплата не требуется."
+            )
+            return redirect("camps:manage_application", pk=pk)
     pending_cancellation = app.cancellation_requests.filter(status="pending").first()
     cancellation_form = CancellationDecisionForm(
         request.POST if action == "cancellation" else None,
@@ -386,6 +414,11 @@ def manage_application(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
             "cancellations": app.cancellation_requests.all(),
             "pending_cancellation": pending_cancellation,
             "cancellation_form": cancellation_form,
+            "reservation_form": reservation_form,
+            "can_reserve": app.status in {"new", "contacted", "agreed", "waitlist"}
+            and app.session.status in {"open", "closed"}
+            and not app.has_pending_cancellation,
+            "platform_timezone": timezone.get_current_timezone_name(),
         },
     )
 
@@ -557,3 +590,48 @@ def cancel_application(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
                 )
                 return redirect("camps:application", pk=pk)
     return render(request, "camps/cancel.html", {"application": app, "form": form})
+
+
+@never_cache
+@require_http_methods(["POST"])
+def confirm_trip(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
+    """Принимает ответ владельца авторизованной или восстановленной гостевой заявки."""
+    app = get_object_or_404(_accessible_applications(request), pk=pk)
+    try:
+        confirm_attendance(
+            application_id=app.pk,
+            actor=cast(User, request.user) if request.user.is_authenticated else None,
+            guest_ids=request.session.get("camp_application_ids", []),
+        )
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
+    else:
+        messages.success(request, "Спасибо! Вы подтвердили, что приедете на кемп.")
+    return redirect("camps:application", pk=pk)
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def confirm_guest_trip(request: HttpRequest, token: str) -> HttpResponse:
+    """Даёт ссылке из письма только право подтвердить приезд; GET ничего не меняет."""
+    app = guest_attendance_application(token)
+    done = bool(app and app.attendance_confirmed)
+    if app is not None and request.method == "POST":
+        try:
+            app = confirm_attendance(application_id=app.pk, token=token)
+        except (ValidationError, PermissionDenied):
+            app = None
+        else:
+            done = True
+    response = render(
+        request,
+        "camps/confirm_trip.html",
+        {"valid": app is not None, "done": done, "application": app},
+        status=200 if app is not None else 410,
+    )
+    response["Referrer-Policy"] = "no-referrer"
+    response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    response["Content-Security-Policy"] = (
+        "default-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
+    )
+    return response

@@ -37,7 +37,7 @@ def _notify_cancellation(pk: int, *, requested: bool) -> None:
             send_camp_event(
                 app=app,
                 event_key="camp.cancellation_requested",
-                message="Запрос на отмену всей заявки получен. Участие сохраняется до решения команды. Возврат согласуем отдельно.",
+                message="Запрос на отмену получен. Ответ команды — в заявке. Временная бронь действует до своего срока, возврат согласуем отдельно.",
             )
         else:
             send_camp_event(
@@ -116,7 +116,8 @@ def decide_cancellation(
         )
     if decision == "approved":
         app.status = CampApplication.Status.CANCELLED
-        app.save(update_fields=["status", "updated_at"])
+        app.reservation_expires_at = None
+        app.save(update_fields=["status", "reservation_expires_at", "updated_at"])
         invalidate_camp_reminders(app)
         invalidate_camp_reminders(app, team_only=True)
     request.status = decision

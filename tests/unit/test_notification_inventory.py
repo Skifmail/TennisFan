@@ -87,6 +87,12 @@ def test_catalog_when_seed_migration_loaded_should_cover_all_current_events() ->
     camp_followup_migration = import_module(
         "apps.notifications.migrations.0013_camp_followup_events"
     )
+    camp_reservation_migration = import_module(
+        "apps.notifications.migrations.0014_camp_reservation_events"
+    )
+    camp_attendance_migration = import_module(
+        "apps.notifications.migrations.0015_camp_attendance_event"
+    )
     junior_migration = import_module("apps.juniors.migrations.0008_notification_policy")
     assert {
         row["key"]
@@ -98,5 +104,7 @@ def test_catalog_when_seed_migration_loaded_should_cover_all_current_events() ->
             *support_migration.ROWS,
             *camp_migration.ROWS,
             *camp_followup_migration.ROWS,
+            *camp_reservation_migration.ROWS,
+            *camp_attendance_migration.ROWS,
         ]
     } == set(EVENTS)

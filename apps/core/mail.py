@@ -116,10 +116,10 @@ class LoggingEmailBackend(BaseEmailBackend):
                 subject=subject,
             )
             body_text = str(getattr(message, "body", "") or "")
-            # Одноразовая ссылка даёт доступ к гостевым заявкам: в журнале остаётся только факт письма.
-            sensitive_guest_access = (
-                getattr(message, "event_key", "") == "camp.guest_access"
-            )
+            # Защищённые гостевые ссылки не сохраняются в журнале исходящих писем.
+            sensitive_guest_access = getattr(
+                message, "event_key", ""
+            ) == "camp.guest_access" or bool(getattr(message, "sensitive_body", False))
             if sensitive_guest_access:
                 body_text, body_html = "Одноразовая ссылка доступа скрыта.", ""
             for to_email in recipients:

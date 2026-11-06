@@ -25,6 +25,12 @@ class EventDefinition:
 
 
 EVENTS: Final[dict[str, EventDefinition]] = {
+    "camp.reservation_updated": EventDefinition(
+        "Кемп: временная бронь", "Кемпы", "inbox"
+    ),
+    "camp.reservation_expired": EventDefinition(
+        "Кемп: срок брони истёк", "Кемпы", "inbox"
+    ),
     "camp.guest_access": EventDefinition(
         "Кемп: восстановление доступа", "Кемпы", "email", True
     ),
@@ -33,6 +39,9 @@ EVENTS: Final[dict[str, EventDefinition]] = {
     ),
     "camp.cancellation_updated": EventDefinition(
         "Кемп: решение по отмене", "Кемпы", "inbox"
+    ),
+    "camp.attendance_confirmed": EventDefinition(
+        "Кемп: участник подтвердил поездку", "Кемпы", "inbox"
     ),
     "camp.departure_reminder": EventDefinition("Кемп: скоро поездка", "Кемпы", "inbox"),
     "camp.payment_reminder": EventDefinition(
@@ -383,8 +392,11 @@ PRODUCER_EVENTS: Final[dict[str, str]] = {
 # В этих событиях до центра не существовало почтового производителя.
 INBOX_ONLY_EVENTS: Final = frozenset(
     [
+        "camp.reservation_updated",
+        "camp.reservation_expired",
         "camp.cancellation_requested",
         "camp.cancellation_updated",
+        "camp.attendance_confirmed",
         "camp.departure_reminder",
         "camp.payment_reminder",
         "camp.unanswered_reminder",

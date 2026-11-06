@@ -12,11 +12,13 @@ from django.utils.html import format_html
 from .models import (
     Camp,
     CampApplication,
+    CampCancellation,
     CampExpense,
     CampGame,
     CampPackage,
     CampParticipant,
     CampPayment,
+    CampReminder,
     CampSession,
     CampTournament,
 )
@@ -180,3 +182,58 @@ class CampGameAdmin(admin.ModelAdmin):
     list_display = ("session", "player1", "player2", "score", "played_at")
     list_filter = ("session",)
     raw_id_fields = ("player1", "player2")
+
+
+@admin.register(CampCancellation)
+class CampCancellationAdmin(admin.ModelAdmin):
+    """История запросов; решения принимаются только через сервис координатора."""
+
+    list_display = ("application", "status", "created_at", "resolved_at", "manage_link")
+    list_filter = ("status", "application__session")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Запрос подаёт сам участник."""
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Сохраняет историю обращений."""
+        return False
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Any = None
+    ) -> tuple[str, ...]:
+        """Защищает статус от изменения в обход проверки мест и уведомлений."""
+        return tuple(field.name for field in self.model._meta.fields) + ("manage_link",)
+
+    @admin.display(description="Рассмотреть")
+    def manage_link(self, obj: CampCancellation) -> str:
+        """Открывает единый рабочий экран заявки."""
+        return cast(
+            str,
+            format_html(
+                '<a href="{}">Открыть заявку →</a>',
+                reverse("camps:manage_application", args=[obj.application_id]),
+            ),
+        )
+
+
+@admin.register(CampReminder)
+class CampReminderAdmin(admin.ModelAdmin):
+    """Диагностика плановых событий, включая неопределённую SMTP-доставку."""
+
+    list_display = ("application", "kind", "basis", "status", "attempts", "updated_at")
+    list_filter = ("status", "kind")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Поводы создаёт планировщик."""
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        """Не позволяет повторить доставку удалением отметки."""
+        return False
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Any = None
+    ) -> tuple[str, ...]:
+        """Журнал доступен только для чтения."""
+        return tuple(field.name for field in self.model._meta.fields)

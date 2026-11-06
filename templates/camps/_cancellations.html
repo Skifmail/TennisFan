@@ -1,0 +1,10 @@
+<section class="camp-panel camp-section">
+<h2>Запросы на отмену</h2>
+{% for item in cancellations %}
+<article class="camp-cancellation"><span class="camp-tag">{{ item.get_status_display }}</span><p class="camp-muted">{{ item.created_at|date:'d.m.Y H:i' }}</p><h3>Причина</h3>{{ item.reason|linebreaks }}{% if item.resolution %}<h3>Ответ команды</h3>{{ item.resolution|linebreaks }}{% endif %}{% if item.status == 'pending' %}<p class="camp-muted">Участие сохраняется до решения координатора. Возврат согласуется отдельно.</p>{% endif %}</article>
+{% empty %}<p class="camp-muted">Запросов пока нет.</p>{% endfor %}
+{% if can_request_cancellation %}<a class="camp-button camp-button--outline" href="{% url 'camps:cancel' pk=application.pk %}">Запросить отмену поездки</a>{% endif %}
+{% if pending_cancellation or cancellation_form.errors %}
+<form method="post" class="camp-form camp-form-section">{% csrf_token %}<input type="hidden" name="action" value="cancellation"><h3>Решение координатора</h3><p>Подтверждение отменит всю заявку и освободит спортивные места. Деньги автоматически не возвращаются.</p>{% include 'camps/_fields.html' with form=cancellation_form %}<button class="camp-button" type="submit">Сохранить решение</button></form>
+{% endif %}
+</section>

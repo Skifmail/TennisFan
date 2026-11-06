@@ -1,0 +1,8 @@
+{% load static %}
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow, noarchive"><meta name="referrer" content="no-referrer"><title>Доступ к заявкам · TennisFan</title><link rel="stylesheet" href="{% static 'css/pages/camps.css' %}?v=20261106-3"></head>
+<body class="camp-access-page"><main class="camp-shell"><div class="camp-access-panel camp-panel">
+<span class="camp-eyebrow">TENNISFAN · ГОСТЕВОЙ ДОСТУП</span>
+{% if valid %}<h1>Открыть мои заявки</h1><p>Подтвердите доступ на этом устройстве. Регистрация не нужна.</p><form method="post">{% csrf_token %}<button type="submit" class="camp-button">Подтвердить доступ</button></form><p class="camp-muted">Не подтверждайте доступ на чужом устройстве. После подтверждения ссылка перестанет действовать.</p>
+{% else %}<h1>Ссылка больше не действует</h1><p>Возможно, она уже использована или прошло больше 30 минут. Запросите новое письмо.</p><a class="camp-button" href="{% url 'camps:recover' %}">Получить новую ссылку</a>{% endif %}
+</div></main></body></html>

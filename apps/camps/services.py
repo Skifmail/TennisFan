@@ -17,8 +17,10 @@ from apps.notifications.infrastructure.email import send_event_mail as send_mail
 from apps.notifications.services import center_enabled, create_notification
 from apps.users.models import User
 
+from .communication import invalidate_camp_reminders
 from .models import (
     CampApplication,
+    CampCancellation,
     CampPackage,
     CampParticipant,
     CampPayment,
@@ -105,7 +107,10 @@ def _notify(application_id: UUID, *, submitted: bool) -> None:
                     if submitted
                     else f"Статус: {app.get_status_display()}."
                 )
-                + f"\nСвязь с командой: {app.session.contact_email} {app.session.contact_phone}",
+                + f"\nСвязь с командой: {app.session.contact_email} {app.session.contact_phone}"
+                + "\nВернуться к гостевым заявкам: "
+                + str(settings.SITE_URL).rstrip("/")
+                + reverse("camps:recover"),
                 settings.DEFAULT_FROM_EMAIL,
                 [app.email],
                 event_key=event,
@@ -214,6 +219,15 @@ def update_application(
     session = CampSession.objects.select_for_update().get(pk=session_id)
     app = CampApplication.objects.select_for_update().get(pk=application_id)
     target = values["status"]
+    pending_cancellation = CampCancellation.objects.filter(
+        application=app, status="pending"
+    )
+    if (
+        pending_cancellation.exists()
+        and target in {"completed", "confirmed"}
+        and target != app.status
+    ):
+        raise ValidationError("Сначала рассмотрите запрос участника на отмену.")
     if target != app.status and target not in TRANSITIONS[app.status]:
         raise ValidationError(
             "Такой переход статуса недоступен. Отменённые и завершённые заявки сохраняются в истории."
@@ -238,6 +252,9 @@ def update_application(
     if target == "completed" and session.end_date > timezone.localdate():
         raise ValidationError("Поездку можно завершить после окончания заезда.")
     changed = app.status != target
+    payment_terms_changed = app.quoted_total != values.get(
+        "quoted_total"
+    ) or app.payment_due != values.get("payment_due")
     for key in (
         "status",
         "quoted_total",
@@ -248,6 +265,19 @@ def update_application(
         setattr(app, key, values.get(key))
     app.full_clean()
     app.save()
+    if payment_terms_changed:
+        invalidate_camp_reminders(app, payment_only=True)
+    if changed and target != "new":
+        invalidate_camp_reminders(app, team_only=True)
+    if target in {"cancelled", "completed"}:
+        invalidate_camp_reminders(app)
+    if target == "cancelled":
+        pending_cancellation.update(
+            status="approved",
+            resolution="Отмена подтверждена командой. Условия возврата согласуются отдельно.",
+            resolved_by=actor,
+            resolved_at=timezone.now(),
+        )
     if changed:
         transaction.on_commit(lambda: _notify(app.pk, submitted=False))
     return cast(CampApplication, app)
@@ -283,4 +313,6 @@ def record_payment(
     )
     payment.full_clean()
     payment.save()
+    if app.balance is not None and app.balance <= 0:
+        invalidate_camp_reminders(app, payment_only=True)
     return payment

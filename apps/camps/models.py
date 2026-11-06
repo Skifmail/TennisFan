@@ -337,6 +337,8 @@ class CampApplication(models.Model):
         package_id: int
         user_id: int | None
         participants: models.Manager[CampParticipant]
+        cancellation_requests: models.Manager[CampCancellation]
+        reminders: models.Manager[CampReminder]
         payments: models.Manager[CampPayment]
         get_status_display: Callable[[], str]
 
@@ -435,6 +437,11 @@ class CampApplication(models.Model):
             and self.package.session_id != self.session_id
         ):
             raise ValidationError({"package": "Пакет относится к другому заезду."})
+
+    @property
+    def has_pending_cancellation(self) -> bool:
+        """Подсвечивает координатору необработанное обращение об отмене."""
+        return bool(self.cancellation_requests.filter(status="pending").exists())
 
     @property
     def paid_amount(self) -> Decimal:
@@ -707,3 +714,131 @@ class CampTournament(models.Model):
 
     def __str__(self) -> str:
         return str(self.tournament)
+
+
+class CampGuestAccess(models.Model):
+    """Одноразовое подтверждение доступа к гостевым заявкам через почту."""
+
+    token_hash: models.CharField[str, str] = models.CharField(
+        max_length=64, unique=True, editable=False
+    )
+    email: models.EmailField[str, str] = models.EmailField(editable=False)
+    application_ids: models.JSONField[list[str], list[str]] = models.JSONField(
+        default=list, editable=False
+    )
+    expires_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        editable=False
+    )
+    used_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField(null=True, editable=False)
+    )
+    created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    class Meta:
+        verbose_name = "Одноразовый доступ гостя"
+        verbose_name_plural = "Одноразовые доступы гостей"
+
+
+class CampCancellation(models.Model):
+    """Запрос на отмену всей заявки; место освобождается только после решения команды."""
+
+    if TYPE_CHECKING:
+        application_id: uuid.UUID
+        resolved_by_id: int | None
+        get_status_display: Callable[[], str]
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Ожидает решения"
+        APPROVED = "approved", "Отмена подтверждена"
+        REJECTED = "rejected", "Запрос отклонён"
+
+    application: models.ForeignKey[CampApplication, CampApplication] = (
+        models.ForeignKey(
+            CampApplication,
+            on_delete=models.PROTECT,
+            related_name="cancellation_requests",
+            verbose_name="Заявка",
+        )
+    )
+    submission_key: models.UUIDField[uuid.UUID, uuid.UUID] = models.UUIDField(
+        unique=True, default=uuid.uuid4, editable=False
+    )
+    reason: models.TextField[str, str] = models.TextField("Причина", max_length=2000)
+    status: models.CharField[str, str] = models.CharField(
+        "Решение", max_length=16, choices=Status.choices, default=Status.PENDING
+    )
+    resolution: models.TextField[str, str] = models.TextField(
+        "Ответ участнику", max_length=2000, blank=True
+    )
+    resolved_by: models.ForeignKey[User | None, User | None] = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Решение принял",
+    )
+    created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        auto_now_add=True
+    )
+    resolved_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField(null=True, blank=True)
+    )
+
+    class Meta:
+        verbose_name = "10. Запрос на отмену"
+        verbose_name_plural = "10. Запросы на отмену"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["application"],
+                condition=models.Q(status="pending"),
+                name="camp_one_pending_cancellation",
+            )
+        ]
+
+
+class CampReminder(models.Model):
+    """Журнал однократных напоминаний с повтором явных ошибок доставки."""
+
+    if TYPE_CHECKING:
+        application_id: uuid.UUID
+
+    application: models.ForeignKey[CampApplication, CampApplication] = (
+        models.ForeignKey(
+            CampApplication, on_delete=models.CASCADE, related_name="reminders"
+        )
+    )
+    kind: models.CharField[str, str] = models.CharField("Повод", max_length=32)
+    basis: models.CharField[str, str] = models.CharField(
+        "Дата или версия повода", max_length=100
+    )
+    status: models.CharField[str, str] = models.CharField(
+        "Доставка",
+        max_length=16,
+        default="pending",
+        choices=[
+            ("pending", "В очереди"),
+            ("processing", "Отправляется"),
+            ("sent", "Подготовлено / отправлено"),
+            ("skipped", "Неактуально / отключено"),
+            ("failed", "Ошибка"),
+            ("uncertain", "Результат отправки неизвестен"),
+        ],
+    )
+    attempts: models.PositiveSmallIntegerField[int, int] = (
+        models.PositiveSmallIntegerField(default=0)
+    )
+    updated_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        default=timezone.now
+    )
+
+    class Meta:
+        verbose_name = "11. Напоминание кемпа"
+        verbose_name_plural = "11. Напоминания кемпов"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["application", "kind", "basis"], name="camp_unique_reminder"
+            )
+        ]

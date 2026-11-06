@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any, cast
 
 from django.conf import settings
@@ -44,11 +45,11 @@ class LoggingEmailBackend(BaseEmailBackend):
         """Закрыть соединение внутреннего backend."""
         self._inner.close()
 
-    def send_messages(self, email_messages: list[EmailMessage]) -> int:
+    def send_messages(self, email_messages: Sequence[EmailMessage]) -> int:
         """Отправить письма и сохранить копии в журнале.
 
         Args:
-            email_messages (list[EmailMessage]): Письма к отправке.
+            email_messages (Sequence[EmailMessage]): Письма к отправке.
 
         Returns:
             int: Число успешно отправленных писем.
@@ -114,6 +115,13 @@ class LoggingEmailBackend(BaseEmailBackend):
                 category=str(getattr(message, "outbound_category", "") or ""),
                 subject=subject,
             )
+            body_text = str(getattr(message, "body", "") or "")
+            # Одноразовая ссылка даёт доступ к гостевым заявкам: в журнале остаётся только факт письма.
+            sensitive_guest_access = (
+                getattr(message, "event_key", "") == "camp.guest_access"
+            )
+            if sensitive_guest_access:
+                body_text, body_html = "Одноразовая ссылка доступа скрыта.", ""
             for to_email in recipients:
                 to_norm = (to_email or "").strip().lower()
                 user = None
@@ -124,11 +132,15 @@ class LoggingEmailBackend(BaseEmailBackend):
                     to_email=to_norm or (to_email or ""),
                     from_email=str(getattr(message, "from_email", "") or ""),
                     subject=subject,
-                    body_text=str(getattr(message, "body", "") or ""),
+                    body_text=body_text,
                     body_html=body_html,
                     category=category,
                     status=status,
-                    error_message=(error or "")[:5000],
+                    error_message=(
+                        "Ошибка отправки одноразовой ссылки"
+                        if sensitive_guest_access and error
+                        else (error or "")
+                    )[:5000],
                     sent_at=now,
                 )
         except Exception:

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import Client
 from django.urls import reverse
@@ -96,6 +98,15 @@ def test_camps_public_pages_hide_drafts(
     camp_session.camp.save()
     assert client.get(camp_session.camp.get_absolute_url()).status_code == 404
     assert "Наш кемп" not in client.get(reverse("camps:list")).content.decode()
+
+
+def test_camps_hero_assets_exist_in_static() -> None:
+    """Видео и постер hero лежат в статике, иначе collectstatic упадёт на манифесте."""
+    video = Path(settings.BASE_DIR) / "static/video/tennisfan-camps-web.mp4"
+    poster = Path(settings.BASE_DIR) / "static/images/camps-hero-poster.webp"
+
+    assert video.is_file(), f"Нет файла {video}"
+    assert poster.is_file(), f"Нет файла {poster}"
 
 
 def test_camps_public_list_uses_video_hero(client: Client) -> None:

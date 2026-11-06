@@ -30,6 +30,7 @@ urlpatterns = [
     path("courts/", include("apps.courts.urls")),
     path("sparring/", include("apps.sparring.urls")),
     path("training/", include("apps.training.urls")),
+    path("camps/", include("apps.camps.urls")),
     path("news/", include("apps.content.urls_news")),
     path("gallery/", include("apps.content.urls_gallery")),
     path("pages/", include("apps.content.urls_pages")),

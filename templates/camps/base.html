@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/pages/camps.css' %}">{% endblock %}
+{% block content %}<div class="camp-shell"><div class="container">{% block camp_content %}{% endblock %}</div></div>{% endblock %}
+{% block extra_js %}<script defer src="{% static 'js/camps.js' %}"></script>{% endblock %}

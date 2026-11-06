@@ -236,6 +236,7 @@
                             <li><a href="{% url 'my_matches' %}">Мои матчи</a></li>
                             <li><a href="{% url 'my_sparring_matches' %}">Личные встречи</a></li>
                             <li><a href="{% url 'my_trainings' %}">Мои тренировки</a></li>
+                            <li><a href="{% url 'camps:my' %}">Мои кемпы</a></li>
                             {% if junior_league_visible %}<li><a href="{% url 'juniors:home' %}">Детская лига</a></li><li><a href="{% url 'juniors:family' %}">Мои дети</a></li>{% endif %}
                             <li><a href="{% url 'clubs:invitations_list' %}">Приглашения в клубы</a></li>
                             {% if user_clubs %}

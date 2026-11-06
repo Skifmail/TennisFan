@@ -25,6 +25,12 @@ class EventDefinition:
 
 
 EVENTS: Final[dict[str, EventDefinition]] = {
+    "camp.application_submitted": EventDefinition(
+        "Кемп: новая заявка", "Кемпы", "inbox"
+    ),
+    "camp.application_updated": EventDefinition(
+        "Кемп: статус участия", "Кемпы", "inbox"
+    ),
     "junior.updated": EventDefinition(
         "Детская лига: изменение", "Детская лига", "inbox"
     ),
@@ -361,6 +367,8 @@ PRODUCER_EVENTS: Final[dict[str, str]] = {
 # В этих событиях до центра не существовало почтового производителя.
 INBOX_ONLY_EVENTS: Final = frozenset(
     [
+        "camp.application_submitted",
+        "camp.application_updated",
         "junior.updated",
         "chat.reply",
         "club.join_approved",

@@ -5,11 +5,14 @@ Sitemap для поисковых систем (Google, Yandex).
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, cast
 
 from django.contrib.sitemaps import Sitemap
+from django.db.models import QuerySet
 from django.urls import reverse
 
+from apps.camps.models import Camp
 from apps.tournaments.landing import TournamentLanding, iter_sitemap_landings
 from apps.tournaments.models import Tournament, TournamentStatus
 
@@ -35,6 +38,7 @@ class StaticViewSitemap(Sitemap):
             "tournament_list",
             "news_list",
             "training_list",
+            "camps:list",
             "coach_list",
             "legal_index",
             "shop_list",
@@ -77,9 +81,25 @@ class TournamentFilterSitemap(Sitemap):
         return obj.url
 
 
+class CampSitemap(Sitemap):
+    """Публикует только открытые страницы собственных кемпов."""
+
+    changefreq = "weekly"
+    priority = 0.7
+
+    def items(self) -> QuerySet[Camp]:
+        """Возвращает опубликованные программы."""
+        return Camp.objects.filter(is_published=True).only("slug", "updated_at")
+
+    def lastmod(self, obj: Camp) -> datetime:
+        """Возвращает дату обновления программы."""
+        return cast(datetime, obj.updated_at)
+
+
 #: Реестр sitemap для urls.py.
 SITEMAPS: dict[str, Any] = {
     "static": StaticViewSitemap,
+    "camps": CampSitemap,
     "tournaments": TournamentSitemap,
     "tournament_filters": TournamentFilterSitemap,
 }

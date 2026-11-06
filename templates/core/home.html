@@ -339,7 +339,8 @@
         </div>
 
         <div class="hero-video-wrapper">
-            <video class="hero-video" muted loop playsinline preload="none" data-deferred-src="{% static 'video/hero_video.mp4' %}"></video>
+            <img class="hero-video-poster" src="{% static 'images/home-hero-poster.webp' %}" alt="" width="1600" height="900" fetchpriority="high" decoding="async">
+            <video class="hero-video" muted loop playsinline preload="none" poster="{% static 'images/home-hero-poster.webp' %}" data-deferred-src="{% static 'video/hero_video.mp4' %}"></video>
         </div>
 
         <div class="hero-subscription">

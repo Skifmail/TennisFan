@@ -717,6 +717,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 video.setAttribute('data-deferred-loaded', '1');
                 video.autoplay = true;
                 video.load();
+                var wrapper = video.closest('.hero-video-wrapper');
+                var reveal = function() {
+                    if (wrapper) {
+                        wrapper.classList.add('is-ready');
+                    }
+                };
+                video.addEventListener('loadeddata', reveal, { once: true });
+                video.addEventListener('canplay', reveal, { once: true });
+                if (video.readyState >= 2) {
+                    reveal();
+                }
                 var play = video.play();
                 if (play && play.catch) {
                     play.catch(function() {});

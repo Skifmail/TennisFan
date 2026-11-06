@@ -203,3 +203,41 @@ class PaymentForm(forms.Form):
     )
     reference = forms.CharField(label="Основание / номер операции", max_length=180)
     operation_key = forms.UUIDField(widget=forms.HiddenInput)
+
+
+class GuestRecoveryForm(forms.Form):
+    """Запрашивает доступ только на адрес из исходной заявки."""
+
+    email = forms.EmailField(
+        label="Email из заявки",
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+    )
+
+
+class CancellationRequestForm(forms.Form):
+    """Отмена всей заявки после явного подтверждения участника."""
+
+    submission_key = forms.UUIDField(widget=forms.HiddenInput)
+    reason = forms.CharField(
+        label="Почему хотите отменить поездку",
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
+    confirm = forms.BooleanField(
+        label="Прошу отменить участие всех людей в этой заявке. Понимаю, что решение и условия возврата подтвердит координатор."
+    )
+
+
+class CancellationDecisionForm(forms.Form):
+    """Решение координатора без автоматического возврата денег."""
+
+    request_id = forms.IntegerField(widget=forms.HiddenInput)
+    decision = forms.ChoiceField(
+        label="Решение по запросу",
+        choices=[("approved", "Подтвердить отмену"), ("rejected", "Отклонить запрос")],
+    )
+    resolution = forms.CharField(
+        label="Ответ участнику и дальнейшие действия",
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )

@@ -1,0 +1,8 @@
+{% extends 'camps/base.html' %}
+{% block title %}Запрос на отмену поездки{% endblock %}
+{% block meta_og %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block camp_content %}
+<a class="camp-back" href="{% url 'camps:application' pk=application.pk %}">← К моей заявке</a>
+<div class="camp-page-heading"><span class="camp-eyebrow">ПЛАНЫ ИЗМЕНИЛИСЬ</span><h1>Запросить отмену</h1><p>{{ application.session.camp.title }} · {{ application.session.start_date|date:'d.m.Y' }}</p></div>
+<form method="post" class="camp-panel camp-form camp-access-panel">{% csrf_token %}<h2>Отмена всей заявки</h2><p>Запрос относится ко всем игрокам и сопровождающим в этой заявке. Если хотите изменить только часть состава, напишите координатору.</p><div class="camp-callout"><strong>Место сохраняется до решения команды</strong><p>Координатор подтвердит отмену и объяснит условия возврата. Отправка запроса сама по себе не возвращает деньги.</p></div>{% include 'camps/_fields.html' %}<button class="camp-button" type="submit">Отправить запрос на отмену</button></form>
+{% endblock %}

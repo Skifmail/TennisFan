@@ -1,0 +1,14 @@
+{% extends 'camps/base.html' %}
+{% block title %}Доступ к гостевым заявкам{% endblock %}
+{% block meta_og %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block camp_content %}
+<a class="camp-back" href="{% url 'camps:my' %}">← Мои кемпы</a>
+<div class="camp-page-heading"><span class="camp-eyebrow">ПОЕЗДКА С TENNISFAN</span><h1>Вернуться к заявке</h1><p>Подавали заявку без регистрации? Отправим одноразовую ссылку на указанный в ней email.</p></div>
+<section class="camp-panel camp-access-panel">
+{% if sent %}
+<h2>Проверьте почту</h2><p role="status">Если на этот адрес есть гостевые заявки, мы отправим письмо со ссылкой. Она действует 30 минут. Проверьте также папку «Спам».</p><p class="camp-muted">Если письмо не пришло, проверьте адрес или свяжитесь с координатором. Повторный запрос доступен с ограничением частоты.</p><a class="camp-text-link" href="{% url 'camps:recover' %}">Указать другой email →</a>
+{% else %}
+<form class="camp-form" method="post">{% csrf_token %}{% include 'camps/_fields.html' %}<button class="camp-button" type="submit">Отправить ссылку</button></form>
+{% endif %}
+</section>
+{% endblock %}

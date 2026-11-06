@@ -19,13 +19,24 @@ from django.views.decorators.http import require_http_methods
 
 from apps.users.models import User
 
+from .cancellations import decide_cancellation, request_cancellation
 from .forms import (
     ApplicationManagementForm,
     CampApplicationForm,
+    CancellationDecisionForm,
+    CancellationRequestForm,
+    GuestRecoveryForm,
     ParticipantFormSet,
     PaymentForm,
 )
-from .models import Camp, CampApplication, CampParticipant, CampSession
+from .guest_access import consume_guest_link, request_guest_access, valid_guest_link
+from .models import (
+    Camp,
+    CampApplication,
+    CampCancellation,
+    CampParticipant,
+    CampSession,
+)
 from .services import (
     can_manage,
     record_payment,
@@ -187,13 +198,23 @@ def application_detail(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
         .prefetch_related("participants", "payments"),
         pk=pk,
     )
-    return render(request, "camps/application.html", {"application": app})
+    return render(
+        request,
+        "camps/application.html",
+        {
+            "application": app,
+            "cancellations": app.cancellation_requests.all(),
+            "can_request_cancellation": app.status
+            in {"new", "contacted", "agreed", "confirmed", "waitlist"}
+            and app.session.end_date >= timezone.localdate()
+            and not app.cancellation_requests.filter(status="pending").exists(),
+        },
+    )
 
 
-@login_required
 @never_cache
 def my_camps(request: HttpRequest) -> HttpResponse:
-    """История заявок, созданных под текущим аккаунтом."""
+    """Заявки аккаунта и подтверждённой гостевой сессии."""
     applications = _accessible_applications(request).select_related(
         "session__camp", "package"
     )
@@ -230,6 +251,11 @@ def manage_session(request: HttpRequest, pk: int) -> HttpResponse:
     applications = session.applications.select_related("package").prefetch_related(
         "participants", "payments"
     )
+    pending_cancellations = CampCancellation.objects.filter(
+        application__session=session, status="pending"
+    ).count()
+    if request.GET.get("cancellation") == "pending":
+        applications = applications.filter(cancellation_requests__status="pending")
     status = request.GET.get("status", "")
     if status in CampApplication.Status.values:
         applications = applications.filter(status=status)
@@ -251,6 +277,7 @@ def manage_session(request: HttpRequest, pk: int) -> HttpResponse:
             "applications": applications,
             "statuses": CampApplication.Status.choices,
             "selected_status": status,
+            "pending_cancellations": pending_cancellations,
             "totals": totals,
             "payments": payments,
             "expenses": expenses,
@@ -285,6 +312,30 @@ def manage_application(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
     form = ApplicationManagementForm(
         request.POST if action == "update" else None, initial=initial
     )
+    pending_cancellation = app.cancellation_requests.filter(status="pending").first()
+    cancellation_form = CancellationDecisionForm(
+        request.POST if action == "cancellation" else None,
+        initial={
+            "request_id": pending_cancellation.pk if pending_cancellation else None
+        },
+    )
+    if action == "cancellation" and cancellation_form.is_valid():
+        try:
+            decide_cancellation(
+                application_id=app.pk,
+                actor=cast(User, request.user),
+                **cancellation_form.cleaned_data,
+            )
+        except (CampCancellation.DoesNotExist, ValidationError):
+            cancellation_form.add_error(
+                None,
+                "Не удалось обработать запрос. Проверьте решение, ответ участнику и актуальность страницы.",
+            )
+        else:
+            messages.success(
+                request, "Решение сохранено. Возврат денег учитывается отдельно."
+            )
+            return redirect("camps:manage_application", pk=pk)
     payment_key_name = f"camp_payment_key_{pk}"
     if payment_key_name not in request.session:
         request.session[payment_key_name] = str(uuid.uuid4())
@@ -328,7 +379,14 @@ def manage_application(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
     return render(
         request,
         "camps/manage_application.html",
-        {"application": app, "form": form, "payment_form": payment_form},
+        {
+            "application": app,
+            "form": form,
+            "payment_form": payment_form,
+            "cancellations": app.cancellation_requests.all(),
+            "pending_cancellation": pending_cancellation,
+            "cancellation_form": cancellation_form,
+        },
     )
 
 
@@ -404,3 +462,98 @@ def session_games(request: HttpRequest, pk: int) -> HttpResponse:
             "tournament_links": session.tournament_links.select_related("tournament"),
         },
     )
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def recover_guest(request: HttpRequest) -> HttpResponse:
+    """Возвращает одинаковое сообщение для существующего и неизвестного email."""
+    form = GuestRecoveryForm(request.POST if request.method == "POST" else None)
+    sent = False
+    if request.method == "POST" and form.is_valid():
+        request_guest_access(
+            email=form.cleaned_data["email"],
+            address=request.META.get("REMOTE_ADDR", ""),
+        )
+        sent = True
+    return render(request, "camps/recover.html", {"form": form, "sent": sent})
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def restore_guest(request: HttpRequest, token: str) -> HttpResponse:
+    """Подтверждает одноразовую ссылку только POST-запросом с CSRF."""
+    valid = valid_guest_link(token)
+    if request.method == "POST":
+        try:
+            ids = consume_guest_link(token)
+        except ValidationError:
+            valid = False
+        else:
+            request.session.cycle_key()
+            existing = request.session.get("camp_application_ids", [])
+            request.session["camp_application_ids"] = list(
+                dict.fromkeys(existing + ids)
+            )[-150:]
+            response: HttpResponse = redirect("camps:my")
+            response["Referrer-Policy"] = "no-referrer"
+            return response
+    response = render(request, "camps/restore.html", {"valid": valid})
+    response["Referrer-Policy"] = "no-referrer"
+    response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
+
+
+@never_cache
+@require_http_methods(["GET", "POST"])
+def cancel_application(request: HttpRequest, pk: uuid.UUID) -> HttpResponse:
+    """Принимает запрос на отмену только от владельца заявки или подтверждённого гостя."""
+    app = get_object_or_404(
+        _accessible_applications(request).select_related("session__camp"), pk=pk
+    )
+    pending = app.cancellation_requests.filter(status="pending").first()
+    if pending:
+        messages.info(request, "Ваш запрос уже ожидает решения координатора.")
+        return redirect("camps:application", pk=pk)
+    if (
+        app.status not in {"new", "contacted", "agreed", "confirmed", "waitlist"}
+        or app.session.end_date < timezone.localdate()
+    ):
+        messages.info(
+            request, "Запрос на отмену недоступен. Свяжитесь с координатором."
+        )
+        return redirect("camps:application", pk=pk)
+    key_name = f"camp_cancel_key_{pk}"
+    if key_name not in request.session:
+        request.session[key_name] = str(uuid.uuid4())
+    form = CancellationRequestForm(
+        request.POST if request.method == "POST" else None,
+        initial={"submission_key": request.session[key_name]},
+    )
+    if request.method == "POST" and form.is_valid():
+        if str(form.cleaned_data["submission_key"]) != request.session[key_name]:
+            form.add_error(None, "Форма устарела. Обновите страницу.")
+        else:
+            try:
+                request_cancellation(
+                    application_id=app.pk,
+                    actor=(
+                        cast(User, request.user)
+                        if request.user.is_authenticated
+                        else None
+                    ),
+                    guest_application_ids=request.session.get(
+                        "camp_application_ids", []
+                    ),
+                    submission_key=form.cleaned_data["submission_key"],
+                    reason=form.cleaned_data["reason"],
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                request.session.pop(key_name, None)
+                messages.success(
+                    request, "Запрос отправлен координатору. Решение появится в заявке."
+                )
+                return redirect("camps:application", pk=pk)
+    return render(request, "camps/cancel.html", {"application": app, "form": form})

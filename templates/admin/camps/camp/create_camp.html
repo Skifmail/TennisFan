@@ -7,6 +7,12 @@
 <link rel="stylesheet" href="{% static 'admin/css/camps_admin.css' %}">
 {% endblock %}
 
+{% block extrahead %}
+{{ block.super }}
+{{ camp_form.media }}
+<script src="{% static 'js/city_autocomplete.js' %}" defer></script>
+{% endblock %}
+
 {% block title %}Создать кемп | {{ site_title|default:_('Django site admin') }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -20,13 +26,10 @@
 
 {% block content %}
 <div id="content-main">
-  <h1>Создать кемп</h1>
-
   <div class="camp-admin-callout">
-    <strong>Одна страница вместо трёх разделов</strong>
     <p>Заполните блоки сверху вниз: кемп → заезд → пакеты. Сохранять между шагами не нужно. Кемп появится на сайте только после нажатия «Создать кемп» с включённой галочкой публикации.</p>
     <ol>
-      <li><strong>Кемп</strong> — название и описание, которые увидят участники.</li>
+      <li><strong>Кемп</strong> — название, описание, тренеры и организаторы, которых увидят участники.</li>
       <li><strong>Заезд</strong> — даты, город, площадка и вместимость.</li>
       <li><strong>Пакеты</strong> — что входит и сколько стоит. Нужен хотя бы один пакет.</li>
     </ol>
@@ -41,7 +44,7 @@
 
     <fieldset class="module aligned camp-admin-section">
       <h2>1. Кемп</h2>
-      <p class="help">Публичная программа. Название, описание и обложку увидят на сайте.</p>
+      <p class="help">Публичная программа. Название, описание, обложку, тренеров и организаторов увидят на сайте.</p>
       {{ camp_form.non_field_errors }}
       {% for field in camp_main_fields %}
         {% include "admin/camps/_field.html" with field=field %}

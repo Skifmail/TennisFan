@@ -56,7 +56,17 @@ class Camp(models.Model):
         "Обложка", upload_to="camps/", blank=True, validators=[validate_image_max_2mb]
     )
     coaches: models.ManyToManyField[Coach, Coach] = models.ManyToManyField(
-        "training.Coach", blank=True, verbose_name="Тренеры"
+        "training.Coach",
+        blank=True,
+        verbose_name="Тренеры",
+        limit_choices_to={"is_active": True},
+    )
+    organizers: models.ManyToManyField[User, User] = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="organized_camps",
+        verbose_name="Организаторы",
+        limit_choices_to={"is_active": True},
     )
     program: models.TextField[str, str] = models.TextField(
         "Программа по дням", blank=True

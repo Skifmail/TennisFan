@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
+from apps.training.models import Coach
 from apps.users.models import User
 
 from .attendance import confirm_attendance, guest_attendance_application
@@ -88,7 +89,15 @@ def camp_list(request: HttpRequest) -> HttpResponse:
 def camp_detail(request: HttpRequest, slug: str) -> HttpResponse:
     """Представляет программу, пакеты и открытые даты без раскрытия участников."""
     camp = get_object_or_404(
-        Camp.objects.prefetch_related("coaches"), slug=slug, is_published=True
+        Camp.objects.prefetch_related(
+            Prefetch("coaches", queryset=Coach.objects.filter(is_active=True)),
+            Prefetch(
+                "organizers",
+                queryset=User.objects.filter(is_active=True).select_related("player"),
+            ),
+        ),
+        slug=slug,
+        is_published=True,
     )
     sessions = camp.sessions.filter(
         end_date__gte=timezone.localdate(), status__in=["open", "closed"]

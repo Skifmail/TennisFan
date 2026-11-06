@@ -11,8 +11,10 @@ from django.test import Client, RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.camps.admin_forms import CampCreateForm
 from apps.camps.models import Camp, CampSession
-from apps.users.models import User
+from apps.training.models import Coach
+from apps.users.models import SkillLevel, User
 
 pytestmark = pytest.mark.django_db
 
@@ -57,6 +59,16 @@ def _payload(**overrides: Any) -> dict[str, Any]:
     return data
 
 
+def _coach(name: str, slug: str, *, is_active: bool = True) -> Coach:
+    """Создаёт тренера платформы для проверки выбора в админке."""
+    return Coach.objects.create(
+        name=name,
+        slug=slug,
+        city="Москва",
+        is_active=is_active,
+    )
+
+
 def test_camp_admin_create_page_shows_three_steps(
     client: Client, manager: User
 ) -> None:
@@ -69,6 +81,155 @@ def test_camp_admin_create_page_shows_three_steps(
     assert "2. Заезд" in content
     assert "3. Пакеты участия" in content
     assert "Опубликовать кемп на сайте" in content
+    assert content.count("<h1>Создать кемп</h1>") == 1
+    assert "Одна страница вместо трёх разделов" not in content
+
+
+def test_camp_admin_levels_are_platform_dropdown(client: Client, manager: User) -> None:
+    """Уровень подготовки выбирается из уровней платформы, а не вводится текстом."""
+    client.force_login(manager)
+    response = client.get(reverse("admin:camps_camp_add"))
+    content = response.content.decode()
+    assert response.status_code == 200
+    assert '<select name="levels"' in content
+    assert "Не указан" in content
+    for _value, label in SkillLevel.choices:
+        assert f'value="{label}"' in content
+
+
+def test_camp_admin_saves_selected_platform_level(
+    client: Client, manager: User
+) -> None:
+    """Выбранный уровень платформы сохраняется в кемпе и виден на сайте."""
+    client.force_login(manager)
+    response = client.post(reverse("admin:camps_camp_add"), _payload(levels="Любитель"))
+    assert response.status_code == 302
+    camp = Camp.objects.get(title="Теннисный кемп в Сочи")
+    assert camp.levels == "Любитель"
+    public_page = client.get(camp.get_absolute_url()).content.decode()
+    assert "Любитель" in public_page
+
+
+def test_camp_admin_keeps_legacy_free_text_level(
+    client: Client, manager: User, camp_session: CampSession
+) -> None:
+    """Старое свободное значение уровня не теряется при редактировании."""
+    camp = camp_session.camp
+    camp.levels = "Новички и любители"
+    camp.save(update_fields=["levels"])
+    client.force_login(manager)
+    response = client.get(reverse("admin:camps_camp_change", args=[camp.pk]))
+    content = response.content.decode()
+    assert response.status_code == 200
+    assert 'value="Новички и любители" selected' in content
+
+
+def test_camp_admin_city_autocomplete_is_connected(
+    client: Client, manager: User, camp_session: CampSession
+) -> None:
+    """Город подсказывается из справочника платформы на обеих страницах."""
+    client.force_login(manager)
+    create_content = client.get(reverse("admin:camps_camp_add")).content.decode()
+    assert "js/city_autocomplete.js" in create_content
+    assert 'name="city"' in create_content
+
+    change_content = client.get(
+        reverse("admin:camps_campsession_change", args=[camp_session.pk])
+    ).content.decode()
+    assert "js/city_autocomplete.js" in change_content
+    assert 'name="city"' in change_content
+
+
+def test_camp_admin_create_page_has_coaches_and_organizers(
+    client: Client, manager: User
+) -> None:
+    """На странице создания можно выбрать тренеров и организаторов."""
+    client.force_login(manager)
+    content = client.get(reverse("admin:camps_camp_add")).content.decode()
+    assert 'name="coaches"' in content
+    assert 'name="organizers"' in content
+    assert "Выберите действующих тренеров платформы" in content
+    assert "Выберите участников платформы" in content
+
+
+def test_camp_admin_saves_coaches_and_organizers(client: Client, manager: User) -> None:
+    """Выбранные тренер и организатор сохраняются и видны на сайте."""
+    coach = _coach("Анна Тренер", "anna-coach")
+    organizer = User.objects.create_user(
+        email="organizer@example.test",
+        password="test-only",
+        first_name="Иван",
+        last_name="Организатор",
+    )
+    client.force_login(manager)
+    payload = _payload(
+        coaches=[str(coach.pk)],
+        organizers=[str(organizer.pk)],
+    )
+    response = client.post(reverse("admin:camps_camp_add"), payload)
+    assert response.status_code == 302
+    camp = Camp.objects.get(title="Теннисный кемп в Сочи")
+    assert list(camp.coaches.all()) == [coach]
+    assert list(camp.organizers.all()) == [organizer]
+    public_page = client.get(camp.get_absolute_url()).content.decode()
+    assert "Анна Тренер" in public_page
+    assert "Иван Организатор" in public_page
+    assert "Организаторы" in public_page
+
+
+def test_camp_admin_only_offers_active_coaches_and_organizers() -> None:
+    """В выпадающих списках нет неактивных тренеров и пользователей."""
+    inactive_coach = _coach("Скрытый тренер", "hidden-coach", is_active=False)
+    inactive_user = User.objects.create_user(
+        email="hidden-organizer@example.test",
+        password="test-only",
+        is_active=False,
+    )
+    form = CampCreateForm()
+    assert inactive_coach not in form.fields["coaches"].queryset
+    assert inactive_user not in form.fields["organizers"].queryset
+
+
+def test_camp_detail_shows_only_active_team(
+    client: Client, camp_session: CampSession
+) -> None:
+    """Публичная страница показывает только действующих тренеров и организаторов."""
+    camp = camp_session.camp
+    active_coach = _coach("Активный тренер", "active-coach")
+    inactive_coach = _coach("Неактивный тренер", "inactive-coach", is_active=False)
+    active_organizer = User.objects.create_user(
+        email="active-organizer@example.test",
+        password="test-only",
+        first_name="Активный",
+        last_name="Организатор",
+    )
+    inactive_organizer = User.objects.create_user(
+        email="inactive-organizer@example.test",
+        password="test-only",
+        first_name="Неактивный",
+        last_name="Организатор",
+        is_active=False,
+    )
+    camp.coaches.set([active_coach, inactive_coach])
+    camp.organizers.set([active_organizer, inactive_organizer])
+
+    content = client.get(camp.get_absolute_url()).content.decode()
+    assert "Активный тренер" in content
+    assert "Неактивный тренер" not in content
+    assert "Активный Организатор" in content
+    assert "Неактивный Организатор" not in content
+
+
+def test_camp_admin_change_page_has_coaches_and_organizers(
+    client: Client, manager: User, camp_session: CampSession
+) -> None:
+    """Страница редактирования кемпа тоже позволяет менять команду."""
+    client.force_login(manager)
+    content = client.get(
+        reverse("admin:camps_camp_change", args=[camp_session.camp_id])
+    ).content.decode()
+    assert 'name="coaches"' in content
+    assert 'name="organizers"' in content
 
 
 def test_camp_admin_creates_published_camp_with_session_and_package(

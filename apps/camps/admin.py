@@ -45,6 +45,8 @@ CAMP_MAIN_FIELDS = (
     "audience",
     "description",
     "image",
+    "coaches",
+    "organizers",
 )
 CAMP_EXTRA_FIELDS = ("slug", "levels", "program", "preparation")
 SESSION_MAIN_FIELDS = (
@@ -91,7 +93,6 @@ class CampAdmin(admin.ModelAdmin):
     list_filter = ("is_published", "audience")
     search_fields = ("title", "subtitle", "description")
     prepopulated_fields = {"slug": ("title",)}
-    filter_horizontal = ("coaches",)
     change_list_template = "admin/camps/camp/change_list.html"
     readonly_fields = ("setup_help", "public_link", "session_list", "updated_at")
     fieldsets = (
@@ -106,19 +107,28 @@ class CampAdmin(admin.ModelAdmin):
                     "audience",
                     "description",
                     "image",
-                    "coaches",
                 )
             },
         ),
         (
-            "2. Дополнительно",
+            "2. Команда",
+            {
+                "fields": ("coaches", "organizers"),
+                "description": (
+                    "Тренеры и организаторы, которых увидят на публичной странице кемпа. "
+                    "Показываются только действующие тренеры и активные участники платформы."
+                ),
+            },
+        ),
+        (
+            "3. Дополнительно",
             {
                 "classes": ("collapse",),
                 "fields": ("levels", "program", "preparation"),
             },
         ),
         (
-            "3. Публикация",
+            "4. Публикация",
             {
                 "fields": ("is_published", "public_link", "updated_at"),
                 "description": (
@@ -139,8 +149,9 @@ class CampAdmin(admin.ModelAdmin):
     )
 
     class Media:
-        """Подключает стили пошаговых подсказок кемпов."""
+        """Подключает стили подсказок и автодополнение города."""
 
+        js = ("js/city_autocomplete.js",)
         css = {"all": ["admin/css/camps_admin.css"]}
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Camp]:
@@ -457,8 +468,9 @@ class CampSessionAdmin(admin.ModelAdmin):
     )
 
     class Media:
-        """Подключает стили подсказок к заезду."""
+        """Подключает стили подсказок и автодополнение города."""
 
+        js = ("js/city_autocomplete.js",)
         css = {"all": ["admin/css/camps_admin.css"]}
 
     def has_module_permission(self, request: HttpRequest) -> bool:

@@ -1,0 +1,131 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/forms.css' %}">
+<link rel="stylesheet" href="{% static 'admin/css/camps_admin.css' %}">
+{% endblock %}
+
+{% block title %}Создать кемп | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Главная</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">Кемпы TennisFan</a>
+  &rsaquo; <a href="{% url 'admin:camps_camp_changelist' %}">Кемпы</a>
+  &rsaquo; Создать кемп
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1>Создать кемп</h1>
+
+  <div class="camp-admin-callout">
+    <strong>Одна страница вместо трёх разделов</strong>
+    <p>Заполните блоки сверху вниз: кемп → заезд → пакеты. Сохранять между шагами не нужно. Кемп появится на сайте только после нажатия «Создать кемп» с включённой галочкой публикации.</p>
+    <ol>
+      <li><strong>Кемп</strong> — название и описание, которые увидят участники.</li>
+      <li><strong>Заезд</strong> — даты, город, площадка и вместимость.</li>
+      <li><strong>Пакеты</strong> — что входит и сколько стоит. Нужен хотя бы один пакет.</li>
+    </ol>
+  </div>
+
+  {% if has_errors %}
+  <p class="errornote">Проверьте поля с ошибками ниже.</p>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+
+    <fieldset class="module aligned camp-admin-section">
+      <h2>1. Кемп</h2>
+      <p class="help">Публичная программа. Название, описание и обложку увидят на сайте.</p>
+      {{ camp_form.non_field_errors }}
+      {% for field in camp_main_fields %}
+        {% include "admin/camps/_field.html" with field=field %}
+      {% endfor %}
+      <details class="camp-admin-details" {% if camp_extra_open %}open{% endif %}>
+        <summary>Дополнительно: адрес страницы, уровень, программа по дням, подготовка</summary>
+        {% for field in camp_extra_fields %}
+          {% include "admin/camps/_field.html" with field=field %}
+        {% endfor %}
+      </details>
+    </fieldset>
+
+    <fieldset class="module aligned camp-admin-section">
+      <h2>2. Заезд</h2>
+      <p class="help">Конкретные даты и условия. У кемпа может быть несколько заездов, но сейчас создаём первый. Координатора и корт платформы можно назначить позже на странице заезда.</p>
+      {{ session_form.non_field_errors }}
+      {% for field in session_main_fields %}
+        {% include "admin/camps/_field.html" with field=field %}
+      {% endfor %}
+      <details class="camp-admin-details" {% if session_extra_open %}open{% endif %}>
+        <summary>Дополнительно: дедлайн, возраст, проживание, контакты и условия</summary>
+        {% for field in session_extra_fields %}
+          {% include "admin/camps/_field.html" with field=field %}
+        {% endfor %}
+      </details>
+    </fieldset>
+
+    <fieldset class="module aligned camp-admin-section">
+      <h2>3. Пакеты участия</h2>
+      <p class="help">Варианты участия: например, «Стандарт» и «С проживанием». Цена указывается за игрока за весь заезд. Если цена пока неизвестна, оставьте поле пустым — на сайте будет «Стоимость по запросу».</p>
+      <p class="help">В строке: название пакета, что входит, цена, валюта, входит ли проживание и доступен ли пакет для заявок. Снимите «Доступен для заявок», чтобы временно скрыть пакет с сайта.</p>
+      {{ package_formset.management_form }}
+      {{ package_formset.non_form_errors }}
+      <div class="camp-admin-table-wrap">
+        <table class="camp-admin-package-table">
+          <thead>
+            <tr>
+              <th>Пакет</th>
+              <th>Что входит</th>
+              <th>Цена за игрока</th>
+              <th>Валюта</th>
+              <th>С проживанием</th>
+              <th>Доступен для заявок</th>
+              <th>Удалить</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in package_formset %}
+            <tr>
+              <td>{{ form.id }}{{ form.name }}{{ form.name.errors }}</td>
+              <td>{{ form.description }}{{ form.description.errors }}</td>
+              <td>{{ form.price }}{{ form.price.errors }}</td>
+              <td>{{ form.currency }}{{ form.currency.errors }}</td>
+              <td>{{ form.with_accommodation }}{{ form.with_accommodation.errors }}</td>
+              <td>{{ form.is_active }}{{ form.is_active.errors }}</td>
+              <td>{{ form.DELETE }}</td>
+            </tr>
+            {% if form.non_field_errors %}
+            <tr><td colspan="7">{{ form.non_field_errors }}</td></tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="help">Заполните хотя бы один пакет. Пустые строки можно оставить пустыми. Если нужно больше трёх пакетов, сохраните кемп и добавьте их в заезде.</p>
+    </fieldset>
+
+    <fieldset class="module aligned camp-admin-section">
+      <h2>Публикация</h2>
+      <div class="form-row checkbox-row">
+        <div>
+          <label for="id_publish">
+            <input type="checkbox" name="publish" id="id_publish" {% if publish %}checked{% endif %}>
+            Опубликовать кемп на сайте
+          </label>
+          <div class="help">Если снять галочку, кемп сохранится как черновик и не будет виден посетителям. Заявки принимает только заезд со статусом «Идёт набор» и активным пакетом.</div>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="submit-row camp-admin-submit">
+      <input type="submit" value="Создать кемп" class="default">
+      <a href="{% url 'admin:camps_camp_changelist' %}" class="button cancel-link">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

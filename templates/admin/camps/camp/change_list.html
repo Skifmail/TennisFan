@@ -1,0 +1,19 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/camps_admin.css' %}">
+{% endblock %}
+
+{% block content_title %}
+{{ block.super }}
+<div class="camp-admin-callout">
+  <strong>Создайте кемп за один раз</strong>
+  <p>Нажмите «Создать кемп»: на одной странице заполняются программа, даты и пакеты. Отдельно создавать заезд и пакеты не нужно.</p>
+</div>
+{% endblock %}
+
+{% block object-tools-items %}
+<li><a href="{% url 'admin:camps_camp_add' %}" class="addlink">Создать кемп</a></li>
+{% endblock %}

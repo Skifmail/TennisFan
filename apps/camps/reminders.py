@@ -133,6 +133,10 @@ def _deliver(pk: int) -> bool:
         app = CampApplication.objects.select_related(
             "session__camp", "session__coordinator", "user"
         ).get(pk=row.application_id)
+        if app.cancellation_requests.filter(status="pending").exists():
+            # Решение ещё не принято: оставляем напоминание в очереди,
+            # чтобы доставить его после отклонения отмены.
+            return False
         if not _still_relevant(row, app):
             row.status = "skipped"
             row.save(update_fields=["status"])

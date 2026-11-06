@@ -34,8 +34,11 @@ def reservation_limit(session: CampSession) -> datetime:
 def default_reservation_deadline(
     session: CampSession, *, current: datetime | None = None
 ) -> datetime:
-    """Сохраняет бронь до кемпа, независимо от момента подачи заявки."""
-    return reservation_limit(session)
+    """Сохраняет бронь до кемпа, не сокращая уже действующий срок."""
+    limit = reservation_limit(session)
+    if current is not None and timezone.is_aware(current) and current > limit:
+        return current
+    return limit
 
 
 def available_places_for_application(session: CampSession, application_id: UUID) -> int:

@@ -1,0 +1,45 @@
+{% if sessions %}
+<div class="camp-admin-table-wrap">
+  <table class="camp-admin-table">
+    <thead>
+      <tr>
+        <th>Даты</th>
+        <th>Город</th>
+        <th>Статус</th>
+        <th>Активных пакетов</th>
+        <th>Заявок</th>
+        <th>Действия</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for session in sessions %}
+      <tr>
+        <td>{{ session.start_date|date:"d.m.Y" }} — {{ session.end_date|date:"d.m.Y" }}</td>
+        <td>{{ session.city }}</td>
+        <td>{{ session.get_status_display }}</td>
+        <td>
+          {% if session.active_packages_count %}
+            {{ session.active_packages_count }}
+          {% else %}
+            <span class="camp-admin-warning">нет</span>
+          {% endif %}
+        </td>
+        <td>{{ session.applications_count }}</td>
+        <td class="camp-admin-actions">
+          <a class="button" href="{% url 'admin:camps_campsession_change' session.pk %}">Даты и пакеты</a>
+          <a class="button" href="{% url 'camps:manage_session' session.pk %}">Заявки</a>
+        </td>
+      </tr>
+      {% if session.status == 'open' and not session.active_packages_count %}
+      <tr>
+        <td colspan="6" class="camp-admin-warning">Нет активных пакетов — кнопка заявки на сайте не появится.</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="camp-admin-callout">У кемпа пока нет заездов. Создайте первый заезд — это даты, место и пакеты участия.</p>
+{% endif %}
+<p><a class="button" href="{% url 'admin:camps_campsession_add' %}?camp={{ camp.pk }}">+ Добавить заезд</a></p>

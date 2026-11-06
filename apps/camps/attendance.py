@@ -50,8 +50,11 @@ def guest_attendance_application(token: str) -> CampApplication | None:
         data = signing.loads(token, salt=SALT, max_age=TOKEN_MAX_AGE)
         if not isinstance(data, dict):
             return None
+        raw_id = data.get("application")
+        if not isinstance(raw_id, str):
+            return None
         app = CampApplication.objects.select_related("session__camp").get(
-            pk=data.get("application"), user__isnull=True
+            pk=raw_id, user__isnull=True
         )
         if data.get(
             "start"

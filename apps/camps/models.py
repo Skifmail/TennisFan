@@ -72,8 +72,8 @@ class Camp(models.Model):
     )
 
     class Meta:
-        verbose_name = "01. Программа кемпа"
-        verbose_name_plural = "01. Программы кемпов"
+        verbose_name = "Кемп"
+        verbose_name_plural = "Кемпы"
         ordering = ["title"]
 
     def __str__(self) -> str:
@@ -197,8 +197,8 @@ class CampSession(models.Model):
     )
 
     class Meta:
-        verbose_name = "02. Заезд"
-        verbose_name_plural = "02. Заезды"
+        verbose_name = "Заезд"
+        verbose_name_plural = "Заезды"
         ordering = ["start_date"]
         constraints = [
             models.CheckConstraint(
@@ -255,6 +255,10 @@ class CampSession(models.Model):
             errors["status"] = (
                 "Сначала отмените подтверждённые заявки и освободите действующие временные брони."
             )
+        if self.pk and self.status == self.Status.OPEN and not self.has_active_packages:
+            errors["status"] = (
+                "Для открытого заезда добавьте хотя бы один активный пакет участия."
+            )
         if errors:
             raise ValidationError(errors)
 
@@ -288,15 +292,37 @@ class CampSession(models.Model):
             ).update(reservation_expires_at=reservation_limit(self))
 
     @property
+    def has_active_packages(self) -> bool:
+        """Проверяет наличие хотя бы одного пакета, доступного для заявок."""
+        prefetched = getattr(self, "active_packages", None)
+        if prefetched is not None:
+            return bool(prefetched)
+        return bool(self.packages.filter(is_active=True).exists())
+
+    @property
+    def application_block_reason(self) -> str | None:
+        """Объясняет, почему заявка сейчас недоступна, или возвращает None."""
+        today = timezone.localdate()
+        if self.status == self.Status.DRAFT:
+            return "Заезд ещё готовится."
+        if self.status == self.Status.CANCELLED:
+            return "Заезд отменён."
+        if self.status == self.Status.COMPLETED:
+            return "Заезд завершён."
+        if self.status == self.Status.CLOSED:
+            return "Набор на этот заезд закрыт."
+        if self.start_date < today:
+            return "Заезд уже начался."
+        if self.registration_deadline and self.registration_deadline < today:
+            return "Срок приёма заявок истёк."
+        if not self.has_active_packages:
+            return "Пакеты участия ещё не опубликованы."
+        return None
+
+    @property
     def accepts_applications(self) -> bool:
         """Проверяет открытость набора без обещания свободного места."""
-        today = timezone.localdate()
-        return bool(
-            self.status == self.Status.OPEN
-            and self.start_date >= today
-            and (not self.registration_deadline or self.registration_deadline >= today)
-            and self.packages.filter(is_active=True).exists()
-        )
+        return self.application_block_reason is None
 
     @property
     def confirmed_players(self) -> int:
@@ -368,8 +394,8 @@ class CampPackage(models.Model):
     )
 
     class Meta:
-        verbose_name = "03. Пакет участия"
-        verbose_name_plural = "03. Пакеты участия"
+        verbose_name = "Пакет участия"
+        verbose_name_plural = "Пакеты участия"
         ordering = ["price", "pk"]
 
     def __str__(self) -> str:
@@ -493,8 +519,8 @@ class CampApplication(models.Model):
     )
 
     class Meta:
-        verbose_name = "04. Заявка"
-        verbose_name_plural = "04. Заявки"
+        verbose_name = "Заявка"
+        verbose_name_plural = "Заявки"
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
@@ -558,6 +584,37 @@ class CampApplication(models.Model):
         """Подсвечивает координатору необработанное обращение об отмене."""
         return bool(self.cancellation_requests.filter(status="pending").exists())
 
+    def _snapshot_date(self, key: str) -> date | None:
+        """Разбирает дату из неизменяемого снимка предложения."""
+        raw = self.offer_snapshot.get(key)
+        if not isinstance(raw, str):
+            return None
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    @property
+    def snapshot_start_date(self) -> date | None:
+        """Возвращает дату начала, зафиксированную при подаче заявки."""
+        return self._snapshot_date("start_date")
+
+    @property
+    def snapshot_end_date(self) -> date | None:
+        """Возвращает дату окончания, зафиксированную при подаче заявки."""
+        return self._snapshot_date("end_date")
+
+    @property
+    def dates_changed_since_application(self) -> bool:
+        """Показывает, что координатор перенёс даты после подачи заявки."""
+        start = self.snapshot_start_date
+        end = self.snapshot_end_date
+        return bool(
+            start is not None
+            and end is not None
+            and (start != self.session.start_date or end != self.session.end_date)
+        )
+
     @property
     def paid_amount(self) -> Decimal:
         """Суммирует ручные поступления за вычетом возвратов."""
@@ -617,8 +674,8 @@ class CampParticipant(models.Model):
     )
 
     class Meta:
-        verbose_name = "05. Участник"
-        verbose_name_plural = "05. Участники"
+        verbose_name = "Участник"
+        verbose_name_plural = "Участники"
         ordering = ["pk"]
 
     def __str__(self) -> str:
@@ -684,8 +741,8 @@ class CampPayment(models.Model):
     )
 
     class Meta:
-        verbose_name = "06. Ручной платёж"
-        verbose_name_plural = "06. Ручные платежи"
+        verbose_name = "Платёж"
+        verbose_name_plural = "Платежи"
         ordering = ["created_at"]
         constraints = [
             models.CheckConstraint(
@@ -726,8 +783,8 @@ class CampExpense(models.Model):
     )
 
     class Meta:
-        verbose_name = "07. Плановый расход"
-        verbose_name_plural = "07. Плановые расходы"
+        verbose_name = "Расход"
+        verbose_name_plural = "Расходы"
 
     def __str__(self) -> str:
         return str(self.name)
@@ -773,8 +830,8 @@ class CampGame(models.Model):
     )
 
     class Meta:
-        verbose_name = "08. Товарищеская встреча"
-        verbose_name_plural = "08. Товарищеские встречи (без рейтинга)"
+        verbose_name = "Товарищеская встреча"
+        verbose_name_plural = "Товарищеские встречи"
         ordering = ["-played_at"]
 
     def clean(self) -> None:
@@ -824,8 +881,8 @@ class CampTournament(models.Model):
     )
 
     class Meta:
-        verbose_name = "09. Турнир кемпа"
-        verbose_name_plural = "09. Турниры кемпов"
+        verbose_name = "Турнир кемпа"
+        verbose_name_plural = "Турниры кемпов"
 
     def __str__(self) -> str:
         return str(self.tournament)
@@ -902,8 +959,8 @@ class CampCancellation(models.Model):
     )
 
     class Meta:
-        verbose_name = "10. Запрос на отмену"
-        verbose_name_plural = "10. Запросы на отмену"
+        verbose_name = "Запрос на отмену"
+        verbose_name_plural = "Запросы на отмену"
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
@@ -950,8 +1007,8 @@ class CampReminder(models.Model):
     )
 
     class Meta:
-        verbose_name = "11. Напоминание кемпа"
-        verbose_name_plural = "11. Напоминания кемпов"
+        verbose_name = "Напоминание"
+        verbose_name_plural = "Напоминания"
         constraints = [
             models.UniqueConstraint(
                 fields=["application", "kind", "basis"], name="camp_unique_reminder"

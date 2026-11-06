@@ -1,0 +1,145 @@
+.camp-admin-callout {
+  margin: 1rem 0 1.25rem;
+  padding: 1rem 1.25rem;
+  border-left: 4px solid var(--primary, #417690);
+  border-radius: 4px;
+  background: var(--darkened-bg, #f8f8f8);
+  line-height: 1.5;
+}
+
+.camp-admin-callout strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.camp-admin-callout p {
+  margin: 0.35rem 0;
+}
+
+.camp-admin-callout ol {
+  margin: 0.5rem 0 0 1.25rem;
+  padding: 0;
+}
+
+.camp-admin-callout li + li {
+  margin-top: 0.25rem;
+}
+
+.camp-admin-section {
+  margin-top: 1.5rem;
+}
+
+.camp-admin-section > h2 {
+  margin-bottom: 0.25rem;
+}
+
+.camp-admin-section > .help {
+  margin: 0 0 0.75rem;
+}
+
+.camp-admin-details {
+  margin: 0.75rem 0 0;
+}
+
+.camp-admin-details > summary {
+  cursor: pointer;
+  padding: 0.35rem 0;
+  font-weight: 600;
+}
+
+.camp-admin-table-wrap {
+  margin: 0.5rem 0;
+  overflow-x: auto;
+}
+
+.camp-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.camp-admin-table th,
+.camp-admin-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--hairline-color, #ddd);
+  text-align: left;
+  vertical-align: top;
+}
+
+.camp-admin-table th {
+  white-space: nowrap;
+}
+
+.camp-admin-actions {
+  white-space: nowrap;
+}
+
+.camp-admin-actions .button {
+  margin: 0 0.25rem 0.25rem 0;
+}
+
+.camp-admin-warning {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.camp-admin-package-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.camp-admin-package-table th,
+.camp-admin-package-table td {
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--hairline-color, #ddd);
+  text-align: left;
+  vertical-align: top;
+}
+
+.camp-admin-package-table input[type="text"],
+.camp-admin-package-table input[type="number"],
+.camp-admin-package-table select,
+.camp-admin-package-table textarea {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.camp-admin-package-table textarea {
+  min-height: 4.5rem;
+}
+
+.camp-admin-submit {
+  margin-top: 1.5rem;
+}
+
+.camp-admin-submit .cancel-link {
+  margin-left: 0.75rem;
+}
+
+.camp-admin-package-inline {
+  border-left: 4px solid var(--primary, #417690);
+}
+
+@media (width <= 767px) {
+  .camp-admin-package-table,
+  .camp-admin-package-table thead,
+  .camp-admin-package-table tbody,
+  .camp-admin-package-table th,
+  .camp-admin-package-table td,
+  .camp-admin-package-table tr {
+    display: block;
+  }
+
+  .camp-admin-package-table thead {
+    display: none;
+  }
+
+  .camp-admin-package-table td {
+    padding: 0.25rem 0;
+    border-bottom: 0;
+  }
+
+  .camp-admin-package-table tr {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--hairline-color, #ddd);
+  }
+}

@@ -284,7 +284,7 @@ def test_camps_hold_ui_and_coordinator_post(
     body = client.get(response.url).content.decode()
     assert (
         "Места временно забронированы" in body
-        and "Предоплата для брони не нужна" in body
+        and "Временная бронь не требует оплаты" in body
     )
     from apps.camps.models import CampApplication
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.urls import reverse
+from loguru import logger
 
 from apps.notifications.infrastructure.email import send_event_mail as send_mail
 from apps.notifications.services import center_enabled, create_notification, preferences
@@ -15,7 +16,15 @@ from .models import CampApplication
 def team_recipients(app: CampApplication) -> list[User]:
     """Выбирает координатора либо действующих суперадминистраторов."""
     if app.session.coordinator_id:
-        return list(User.objects.filter(pk=app.session.coordinator_id, is_active=True))
+        coordinator = list(
+            User.objects.filter(pk=app.session.coordinator_id, is_active=True)
+        )
+        if coordinator:
+            return coordinator
+        logger.warning(
+            "Координатор кемпа {} неактивен; уведомление уйдёт супер-администраторам.",
+            app.session.coordinator_id,
+        )
     return list(User.objects.filter(is_active=True, is_superuser=True))
 
 

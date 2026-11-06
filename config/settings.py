@@ -146,6 +146,7 @@ INSTALLED_APPS = [
     "apps.courts",
     "apps.sparring",
     "apps.training",
+    "apps.camps",
     "apps.content",
     "apps.comments",
     "apps.chat",

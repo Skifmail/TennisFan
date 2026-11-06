@@ -69,6 +69,8 @@ def test_camp_admin_create_page_shows_three_steps(
     assert "2. Заезд" in content
     assert "3. Пакеты участия" in content
     assert "Опубликовать кемп на сайте" in content
+    assert content.count("<h1>Создать кемп</h1>") == 1
+    assert "Одна страница вместо трёх разделов" not in content
 
 
 def test_camp_admin_creates_published_camp_with_session_and_package(

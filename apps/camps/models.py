@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Any, cast
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
-from django.db.models import Sum
+from django.db import models, transaction
+from django.db.models import Q, Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -145,6 +145,11 @@ class CampSession(models.Model):
             "Мест для игроков", validators=[MinValueValidator(1)]
         )
     )
+    auto_reserve: models.BooleanField[bool, bool] = models.BooleanField(
+        "Временная бронь при подаче заявки",
+        default=True,
+        help_text="Если мест достаточно для всей группы, они резервируются без оплаты. Иначе заявка попадает в лист ожидания.",
+    )
     minimum_players: models.PositiveSmallIntegerField[int, int] = (
         models.PositiveSmallIntegerField(
             "Минимум игроков для проведения",
@@ -231,18 +236,56 @@ class CampSession(models.Model):
             errors["coordinator"] = (
                 "Выберите действующего сотрудника с правом изменения заявок кемпа."
             )
-        if self.pk and self.capacity and self.capacity < self.confirmed_players:
-            errors["capacity"] = "Вместимость меньше числа подтверждённых игроков."
+        if (
+            self.pk
+            and self.capacity
+            and self.capacity < self.confirmed_players + self.reserved_players
+        ):
+            errors["capacity"] = (
+                "Вместимость меньше числа подтверждённых и временно забронированных мест."
+            )
         if (
             self.pk
             and self.status == self.Status.CANCELLED
-            and self.applications.filter(status="confirmed").exists()
+            and (
+                self.applications.filter(status="confirmed").exists()
+                or self.reserved_players > 0
+            )
         ):
             errors["status"] = (
-                "Сначала отмените подтверждённые заявки и согласуйте возвраты с участниками."
+                "Сначала отмените подтверждённые заявки и освободите действующие временные брони."
             )
         if errors:
             raise ValidationError(errors)
+
+    @transaction.atomic
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """При переносе начала переносит действующие брони под блокировкой заезда."""
+        previous_start = None
+        if self.pk:
+            previous_start = (
+                type(self)
+                .objects.select_for_update()
+                .filter(pk=self.pk)
+                .values_list("start_date", flat=True)
+                .first()
+            )
+        super().save(*args, **kwargs)
+        update_fields = kwargs.get("update_fields")
+        if (
+            previous_start is not None
+            and previous_start != self.start_date
+            and (update_fields is None or "start_date" in update_fields)
+        ):
+            from .communication import invalidate_camp_reminders
+            from .reservations import reservation_limit
+
+            for app in self.applications.all().iterator():
+                invalidate_camp_reminders(app, departure_only=True)
+            self.applications.filter(
+                status__in=["new", "contacted", "agreed"],
+                reservation_expires_at__gt=timezone.now(),
+            ).update(reservation_expires_at=reservation_limit(self))
 
     @property
     def accepts_applications(self) -> bool:
@@ -268,9 +311,24 @@ class CampSession(models.Model):
         )
 
     @property
+    def reserved_players(self) -> int:
+        """Считает действующие временные брони, исключая сопровождающих и истёкшие сроки."""
+        return int(
+            CampParticipant.objects.filter(
+                application__session=self,
+                application__status__in=["new", "contacted", "agreed"],
+                application__reservation_expires_at__gt=timezone.now(),
+            )
+            .exclude(role="companion")
+            .count()
+        )
+
+    @property
     def available_places(self) -> int:
-        """Возвращает свободную спортивную вместимость."""
-        return int(max(0, self.capacity - self.confirmed_players))
+        """Вычитает подтверждённые места и только действующие временные брони."""
+        return int(
+            max(0, self.capacity - self.confirmed_players - self.reserved_players)
+        )
 
 
 class CampPackage(models.Model):
@@ -398,6 +456,20 @@ class CampApplication(models.Model):
     currency: models.CharField[str, str] = models.CharField(
         "Валюта расчётов", max_length=3, default="RUB", editable=False
     )
+    reservation_expires_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField(
+            "Временная бронь до",
+            null=True,
+            blank=True,
+            db_index=True,
+        )
+    )
+    attendance_confirmed_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField("Поездка подтверждена участником", null=True, blank=True)
+    )
+    attendance_start_date: models.DateField[date | None, date | None] = (
+        models.DateField("Подтверждённая дата начала", null=True, blank=True)
+    )
     payment_due: models.DateField[date | None, date | None] = models.DateField(
         "Срок доплаты", null=True, blank=True
     )
@@ -424,6 +496,13 @@ class CampApplication(models.Model):
         verbose_name = "04. Заявка"
         verbose_name_plural = "04. Заявки"
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(reservation_expires_at__isnull=True)
+                | Q(status__in=["new", "contacted", "agreed", "waitlist"]),
+                name="camp_reservation_pending_only",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.contact_name} · {self.session}"
@@ -437,6 +516,42 @@ class CampApplication(models.Model):
             and self.package.session_id != self.session_id
         ):
             raise ValidationError({"package": "Пакет относится к другому заезду."})
+
+    @property
+    def has_active_reservation(self) -> bool:
+        """Проверяет срок брони независимо от своевременности запуска cron."""
+        return bool(
+            self.status in {"new", "contacted", "agreed"}
+            and self.reservation_expires_at is not None
+            and self.reservation_expires_at > timezone.now()
+        )
+
+    @property
+    def reservation_expired(self) -> bool:
+        """Позволяет объяснить освобождение мест, сохраняя первоначальный срок в истории заявки."""
+        return bool(
+            self.reservation_expires_at is not None
+            and self.reservation_expires_at <= timezone.now()
+            and self.status in {"new", "contacted", "agreed", "waitlist"}
+        )
+
+    @property
+    def attendance_confirmed(self) -> bool:
+        """При переносе даты начала запрашивает новое подтверждение поездки."""
+        return bool(
+            self.attendance_confirmed_at is not None
+            and self.attendance_start_date == self.session.start_date
+        )
+
+    @property
+    def can_confirm_attendance(self) -> bool:
+        """Разрешает ответ только на актуальную бронь или согласованное участие."""
+        return bool(
+            (self.status == "confirmed" or self.has_active_reservation)
+            and self.session.status in {"open", "closed"}
+            and self.session.start_date >= timezone.localdate()
+            and not self.has_pending_cancellation
+        )
 
     @property
     def has_pending_cancellation(self) -> bool:

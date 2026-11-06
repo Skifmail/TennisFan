@@ -241,3 +241,15 @@ class CancellationDecisionForm(forms.Form):
         max_length=2000,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+
+
+class ReservationForm(forms.Form):
+    """Явный абсолютный срок предотвращает повторное продление от двойного POST."""
+
+    expires_at = forms.DateTimeField(
+        label="Временная бронь до",
+        widget=forms.DateTimeInput(
+            attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"
+        ),
+        help_text="Время платформы. Места резервируются для всех игроков заявки без оплаты.",
+    )

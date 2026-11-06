@@ -22,6 +22,7 @@ class EventEmail(EmailMultiAlternatives):
     """
 
     outbound_category: str = ""
+    sensitive_body: bool = False
 
     def __init__(
         self,

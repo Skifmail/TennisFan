@@ -26,6 +26,7 @@ from .models import (
     CampPayment,
     CampSession,
 )
+from .reservations import assign_initial_reservation, available_places_for_application
 
 ACTIVE_STATUSES = {
     CampApplication.Status.NEW,
@@ -66,6 +67,15 @@ def _notify(application_id: UUID, *, submitted: bool) -> None:
         "session__camp", "session__coordinator", "user"
     ).get(pk=application_id)
     event = "camp.application_submitted" if submitted else "camp.application_updated"
+    if app.has_active_reservation and app.reservation_expires_at is not None:
+        deadline = timezone.localtime(app.reservation_expires_at).strftime(
+            "%d.%m.%Y %H:%M %Z"
+        )
+        receipt = f"Места временно забронированы до {deadline}. Предоплата не нужна. Участие подтвердит координатор."
+    elif app.status == "waitlist":
+        receipt = "Заявка сохранена в листе ожидания. Свободных мест для всей группы пока нет. Координатор свяжется с вами."
+    else:
+        receipt = "Заявка на кемп получена. Место подтвердит координатор."
     recipients: list[tuple[User, str, str]] = []
     if submitted:
         managers = User.objects.filter(is_active=True, is_superuser=True)
@@ -86,7 +96,7 @@ def _notify(application_id: UUID, *, submitted: bool) -> None:
             (
                 app.user,
                 (
-                    "Заявка на кемп получена. Место подтвердит координатор."
+                    receipt
                     if submitted
                     else f"Заявка на кемп: {app.get_status_display()}."
                 ),
@@ -102,11 +112,7 @@ def _notify(application_id: UUID, *, submitted: bool) -> None:
                     else "TennisFan · статус участия в кемпе"
                 ),
                 f"{app.session.camp.title} · {app.session.start_date:%d.%m.%Y}\n"
-                + (
-                    "Заявка получена. Наличие мест и стоимость подтвердит координатор."
-                    if submitted
-                    else f"Статус: {app.get_status_display()}."
-                )
+                + (receipt if submitted else f"Статус: {app.get_status_display()}.")
                 + f"\nСвязь с командой: {app.session.contact_email} {app.session.contact_phone}"
                 + "\nВернуться к гостевым заявкам: "
                 + str(settings.SITE_URL).rstrip("/")
@@ -203,6 +209,7 @@ def submit_application(
         )
         person.full_clean()
         person.save()
+    assign_initial_reservation(app, session)
     transaction.on_commit(lambda: _notify(app.pk, submitted=True))
     return cast(CampApplication, app)
 
@@ -241,7 +248,7 @@ def update_application(
                 "Нельзя подтвердить участие в отменённом, завершённом или прошедшем заезде."
             )
         players = app.participants.exclude(role="companion").count()
-        if players < 1 or players > session.available_places:
+        if players < 1 or players > available_places_for_application(session, app.pk):
             raise ValidationError(
                 "Для всех игроков заявки недостаточно свободных мест. Используйте лист ожидания."
             )
@@ -263,6 +270,10 @@ def update_application(
         "staff_notes",
     ):
         setattr(app, key, values.get(key))
+    if target in {"confirmed", "cancelled", "completed"} or (
+        target == "waitlist" and not app.reservation_expired
+    ):
+        app.reservation_expires_at = None
     app.full_clean()
     app.save()
     if payment_terms_changed:

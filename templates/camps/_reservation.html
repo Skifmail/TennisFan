@@ -1,0 +1,7 @@
+{% if application.has_active_reservation %}
+<div class="camp-callout" role="status"><strong>Места временно забронированы</strong><p>До {{ application.reservation_expires_at|date:'d.m.Y H:i T' }}. Предоплата для брони не нужна. Места сохраняются до кемпа. За 7, 3 и 1 день напомним о поездке и попросим подтвердить приезд. Молчание не отменяет бронь до этой даты. Условия участия согласуйте с координатором.</p></div>
+{% elif application.reservation_expired %}
+<div class="camp-callout" role="status"><strong>Срок временной брони истёк</strong><p>Места освобождены. Заявка сохранена в листе ожидания. Координатор сможет выдать новую бронь, если будут свободные места.</p></div>
+{% elif application.status == 'waitlist' %}
+<div class="camp-callout"><strong>Заявка в листе ожидания</strong><p>Места пока не забронированы. Координатор свяжется с вами и обсудит доступные варианты.</p></div>
+{% endif %}

@@ -8,6 +8,10 @@ app_name = "camps"
 urlpatterns = [
     path("", views.camp_list, name="list"),
     path("my/", views.my_camps, name="my"),
+    path(
+        "confirm-trip/<str:token>/", views.confirm_guest_trip, name="attendance_guest"
+    ),
+    path("applications/<uuid:pk>/confirm-trip/", views.confirm_trip, name="attendance"),
     path("recover/", views.recover_guest, name="recover"),
     path("access/<str:token>/", views.restore_guest, name="restore"),
     path("applications/<uuid:pk>/cancel/", views.cancel_application, name="cancel"),

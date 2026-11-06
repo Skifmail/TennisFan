@@ -68,3 +68,7 @@
 #   15 * * * * — раз в час: напоминания о поездке, доплате и заявках кемпов без ответа.
 #                  Команда: send_camp_reminders
 #                  Проверка без отправки: send_camp_reminders --dry-run
+
+#   * * * * * — каждую минуту: освобождение временных броней кемпов без оплаты.
+#                Команда: process_camp_reservations
+#                Проверка: process_camp_reservations --dry-run

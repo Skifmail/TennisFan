@@ -14,7 +14,7 @@ from loguru import logger
 from apps.users.models import User
 
 from .communication import invalidate_camp_reminders, send_camp_event
-from .models import CampApplication, CampCancellation, CampSession
+from .models import CampApplication, CampCancellation, CampReminder, CampSession
 from .services import ACTIVE_STATUSES, require_manager
 
 
@@ -120,6 +120,22 @@ def decide_cancellation(
         app.save(update_fields=["status", "reservation_expires_at", "updated_at"])
         invalidate_camp_reminders(app)
         invalidate_camp_reminders(app, team_only=True)
+    else:
+        # Отклонение возвращает участие: ранее пропущенные напоминания
+        # снова проходят проверку актуальности при следующем запуске cron.
+        CampReminder.objects.filter(
+            application=app,
+            status="skipped",
+            kind__in=[
+                "departure_7",
+                "departure_3",
+                "departure_1",
+                "payment_3",
+                "payment_1",
+                "payment_0",
+                "payment_overdue",
+            ],
+        ).update(status="pending", attempts=0)
     request.status = decision
     request.resolution = resolution.strip()
     request.resolved_by = actor

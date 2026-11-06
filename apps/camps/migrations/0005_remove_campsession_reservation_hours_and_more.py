@@ -2,11 +2,11 @@
 
 from datetime import datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import migrations, models
 from django.utils import timezone
-from zoneinfo import ZoneInfo
 
 
 def extend_current_holds(apps: Any, schema_editor: Any) -> None:

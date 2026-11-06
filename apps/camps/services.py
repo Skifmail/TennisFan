@@ -78,11 +78,18 @@ def _notify(application_id: UUID, *, submitted: bool) -> None:
         receipt = "Заявка на кемп получена. Место подтвердит координатор."
     recipients: list[tuple[User, str, str]] = []
     if submitted:
-        managers = User.objects.filter(is_active=True, is_superuser=True)
+        managers = list(User.objects.filter(is_active=True, is_superuser=True))
         if app.session.coordinator_id:
-            managers = User.objects.filter(
-                pk=app.session.coordinator_id, is_active=True
+            coordinator = list(
+                User.objects.filter(pk=app.session.coordinator_id, is_active=True)
             )
+            if coordinator:
+                managers = coordinator
+            else:
+                logger.warning(
+                    "Координатор кемпа {} неактивен; заявка уйдёт супер-администраторам.",
+                    app.session.coordinator_id,
+                )
         for manager in managers:
             recipients.append(
                 (

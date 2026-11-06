@@ -1,0 +1,20 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/css/camps_admin.css' %}">
+{% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+<div class="camp-admin-callout">
+  <strong>Как заполнить заезд</strong>
+  <ol>
+    <li>Укажите даты и место.</li>
+    <li>Проверьте вместимость и возраст.</li>
+    <li>Добавьте хотя бы один пакет участия — без него заявки не принимаются.</li>
+    <li>Поставьте статус «Идёт набор» и сохраните.</li>
+  </ol>
+</div>
+{% endblock %}

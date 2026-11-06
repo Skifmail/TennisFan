@@ -36,6 +36,7 @@ from .models import (
     Camp,
     CampApplication,
     CampCancellation,
+    CampPackage,
     CampParticipant,
     CampSession,
 )
@@ -54,7 +55,13 @@ def camp_list(request: HttpRequest) -> HttpResponse:
     sessions = (
         CampSession.objects.filter(status__in=["open", "closed"])
         .filter(end_date__gte=timezone.localdate())
-        .prefetch_related("packages")
+        .prefetch_related(
+            Prefetch(
+                "packages",
+                queryset=CampPackage.objects.filter(is_active=True),
+                to_attr="active_packages",
+            )
+        )
     )
     camps = Camp.objects.filter(is_published=True).prefetch_related(
         Prefetch("sessions", queryset=sessions, to_attr="upcoming_sessions")
@@ -85,12 +92,27 @@ def camp_detail(request: HttpRequest, slug: str) -> HttpResponse:
     )
     sessions = camp.sessions.filter(
         end_date__gte=timezone.localdate(), status__in=["open", "closed"]
-    ).prefetch_related("packages", "tournament_links__tournament")
+    ).prefetch_related(
+        Prefetch(
+            "packages",
+            queryset=CampPackage.objects.filter(is_active=True),
+            to_attr="active_packages",
+        ),
+        "tournament_links__tournament",
+    )
     return render(
         request,
         "camps/detail.html",
         {"camp": camp, "sessions": sessions, "today": timezone.localdate()},
     )
+
+
+def _client_ip(request: HttpRequest) -> str:
+    """Возвращает IP клиента с учётом reverse proxy, не раскрывая пустое значение."""
+    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    if forwarded:
+        return forwarded.split(",")[0].strip() or "unknown"
+    return (request.META.get("REMOTE_ADDR") or "").strip() or "unknown"
 
 
 def _submission_key(request: HttpRequest, session_id: int) -> str:
@@ -119,11 +141,18 @@ def apply(request: HttpRequest, session_id: int) -> HttpResponse:
     existing = CampApplication.objects.filter(submission_key=key).first()
     if existing:
         return redirect("camps:application", pk=existing.pk)
-    if not session.accepts_applications:
-        messages.info(
-            request, "Приём заявок на этот заезд закрыт. Посмотрите другие даты."
+    block_reason = session.application_block_reason
+    if block_reason is not None:
+        contact = " ".join(
+            value for value in (session.contact_email, session.contact_phone) if value
         )
-        return redirect(session.camp.get_absolute_url())
+        suffix = (
+            f" Связаться с координатором: {contact}."
+            if contact
+            else " Посмотрите другие даты или свяжитесь с нами."
+        )
+        messages.info(request, f"{block_reason}{suffix}")
+        return redirect(f"{session.camp.get_absolute_url()}#dates")
     user = cast(User, request.user) if request.user.is_authenticated else None
     initial: dict[str, Any] = {"submission_key": key}
     if user:
@@ -148,8 +177,8 @@ def apply(request: HttpRequest, session_id: int) -> HttpResponse:
                     None, "Форма устарела. Обновите страницу и попробуйте ещё раз."
                 )
             else:
-                rate_key = f"camp-application:{request.META.get('REMOTE_ADDR', '')}"
-                count = cache.get(rate_key, 0)
+                rate_key = f"camp-application:{_client_ip(request)}"
+                count = int(cache.get(rate_key, 0) or 0)
                 if count >= 8:
                     form.add_error(
                         None,
@@ -171,7 +200,11 @@ def apply(request: HttpRequest, session_id: int) -> HttpResponse:
                     except ValidationError as exc:
                         form.add_error(None, exc)
                     else:
-                        cache.set(rate_key, count + 1, 3600)
+                        cache.add(rate_key, 0, timeout=3600)
+                        try:
+                            cache.incr(rate_key)
+                        except ValueError:
+                            cache.set(rate_key, 1, 3600)
                         owned = request.session.get("camp_application_ids", [])
                         request.session["camp_application_ids"] = (
                             owned + [str(application.pk)]
@@ -506,7 +539,7 @@ def recover_guest(request: HttpRequest) -> HttpResponse:
     if request.method == "POST" and form.is_valid():
         request_guest_access(
             email=form.cleaned_data["email"],
-            address=request.META.get("REMOTE_ADDR", ""),
+            address=_client_ip(request),
         )
         sent = True
     return render(request, "camps/recover.html", {"form": form, "sent": sent})

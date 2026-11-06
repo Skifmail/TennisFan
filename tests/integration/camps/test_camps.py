@@ -98,6 +98,19 @@ def test_camps_public_pages_hide_drafts(
     assert "Наш кемп" not in client.get(reverse("camps:list")).content.decode()
 
 
+def test_camps_public_list_uses_video_hero(client: Client) -> None:
+    """Каталог показывает видео с быстрой webp-заглушкой вместо иллюстрации."""
+    body = client.get(reverse("camps:list")).content.decode()
+
+    assert "tennisfan-camps-web.mp4" in body
+    assert "camps-hero-poster.webp" in body
+    assert "data-camp-hero-video" in body
+    assert "autoplay muted loop playsinline" in body
+    assert 'fetchpriority="high"' in body
+    assert "camp-court-art" not in body
+    assert "Больше тенниса. Ближе друг к другу." in body
+
+
 def test_camps_guest_submission_is_private_and_idempotent(
     client: Client, camp_session: CampSession
 ) -> None:

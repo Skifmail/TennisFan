@@ -169,6 +169,61 @@
   z-index: -1;
 }
 
+.camp-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.camp-hero.camp-hero--video {
+  display: block;
+  padding: 0;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  background: #001f14;
+}
+
+.camp-hero__poster,
+.camp-hero__video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camp-hero__poster {
+  z-index: 0;
+}
+
+.camp-hero__video {
+  z-index: 1;
+  opacity: 0;
+}
+
+.camp-hero--video.is-ready .camp-hero__video {
+  opacity: 1;
+}
+
+.camp-hero__link {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+}
+
+.camp-hero__link:focus-visible {
+  outline: 3px solid var(--camp-gold);
+  outline-offset: -6px;
+}
+
 .camp-tag {
   display: inline-flex;
   font-size: .7rem;
@@ -228,75 +283,6 @@
 
 .camp-button--wide {
   width: 100%;
-}
-
-.camp-court-art {
-  position: relative;
-  border: 2px solid #e9e5bca6;
-  transform: rotate(-8deg);
-  margin: 30px 0 30px 20px;
-  background: linear-gradient(100deg, #1c6146, #2e7951);
-  border-radius: 2px;
-  box-shadow: 22px 25px 0 #0c382875;
-}
-
-.camp-court-art::before {
-  content: '';
-  position: absolute;
-  inset: 0 12%;
-  border-inline: 2px solid #e9e5bca6;
-}
-
-.camp-court-art::after {
-  content: '';
-  position: absolute;
-  inset: 23% 12%;
-  border-block: 2px solid #e9e5bca6;
-}
-
-.camp-court-art__line {
-  position: absolute;
-  top: 50%;
-  width: 100%;
-  border-top: 2px solid #e9e5bca6;
-}
-
-.camp-court-art__line::before {
-  content: '';
-  position: absolute;
-  top: -80px;
-  left: 50%;
-  height: 160px;
-  border-left: 2px solid #e9e5bca6;
-}
-
-.camp-court-art__ball {
-  position: absolute;
-  height: 48px;
-  width: 48px;
-  border-radius: 50%;
-  background: #e0d77f;
-  top: 30%;
-  right: 20%;
-  box-shadow: 12px 18px 20px #092c3870;
-}
-
-.camp-court-art__ball::after {
-  content: '';
-  position: absolute;
-  inset: 5px 10px;
-  border-inline: 2px solid #ffffffb3;
-  border-radius: 50%;
-  transform: rotate(30deg);
-}
-
-.camp-court-art__caption {
-  position: absolute;
-  bottom: -40px;
-  font-size: .7rem;
-  letter-spacing: .1em;
-  color: #e3d7ae;
-  transform: rotate(8deg);
 }
 
 .camp-section-heading {
@@ -583,6 +569,27 @@
   color: var(--camp-muted);
   font-size: .95rem;
   line-height: 1.55;
+}
+
+.camp-coach .camp-coach__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 6px 12px;
+  border: 1px solid var(--camp-line);
+  border-radius: 999px;
+  background: var(--camp-soft);
+  color: var(--camp-gold);
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.camp-coach:hover .camp-coach__more {
+  border-color: var(--camp-gold);
+  background: rgb(166 130 74 / 16%);
 }
 
 .camp-coach__contact {
@@ -920,10 +927,6 @@
     gap: 20px;
   }
 
-  .camp-court-art {
-    margin-inline: 0;
-  }
-
   .camp-facts {
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
@@ -960,11 +963,6 @@
   .camp-hero h1 {
     font-size: clamp(1.9rem, 7.8vw, 2.8rem);
     overflow-wrap: anywhere;
-  }
-
-  .camp-court-art {
-    height: 180px;
-    margin: 0 22px 32px;
   }
 
   .camp-grid, .camp-detail-grid, .camp-values, .camp-coaches, .camp-packages, .camp-two-columns, .camp-stats {
@@ -1082,6 +1080,10 @@
     transition: opacity 100ms ease;
     transform: none;
   }
+
+  .camp-hero__video {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -1138,11 +1140,6 @@
 @media (width <= 380px) {
   .camp-hero {
     padding: 24px 18px;
-  }
-
-  .camp-court-art {
-    height: 150px;
-    margin-inline: 16px;
   }
 
   .camp-facts {

@@ -26,7 +26,14 @@ let now = 100000000;
 function page(user) {
     const timers = [];
     let closed;
-    const dialog = {open:false, shows:0, showModal(){this.open=true;this.shows++;}, close(){this.open=false;}};
+    const dialogEvents = new Map();
+    const dialog = {
+        open:false, shows:0,
+        showModal(){this.open=true;this.shows++;},
+        close(){this.open=false;},
+        addEventListener:(event, callback)=>dialogEvents.set(event, callback),
+        getBoundingClientRect:()=>({left:10, top:10, right:100, bottom:100})
+    };
     const context = {
         Date: {now:()=>now}, JSON, Number,
         localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},
@@ -40,13 +47,20 @@ function page(user) {
     };
     vm.runInNewContext(code,context);
     timers[0]();
-    return {dialog,timers,close:()=>closed()};
+    return {
+        dialog,timers,close:()=>closed(),
+        click:(x,y,target=dialog)=>dialogEvents.get('click')({target,clientX:x,clientY:y})
+    };
 }
 const first=page(1); assert.equal(first.dialog.shows,1);first.close();
 first.timers[1]();assert.equal(first.dialog.shows,1);
 const next=page(1);assert.equal(next.dialog.shows,0);
 assert.equal(page(2).dialog.shows,1);
 now+=21600000;next.timers[1]();assert.equal(next.dialog.shows,1);
+next.click(10,10);assert.equal(next.dialog.open,true);
+next.click(0,0,{});assert.equal(next.dialog.open,true);
+next.click(0,0);assert.equal(next.dialog.open,false);
+next.timers[1]();assert.equal(next.dialog.shows,1);
 """
         result = subprocess.run(
             [shutil.which("node") or "node", "-e", harness, script],

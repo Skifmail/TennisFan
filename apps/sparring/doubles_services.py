@@ -50,7 +50,7 @@ def _normalize_team_side(target_side: str) -> str:
 
 def _lock_request(match_request_id: int) -> DoublesMatchRequest:
     """Заблокировать свежую заявку до чтения откликов, команд и игроков."""
-    request = (
+    request: DoublesMatchRequest | None = (
         DoublesMatchRequest.objects.select_for_update()
         .filter(pk=match_request_id)
         .first()
@@ -76,7 +76,7 @@ def _pending_join(
     request: DoublesMatchRequest, join_request_id: int
 ) -> DoublesJoinRequest:
     """Обработать старую кнопку как бизнес-отказ, а не техническую ошибку БД."""
-    join = (
+    join: DoublesJoinRequest | None = (
         DoublesJoinRequest.objects.select_for_update()
         .filter(
             pk=join_request_id,
@@ -182,7 +182,7 @@ def create_doubles_request(
         (created_by, partner) if partner else (created_by,), sport or "tennis"
     )
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.create(
+        req: DoublesMatchRequest = DoublesMatchRequest.objects.create(
             status=DoublesMatchRequestStatus.OPEN,
             created_by=created_by,
             city=city,
@@ -270,7 +270,7 @@ def create_join_request(
             ).exists():
                 raise ValueError(f"У игрока {p} уже есть ожидающая заявка на эту игру")
 
-        jr = DoublesJoinRequest.objects.create(
+        jr: DoublesJoinRequest = DoublesJoinRequest.objects.create(
             match_request=req,
             target_side=target_side,
             status=DoublesJoinRequestStatus.PENDING,
@@ -613,7 +613,7 @@ def _create_doubles_match_from_teams(
         else Match.RatingCalcStatus.PENDING
     )
 
-    match = Match.objects.create(
+    match: Match = Match.objects.create(
         tournament=None,
         match_type=Match.MatchType.SPARRING,
         sparring_response=None,

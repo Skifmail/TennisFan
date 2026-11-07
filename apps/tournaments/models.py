@@ -2159,7 +2159,8 @@ class ManualTournamentStage(models.Model):
         ]
 
     def __str__(self) -> str:
-        return self.name
+        name: str = self.name
+        return name
 
 
 class TournamentPlayerResult(models.Model):

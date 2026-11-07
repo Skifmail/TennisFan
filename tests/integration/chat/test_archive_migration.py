@@ -12,7 +12,7 @@ from apps.chat.models import ChatArchive, ChatArchivedMessage, ChatMessage, Chat
 from apps.core.models import City
 from tests.support.factories import make_user
 
-pytestmark = pytest.mark.django_db
+pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def test_migration_when_old_message_states_differ_should_preserve_known_text_once() -> (

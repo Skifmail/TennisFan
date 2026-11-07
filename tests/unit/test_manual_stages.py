@@ -25,6 +25,7 @@ from apps.tournaments.models import (
     TournamentStatus,
     TournamentTeam,
 )
+from apps.tournaments.score_validation import ProposalValidationError
 from tests.support.factories import make_player, make_tournament, make_user
 
 
@@ -455,3 +456,28 @@ class ManualStagesTests(TestCase):
         self.assertContains(
             response, reverse("tournament_manage_cancel", args=[self.tournament.slug])
         )
+
+    def test_advancement_when_target_loses_tournament_should_rollback_result(
+        self,
+    ) -> None:
+        """Повреждённая связь финала откатывает результат без частичного продвижения."""
+        self._qualifiers()
+        self._complete_qualifiers()
+        create_two_knockouts(self.tournament, self.tokens[:4], self.tokens[4:])
+        semifinals = list(
+            self.tournament.matches.filter(
+                manual_stage__kind="main", round_index=1
+            ).order_by("round_order")
+        )
+        self._complete(semifinals[0])
+        final = semifinals[1].next_match
+        assert final is not None
+        Match.objects.filter(pk=final.pk).update(tournament=None)
+
+        with self.assertRaisesRegex(ProposalValidationError, "турнира"):
+            self._complete(semifinals[1])
+
+        semifinals[1].refresh_from_db()
+        final.refresh_from_db()
+        self.assertEqual(semifinals[1].status, Match.MatchStatus.SCHEDULED)
+        self.assertIsNone(final.player2_id)

@@ -301,7 +301,21 @@ def send_photo_or_raise(
     parse_mode: str = "HTML",
     reply_markup: dict[str, Any] | None = None,
 ) -> int:
-    """Отправить фото с проверенным ответом; закрыть локальный файл при любом исходе."""
+    """Отправить фото с проверенным ответом и закрыть локальный файл при любом исходе.
+
+    Args:
+        chat_id: Идентификатор чата получателя.
+        photo: Локальный путь, HTTP(S)-адрес или содержимое изображения.
+        caption: Подпись к изображению.
+        parse_mode: Формат разметки подписи.
+        reply_markup: Клавиатура сообщения.
+
+    Returns:
+        Идентификатор сообщения, принятого Telegram.
+
+    Raises:
+        TelegramAPIError: Транспорт отклонил отправку или локальный файл недоступен.
+    """
     payload: dict[str, Any] = {"chat_id": chat_id}
     if caption:
         payload["caption"] = caption
@@ -317,10 +331,11 @@ def send_photo_or_raise(
                 payload["photo"] = photo
             else:
                 stream = cast(BinaryIO, stack.enter_context(open(photo, "rb")))
-            return _message_id(
+            message_id = _message_id(
                 telegram_call(
                     _get_bot_token(), "sendPhoto", payload, timeout=30, photo=stream
                 )
             )
+        return message_id
     except OSError:
         raise TelegramAPIError("telegram_photo_unavailable") from None

@@ -668,7 +668,9 @@ def resolve_result_proposal(
     match = lock_match(match_id)
     if match is None:
         raise ProposalValidationError("Матч не найден.")
-    proposal = MatchResultProposal.objects.select_for_update().get(pk=proposal_id)
+    proposal: MatchResultProposal = MatchResultProposal.objects.select_for_update().get(
+        pk=proposal_id
+    )
     proposal.match = match
     if (
         proposal.applied_at is not None

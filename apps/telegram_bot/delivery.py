@@ -82,10 +82,11 @@ def enqueue_message(
         "available_at": now,
         "expires_at": expires_at or now + LIFETIME,
     }
+    item: Delivery
     if key is not None:
-        return Delivery.objects.get_or_create(key=key, defaults=values)[0]
-    if broadcast is not None:
-        return Delivery.objects.get_or_create(
+        item, _ = Delivery.objects.get_or_create(key=key, defaults=values)
+    elif broadcast is not None:
+        item, _ = Delivery.objects.get_or_create(
             telegram_broadcast=broadcast,
             user_id=user.pk,
             channel="telegram",
@@ -94,9 +95,9 @@ def enqueue_message(
                 for name, value in values.items()
                 if name not in {"telegram_broadcast", "user_id", "channel"}
             },
-        )[0]
-    if announcement is not None:
-        return Delivery.objects.get_or_create(
+        )
+    elif announcement is not None:
+        item, _ = Delivery.objects.get_or_create(
             tournament_announcement=announcement,
             user_id=user.pk,
             channel="telegram",
@@ -105,8 +106,10 @@ def enqueue_message(
                 for name, value in values.items()
                 if name not in {"tournament_announcement", "user_id", "channel"}
             },
-        )[0]
-    return Delivery.objects.create(**values)
+        )
+    else:
+        item = Delivery.objects.create(**values)
+    return item
 
 
 @transaction.atomic
@@ -224,7 +227,7 @@ def _claim() -> Delivery | None:
     now = timezone.now()
     if state.cooldown_until > now or (state.lease_until and state.lease_until > now):
         return None
-    item = (
+    item: Delivery | None = (
         Delivery.objects.select_for_update(skip_locked=True)
         .filter(channel="telegram", status="queued", available_at__lte=now)
         .order_by("available_at", "pk")

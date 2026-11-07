@@ -183,10 +183,12 @@ def _manual_stage_layout(
     for stage in tournament.manual_stages.all():
         matches = list(stage.matches.order_by("round_index", "round_order"))
         if stage.kind == ManualTournamentStage.Kind.QUALIFIER:
-            entities = [
-                by_token[t].team or by_token[t].player
-                for t in stage.member_tokens
-                if t in by_token
+            entities: list[Player | TournamentTeam] = [
+                member
+                for token in stage.member_tokens
+                if token in by_token
+                if (member := by_token[token].team or by_token[token].player)
+                is not None
             ]
             standings = compute_standings_for_entities(tournament, entities, matches)
             entities, matrix = get_match_matrix_for_entities(

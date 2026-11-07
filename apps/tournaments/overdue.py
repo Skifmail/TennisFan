@@ -69,11 +69,14 @@ def get_overdue_notification_recipients(match: Match) -> list[User]:
 def _manage_url(match: Match) -> str:
     """Ссылка на управление турниром с якорем на матч."""
     tournament = match.tournament
+    url: str
     if tournament is not None:
-        return (
+        url = (
             reverse("tournament_manage", args=[tournament.slug]) + f"#match-{match.pk}"
         )
-    return reverse("match_detail", args=[match.pk])
+    else:
+        url = reverse("match_detail", args=[match.pk])
+    return url
 
 
 def _build_overdue_lk_message(match: Match) -> str:
@@ -679,7 +682,7 @@ def _players_matching_name(query: str) -> list[Player]:
 
 def _reload_match(match_id: int) -> Match:
     """Перечитать матч со связанными игроками."""
-    return Match.objects.select_related(
+    match: Match = Match.objects.select_related(
         "player1__user",
         "player2__user",
         "winner",
@@ -690,6 +693,7 @@ def _reload_match(match_id: int) -> Match:
         "team2__player2",
         "winner_team",
     ).get(pk=match_id)
+    return match
 
 
 def find_match_for_walkover_replace(
@@ -714,7 +718,7 @@ def find_match_for_walkover_replace(
         ValueError: Если матч не найден или найдено несколько.
     """
     if match_id:
-        match = (
+        match: Match | None = (
             Match.objects.filter(pk=match_id)
             .select_related(
                 "player1__user",
@@ -756,7 +760,7 @@ def find_match_for_walkover_replace(
             Q(tournament__name__icontains=tournament_q)
             | Q(tournament__slug__icontains=tournament_q)
         )
-    matches = list(qs.order_by("-pk"))
+    matches: list[Match] = list(qs.order_by("-pk"))
     if not matches:
         raise ValueError(f"Walkover-матч не найден: {player_q} vs {opponent_q}.")
     if len(matches) > 1:
@@ -788,17 +792,19 @@ def resolve_walkover_loser(
         raise ValueError("Для парного матча укажите --match-id и правьте вручную.")
     if not match.player1_id or not match.player2_id:
         raise ValueError("У матча нет обоих игроков.")
+    first: Player | None = match.player1
+    second: Player | None = match.player2
 
     if keep_winner:
         if not match.winner_id:
             raise ValueError("У матча нет победителя, укажите --loser.")
         if match.winner_id == match.player1_id:
-            if match.player2 is None:
+            if second is None:
                 raise ValueError("У матча нет второго игрока.")
-            return match.player2
-        if match.player1 is None:
+            return second
+        if first is None:
             raise ValueError("У матча нет первого игрока.")
-        return match.player1
+        return first
 
     query = loser_query.strip()
     if not query:
@@ -806,7 +812,7 @@ def resolve_walkover_loser(
 
     candidates = [
         player
-        for player in (match.player1, match.player2)
+        for player in (first, second)
         if player is not None and _player_matches_query(player, query)
     ]
     if len(candidates) == 1:

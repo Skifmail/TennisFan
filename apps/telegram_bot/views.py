@@ -99,7 +99,10 @@ def _get_redirect_url_after_bot_settings_change(request: HttpRequest) -> str:
     next_url = str(request.POST.get("next", "")).strip()
     if next_url.startswith("/") and not next_url.startswith("//"):
         return next_url
-    return reverse("profile", kwargs={"pk": cast(User, request.user).player.pk})
+    profile_url: str = reverse(
+        "profile", kwargs={"pk": cast(User, request.user).player.pk}
+    )
+    return profile_url
 
 
 def _parse_score_input(text: str) -> tuple[list[tuple[int, int]] | None, str | None]:
@@ -990,9 +993,9 @@ def _handle_sparring_callback(
             _answer_callback(cq_id, "Мои отклики")
             return True
         status_labels: dict[str, str] = {
-            SparringResponse.ResponseStatus.PENDING: "На рассмотрении",
-            SparringResponse.ResponseStatus.ACCEPTED: "Принят",
-            SparringResponse.ResponseStatus.REJECTED: "Отклонен",
+            str(SparringResponse.ResponseStatus.PENDING): "На рассмотрении",
+            str(SparringResponse.ResponseStatus.ACCEPTED): "Принят",
+            str(SparringResponse.ResponseStatus.REJECTED): "Отклонен",
         }
         lines = ["🙋 <b>Мои отклики</b>", ""]
         keyboard = []

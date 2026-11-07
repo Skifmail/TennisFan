@@ -31,7 +31,7 @@ def lock_user_bot_link(
     ).filter(user_bot_chat_id=chat_id)
     if user_id is not None:
         links = links.filter(user_id=user_id)
-    link = links.first()
+    link: UserTelegramLink | None = links.first()
     if link is None:
         return None
     user = User.objects.select_for_update(no_key=True).get(pk=link.user_id)

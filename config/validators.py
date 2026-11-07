@@ -14,7 +14,7 @@ from django.db import models
 from loguru import logger
 
 if TYPE_CHECKING:
-    _ImageModel = models.Model
+    from django.db.models import Model as _ImageModel
 else:
     _ImageModel = object
 

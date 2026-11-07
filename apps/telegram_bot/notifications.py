@@ -49,11 +49,12 @@ def get_chat_id_for_user(user: User | None) -> int | None:
     """chat_id для пользовательского бота (None если пользователь ещё не нажал /start в чате с ботом)."""
     if not user or not user.is_active:
         return None
-    return (
+    chat_id: int | None = (
         UserTelegramLink.objects.filter(user_id=user.pk, user_bot_chat_id__gt=0)
         .values_list("user_bot_chat_id", flat=True)
         .first()
     )
+    return chat_id
 
 
 def send_to_user_by_user(

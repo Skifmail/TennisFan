@@ -17,6 +17,16 @@ def lock_match(
     Порядок: исходная заявка, матч, составы/игроки, подписки. Вызывающий сервис
     должен держать atomic(). Если администратор успел изменить связь между
     чтением контекста и блокировкой, действие отказывается от старого контекста.
+
+    Args:
+        match_id: Идентификатор исходного матча.
+        additional_request_id: Прежняя или новая заявка серии для общей блокировки.
+
+    Returns:
+        Заблокированный матч или None, если запись не найдена.
+
+    Raises:
+        ProposalValidationError: Контекст матча изменился или ручной этап потерял турнир.
     """
     context = (
         Match.objects.filter(pk=match_id)
@@ -26,6 +36,8 @@ def lock_match(
     if context is None:
         return None
     if context["manual_stage_id"]:
+        if context["tournament_id"] is None:
+            raise ProposalValidationError("У матча ручного этапа нет турнира.")
         Tournament.objects.select_for_update().get(pk=context["tournament_id"])
     request_id = context["sparring_team_request_id"]
     request_ids = {request_id, additional_request_id} - {None}
@@ -34,7 +46,9 @@ def lock_match(
         .filter(pk__in=request_ids)
         .order_by("pk")
     )
-    match = Match.objects.select_for_update(no_key=True).filter(pk=match_id).first()
+    match: Match | None = (
+        Match.objects.select_for_update(no_key=True).filter(pk=match_id).first()
+    )
     if match is not None and match.sparring_team_request_id != request_id:
         raise ProposalValidationError("Контекст матча изменился. Повторите действие.")
     return match

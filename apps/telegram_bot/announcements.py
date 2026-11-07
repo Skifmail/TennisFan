@@ -27,7 +27,11 @@ LIFETIME: Final = timedelta(days=1)
 
 def request_announcement(tournament_pk: int) -> TournamentAnnouncement:
     """Зафиксировать подготовку в транзакции создания турнира, без фонового потока."""
-    return TournamentAnnouncement.objects.get_or_create(tournament_id=tournament_pk)[0]
+    announcement: TournamentAnnouncement
+    announcement, _ = TournamentAnnouncement.objects.get_or_create(
+        tournament_id=tournament_pk
+    )
+    return announcement
 
 
 def _candidate_users(tournament: Tournament) -> QuerySet[User]:

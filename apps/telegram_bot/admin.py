@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeAlias, cast
 
 from django.contrib import admin, messages
 from django.db.models import QuerySet
@@ -25,9 +25,9 @@ from .models import (
 )
 
 if TYPE_CHECKING:
-    _BroadcastAdmin = admin.ModelAdmin[TelegramBroadcast]
-    _LinkAdmin = admin.ModelAdmin[UserTelegramLinkProxy]
-    _ExtensionAdmin = admin.ModelAdmin[DeadlineExtensionRequestProxy]
+    _BroadcastAdmin: TypeAlias = admin.ModelAdmin[TelegramBroadcast]
+    _LinkAdmin: TypeAlias = admin.ModelAdmin[UserTelegramLinkProxy]
+    _ExtensionAdmin: TypeAlias = admin.ModelAdmin[DeadlineExtensionRequestProxy]
 else:
     _BroadcastAdmin = _LinkAdmin = _ExtensionAdmin = admin.ModelAdmin
 
@@ -127,9 +127,10 @@ class TelegramBroadcastAdmin(_BroadcastAdmin):
         self, request: HttpRequest, obj: TelegramBroadcast | None = None
     ) -> list[str] | tuple[str, ...]:
         """Запретить редактировать содержимое уже поставленной рассылки."""
+        fields: list[str] | tuple[str, ...] = super().get_readonly_fields(request, obj)
         if obj and obj.status != TelegramBroadcast.Status.DRAFT:
-            return list(super().get_readonly_fields(request, obj)) + ["text", "image"]
-        return super().get_readonly_fields(request, obj)
+            return list(fields) + ["text", "image"]
+        return fields
 
     def save_model(
         self,

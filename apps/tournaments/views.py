@@ -1565,9 +1565,22 @@ def tournament_photo_prompt_dismiss(request, slug):
     return redirect(_get_safe_next_url(request, fallback))
 
 
-def _tournament_manage_get_any_tournament(request, slug):
-    """Get tournament by slug and check access for common manage actions."""
-    t = get_object_or_404(Tournament, slug=slug)
+def _tournament_manage_get_any_tournament(
+    request: HttpRequest, slug: str
+) -> Tournament | None:
+    """Получить турнир и проверить право на общие действия управления.
+
+    Args:
+        request: Запрос организатора.
+        slug: Публичный идентификатор турнира.
+
+    Returns:
+        Турнир при наличии прав, иначе None.
+
+    Raises:
+        Http404: Если турнир с указанным идентификатором не найден.
+    """
+    t: Tournament = get_object_or_404(Tournament, slug=slug)
     if not _can_manage_tournament(request, t):
         messages.error(request, "Нет доступа к управлению этим турниром.")
         return None

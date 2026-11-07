@@ -128,7 +128,7 @@ def _charge_team_series(match: Match) -> None:
         charged = _spend_for_sparring(
             subscription,
             amount=SPARRING_TEAM_COST,
-            reason=FancoinTransaction.Reason.SPARRING_TEAM,
+            reason=FancoinTransaction.Reason(FancoinTransaction.Reason.SPARRING_TEAM),
             match=match,
             doubles_request=request,
         )
@@ -178,7 +178,9 @@ def charge_fancoin_for_completed_match(match: Match) -> None:
                 user_id=user_id,
                 match=match,
                 amount=SPARRING_DOUBLES_COST,
-                reason=FancoinTransaction.Reason.SPARRING_DOUBLES,
+                reason=FancoinTransaction.Reason(
+                    FancoinTransaction.Reason.SPARRING_DOUBLES
+                ),
             )
         return
 
@@ -192,5 +194,7 @@ def charge_fancoin_for_completed_match(match: Match) -> None:
             user_id=user_id,
             match=match,
             amount=SPARRING_SINGLES_COST,
-            reason=FancoinTransaction.Reason.SPARRING_SINGLES,
+            reason=FancoinTransaction.Reason(
+                FancoinTransaction.Reason.SPARRING_SINGLES
+            ),
         )

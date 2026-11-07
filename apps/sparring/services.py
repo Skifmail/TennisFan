@@ -24,12 +24,13 @@ if TYPE_CHECKING:
 def _deadline_for_sparring_invitation(invitation: SparringInvitation) -> datetime:
     """Вычислить дедлайн матча по приглашению (дата игры + 7 дней на внесение результата или +7 дней от сейчас)."""
     if invitation.proposed_date:
-        dt_end = timezone.make_aware(
+        dt_end: datetime = timezone.make_aware(
             datetime.combine(invitation.proposed_date, time(23, 59, 59)),
             timezone.get_current_timezone(),
         )
         return dt_end + timedelta(days=7)
-    return timezone.now() + timedelta(days=7)
+    deadline: datetime = timezone.now() + timedelta(days=7)
+    return deadline
 
 
 def create_match_from_invitation(invitation: SparringInvitation) -> Match:
@@ -60,7 +61,7 @@ def create_match_from_invitation(invitation: SparringInvitation) -> Match:
     )
     deadline = _deadline_for_sparring_invitation(invitation)
 
-    match = Match.objects.create(
+    match: Match = Match.objects.create(
         tournament=None,
         match_type=Match.MatchType.SPARRING,
         sparring_response=None,
@@ -197,7 +198,7 @@ def create_match_from_response(sparring_response: SparringResponse) -> Match:
         else Match.RatingCalcStatus.PENDING
     )
 
-    match = Match.objects.create(
+    match: Match = Match.objects.create(
         tournament=None,
         match_type=Match.MatchType.SPARRING,
         sparring_response=sparring_response,
@@ -221,7 +222,9 @@ def create_match_from_response(sparring_response: SparringResponse) -> Match:
 
 def _lock_sparring_request(request_id: int) -> SparringRequest:
     """Взять общую блокировку заявки до блокировок её откликов."""
-    request = SparringRequest.objects.select_for_update().filter(pk=request_id).first()
+    request: SparringRequest | None = (
+        SparringRequest.objects.select_for_update().filter(pk=request_id).first()
+    )
     if request is None:
         raise ValueError("Заявка не найдена.")
     return request

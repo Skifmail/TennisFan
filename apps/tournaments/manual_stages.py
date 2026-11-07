@@ -34,7 +34,7 @@ from .round_robin import (
 
 def has_manual_stages(tournament: Tournament) -> bool:
     """Проверить наличие свободного сценария турнира."""
-    return tournament.manual_stages.exists()
+    return bool(tournament.manual_stages.exists())
 
 
 def _ensure_active(tournament: Tournament) -> None:
@@ -224,10 +224,20 @@ def create_two_knockouts(
 
 
 def _advance(match: Match) -> None:
-    """Передать победителя в закреплённую сторону следующего матча."""
+    """Передать победителя в закреплённую сторону следующего матча.
+
+    Args:
+        match: Завершённый матч ручного этапа.
+
+    Raises:
+        ManualPairingError: Если следующий матч потерял связь с турниром.
+    """
     if not match.next_match_id or not (match.winner_id or match.winner_team_id):
         return
     target = Match.objects.select_for_update().get(pk=match.next_match_id)
+    tournament = target.tournament
+    if tournament is None:
+        raise ManualPairingError("У следующего матча нет турнира.")
     side = 1 if match.round_order % 2 else 2
     fields: dict[str, Any] = {f"player{side}_id": match.winner_id}
     if match.winner_team_id:
@@ -240,9 +250,8 @@ def _advance(match: Match) -> None:
         from .signals import notify_telegram_match_created
 
         target.deadline = max(
-            _deadline(target.tournament, target.round_index),
-            timezone.now()
-            + timedelta(days=target.tournament.match_days_per_round or 7),
+            _deadline(tournament, target.round_index),
+            timezone.now() + timedelta(days=tournament.match_days_per_round or 7),
         )
         Match.objects.filter(pk=target.pk).update(deadline=target.deadline)
         notify_telegram_match_created(Match, target, created=True)
@@ -250,12 +259,15 @@ def _advance(match: Match) -> None:
 
 def result_is_locked(match: Match) -> bool:
     """Запретить правку результата, на котором уже основан следующий этап."""
-    if not match.manual_stage_id or match.status not in FINAL_STATUSES:
+    stage = match.manual_stage
+    if stage is None or match.status not in FINAL_STATUSES:
         return False
-    if match.manual_stage.kind == ManualTournamentStage.Kind.QUALIFIER:
-        return match.tournament.manual_stages.exclude(
-            kind=ManualTournamentStage.Kind.QUALIFIER
-        ).exists()
+    if stage.kind == ManualTournamentStage.Kind.QUALIFIER:
+        return bool(
+            stage.tournament.manual_stages.exclude(
+                kind=ManualTournamentStage.Kind.QUALIFIER
+            ).exists()
+        )
     return bool(match.next_match_id and (match.winner_id or match.winner_team_id))
 
 
@@ -265,9 +277,10 @@ def handle_result(tournament: Tournament, match: Match) -> None:
     tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
     if tournament.status in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED):
         return
-    if not match.manual_stage_id:
+    match_stage = match.manual_stage
+    if match_stage is None:
         return
-    if match.manual_stage.kind != ManualTournamentStage.Kind.QUALIFIER:
+    if match_stage.kind != ManualTournamentStage.Kind.QUALIFIER:
         _advance(match)
     stages = list(
         tournament.manual_stages.exclude(kind=ManualTournamentStage.Kind.QUALIFIER)
@@ -373,7 +386,11 @@ def stage_context(tournament: Tournament) -> dict[str, Any]:
     """Собрать таблицы отбора и матчи обеих сеток для организатора и зрителя."""
     entities = _entities(tournament)
     stages = []
+    knockouts_created = False
     for stage in tournament.manual_stages.all():
+        knockouts_created = (
+            knockouts_created or stage.kind != ManualTournamentStage.Kind.QUALIFIER
+        )
         matches = list(
             stage.matches.select_related(
                 "player1__user",
@@ -385,9 +402,10 @@ def stage_context(tournament: Tournament) -> dict[str, Any]:
             ).order_by("round_index", "round_order")
         )
         members = [
-            entities[t].team or entities[t].player
-            for t in stage.member_tokens
-            if t in entities
+            member
+            for token in stage.member_tokens
+            if token in entities
+            if (member := entities[token].team or entities[token].player) is not None
         ]
         standings = (
             compute_standings_for_entities(tournament, members, matches)
@@ -399,9 +417,7 @@ def stage_context(tournament: Tournament) -> dict[str, Any]:
         "manual_stage_views": stages,
         "stage_entities": list(entities.values()),
         "qualifiers_done": qualifiers_complete(tournament),
-        "knockouts_created": any(
-            s["stage"].kind != ManualTournamentStage.Kind.QUALIFIER for s in stages
-        ),
+        "knockouts_created": knockouts_created,
         "has_stages": bool(stages),
         "stages_closed": tournament.status
         in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED),

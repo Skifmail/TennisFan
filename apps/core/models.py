@@ -90,7 +90,8 @@ class UserTelegramLink(models.Model):
         self.binding_token = fresh.binding_token
         self.token_created_at = fresh.token_created_at
         self.user_bot_chat_id = fresh.user_bot_chat_id
-        return self.binding_token
+        token: str = fresh.binding_token
+        return token
 
     def migrate_guest_messages(self):
         """

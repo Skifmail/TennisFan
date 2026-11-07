@@ -128,10 +128,10 @@ class SparringDeadlineExtensionTests(TestCase):
         )
 
     @patch("apps.tournaments.sparring_deadlines.create_notification")
-    def test_notifications_are_sent_after_commit(self, notify: Any) -> None:
+    def test_notifications_are_saved_in_same_transaction(self, notify: Any) -> None:
         with self.captureOnCommitCallbacks(execute=True):
             extend_sparring_deadline(self.match.pk, self.player1)
-            notify.assert_not_called()
+            self.assertEqual(notify.call_count, 2)
         self.assertEqual(notify.call_count, 2)
 
     @patch(

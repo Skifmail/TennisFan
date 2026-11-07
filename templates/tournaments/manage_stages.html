@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Ручные этапы: {{ tournament.name }}{% endblock %}
+{% block content %}
+<div class="container pairs-page" style="padding-top: var(--spacing-2xl);">
+    <nav class="manage-crumbs mb-3" aria-label="Навигация">
+        <a href="{% url 'tournament_manage' slug=tournament.slug %}">← Управление</a>
+        <a href="{% url 'tournament_detail' slug=tournament.slug %}">Публичная страница</a>
+    </nav>
+    <header class="pairs-hero"><div>
+        <p class="pairs-hero__eyebrow">{{ tournament.get_format_display }} · ручное управление</p>
+        <h1 class="pairs-hero__title">Круговой отбор → две олимпийские сетки</h1>
+        <p>{{ tournament.name }}</p>
+        <p>Задайте состав отборов, внесите результаты и распределите участников в две сетки. Формат турнира сохранится.</p>
+    </div></header>
+    {% if stage_error %}<div class="alert alert-error" role="alert">{{ stage_error }}</div>{% endif %}
+    {% if can_create_stages %}
+    <section class="pairs-card mb-4"><h2 class="h4">1. Круговой отбор</h2>
+        <p>В каждом отборе все играют со всеми. Можно оставить один общий отбор или распределить участников по нескольким. В каждом должно быть минимум двое.</p>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="qualifiers">
+            <div class="table-responsive"><table class="table"><thead><tr><th scope="col">Участник</th><th scope="col">Отбор</th></tr></thead><tbody>
+            {% for row in stage_rows %}<tr><td><label for="group-{{ forloop.counter }}">{{ row.entity.name }} · {{ row.entity.strength_label }}</label></td><td>
+                <select id="group-{{ forloop.counter }}" class="form-select" name="qualifier_{{ row.entity.token }}" required>
+                    {% for number in group_numbers %}<option value="{{ number }}" {% if row.group == number %}selected{% endif %}>Отбор {{ number }}</option>{% endfor %}
+                </select>
+            </td></tr>{% endfor %}</tbody></table></div>
+            <p>После сохранения состав отборов фиксируется, а матчи создаются сразу.</p>
+            <button class="btn btn-primary" type="submit">Сохранить отборы и создать матчи</button>
+        </form>
+    </section>
+    {% elif not has_stages %}
+    <div class="alert">В этом турнире уже созданы обычные матчи. Свободный сценарий выбирается до первого сохранения пар.</div>
+    {% endif %}
+    {% if qualifiers_done and not knockouts_created and not stages_closed %}
+    <section class="pairs-card mb-4"><h2 class="h4">2. Две олимпийские сетки</h2>
+        <p>Все матчи отбора завершены. Ниже — его таблицы. Выберите для каждого участника основную или утешительную сетку и задайте порядок посева. Вы можете отправить в утешительную и четвёртые места.</p>
+        <p>В каждой сетке должно быть минимум двое. Позиции посева внутри сетки должны различаться. При неполной сетке первые позиции получают проход без игры; остальные играют соседними парами по порядку посева. Победители продолжают по созданному дереву.</p>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="knockouts">
+            <div class="table-responsive"><table class="table"><thead><tr><th scope="col">Участник</th><th scope="col">Сетка</th><th scope="col">Порядок посева</th></tr></thead><tbody>
+            {% for row in stage_rows %}<tr><td>{{ row.entity.name }}</td><td>
+                <select class="form-select" name="branch_{{ row.entity.token }}" aria-label="Сетка: {{ row.entity.name }}" required>
+                    <option value="">Выберите сетку</option>
+                    <option value="main" {% if row.branch == 'main' %}selected{% endif %}>Основная</option>
+                    <option value="consolation" {% if row.branch == 'consolation' %}selected{% endif %}>Утешительная</option>
+                </select>
+            </td><td><input class="form-control" type="number" min="1" max="{{ stage_rows|length }}" name="seed_{{ row.entity.token }}" value="{{ row.seed }}" aria-label="Посев: {{ row.entity.name }}" required></td></tr>{% endfor %}
+            </tbody></table></div>
+            <p>Обе сетки сохраняются одновременно. После этого результаты отбора зафиксированы.</p>
+            <button class="btn btn-primary" type="submit">Создать обе олимпийские сетки</button>
+        </form>
+    </section>
+    {% elif has_stages and not qualifiers_done %}<p class="alert">Завершите все матчи кругового отбора — затем здесь появится составление двух сеток.</p>{% endif %}
+    {% if stages_closed %}<p class="alert">{{ tournament.get_status_display }}. Редактирование закрыто.</p>{% endif %}
+    {% include 'tournaments/_manual_stages.html' %}
+</div>
+{% endblock %}

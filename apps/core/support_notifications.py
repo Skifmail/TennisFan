@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import cast
 
 from django.conf import settings
 from django.core.mail import get_connection
 from django.db import connection, transaction
 from django.db.models import Q
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
+from django.urls import reverse
+from django.utils.html import escape, strip_tags
 
 from apps.notifications.infrastructure.email import EventEmail as EmailMultiAlternatives
 from apps.notifications.services import create_notification
@@ -68,7 +68,7 @@ def _send_with_timeout(message: EmailMultiAlternatives) -> int:
         timeout=_support_email_timeout_seconds(),
     )
     message.connection = connection
-    return cast(int, message.send(fail_silently=False))
+    return message.send(fail_silently=False)
 
 
 @transaction.atomic
@@ -79,9 +79,9 @@ def _notify_support_admins(message: SupportMessage) -> str:
     text = (
         f"Новое сообщение об ошибке №{report.pk}. Откройте диалог поддержки."
         if report
-        else f"Новое сообщение в диалоге поддержки №{message.thread_id}."
+        else f"Новое сообщение в диалоге поддержки №{message.thread.pk}."
     )
-    url = f"/platform/support/{message.thread_id}/"
+    url = f"/platform/support/{message.thread.pk}/"
     for admin in User.objects.filter(is_active=True).filter(
         Q(is_staff=True) | Q(is_superuser=True)
     ):
@@ -180,6 +180,46 @@ def send_user_support_reply(message: SupportMessage) -> bool:
         return False
 
 
+def notify_user_support_reply_in_bot(message: SupportMessage) -> bool:
+    """Поставить пользователю уведомление в Telegram об ответе поддержки.
+
+    Сообщение попадает в общую очередь доставки, поэтому не отправляется до
+    коммита и переживает перезапуск процесса.
+
+    Args:
+        message (SupportMessage): Сообщение администратора.
+
+    Returns:
+        bool: True, если задание создано или уже существовало.
+    """
+    thread = message.thread
+    user = thread.user
+    if user is None or not user.is_active:
+        return False
+    reply_text = (message.text or "").strip()
+    if len(reply_text) > 600:
+        reply_text = reply_text[:597].rstrip() + "..."
+    preview = (
+        escape(reply_text) if reply_text else "Откройте диалог, чтобы прочитать ответ."
+    )
+    text = "💬 <b>Ответ поддержки</b>\n\n" f"Обращение №{thread.pk}\n\n" f"{preview}"
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "➡️ Открыть диалог",
+                    "url": f"{_base_url()}{reverse('support_feedback')}",
+                }
+            ]
+        ]
+    }
+    from apps.telegram_bot.delivery import enqueue_message
+
+    return (
+        enqueue_message(user, text, reply_markup, event_key="support.reply") is not None
+    )
+
+
 def _send_user_support_reply_in_background(message_id: int) -> None:
     """Отправить email-ответ поддержки в фоновом потоке.
 
@@ -213,6 +253,12 @@ def send_user_support_reply_async(message: SupportMessage) -> None:
     Returns:
         None: Функция ничего не возвращает.
     """
+    try:
+        notify_user_support_reply_in_bot(message)
+    except Exception:
+        logger.exception(
+            "support reply telegram enqueue failed: id=%s", getattr(message, "pk", None)
+        )
     thread = threading.Thread(
         target=_send_user_support_reply_in_background,
         args=(int(message.pk),),

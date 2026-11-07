@@ -7,10 +7,7 @@ from datetime import timedelta
 from typing import Any, cast
 
 from django.db.models import Q
-from django.urls import reverse
-from django.utils import timezone
 
-from apps.notifications.services import create_notification
 from apps.users.models import Player
 
 from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
@@ -816,6 +813,11 @@ def check_and_finalize_if_complete(tournament: Tournament) -> bool:
     Если все матчи кругового турнира сыграны — установить статус «Завершён»
     и начислить очки в общий рейтинг по итоговым местам (1 место = fan_points_winner, 2 = fan_points_final, …).
     """
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return False
+
     if not _is_round_robin(tournament) or tournament.status == "completed":
         return False
     main_matches = tournament.matches.filter(is_consolation=False)
@@ -1005,70 +1007,10 @@ def _overdue_winner_round_robin(match: Match) -> Player | None:
 
 
 def apply_overdue_walkover_round_robin(match: Match, winner: Player) -> None:
-    """
-    Оформить тех. победу в круговом турнире (дедлайн истёк): обновить матч, отклонить заявки, уведомить игроков.
-    """
-    is_doubles = match.tournament.is_doubles() and match.team1_id and match.team2_id
+    """Совместимый вход авто-RT с той же свежестью и атомарностью, что у cron и бота."""
+    from .overdue import apply_deadline_auto_rt
 
-    winner_team = None
-    if is_doubles:
-        winner_team = match.team1 if winner == match.team1.player1 else match.team2
-        match.winner_team = winner_team
-        match.winner = winner
-    else:
-        match.winner = winner
-
-    match.status = Match.MatchStatus.WALKOVER
-    match.completed_datetime = timezone.now()
-    update_fields = ["winner", "status", "completed_datetime"]
-    if is_doubles:
-        update_fields.append("winner_team")
-    match.save(update_fields=update_fields)
-
-    match.result_proposals.filter(status=Match.ProposalStatus.PENDING).update(
-        status=Match.ProposalStatus.REJECTED
-    )
-
-    url = reverse("match_detail", args=[match.pk])
-    if is_doubles and match.team1 and match.team2 and winner_team is not None:
-        # Для парных: уведомляем обоих игроков команды-победителя и обоих игроков команды-проигравшего
-        loser_team = match.team2 if winner_team == match.team1 else match.team1
-        for player in (winner_team.player1, winner_team.player2):
-            if player and not getattr(player, "is_bye", False):
-                create_notification(
-                    user=player.user,
-                    message="Дедлайн матча истёк. Вам присуждена тех. победа.",
-                    url=url,
-                    event_key="match.overdue_result",
-                )
-        for player in (loser_team.player1, loser_team.player2):
-            if player and not getattr(player, "is_bye", False):
-                create_notification(
-                    user=player.user,
-                    message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
-                    url=url,
-                    event_key="match.overdue_result",
-                )
-    else:
-        winner_user = winner.user
-        loser = match.player2 if winner == match.player1 else match.player1
-        if loser is None:
-            return
-        loser_user = loser.user
-
-        create_notification(
-            user=winner_user,
-            message="Дедлайн матча истёк. Вам присуждена тех. победа.",
-            url=url,
-            event_key="match.overdue_result",
-        )
-        create_notification(
-            user=loser_user,
-            message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
-            url=url,
-            event_key="match.overdue_result",
-        )
-    logger.info("Round-robin overdue walkover: match %s → winner %s", match.pk, winner)
+    apply_deadline_auto_rt(match)
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:

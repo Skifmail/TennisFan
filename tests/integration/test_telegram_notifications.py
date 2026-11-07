@@ -16,6 +16,7 @@ from apps.clubs.models import (
     ClubNotificationSettings,
 )
 from apps.core.models import UserTelegramLink
+from apps.notifications.models import Delivery
 from apps.telegram_bot.notifications import (
     _format_new_tournament_message,
     _send_new_tournament_notification,
@@ -82,22 +83,21 @@ class NewClubTournamentNotificationTests(TestCase):
         )
 
     @patch("apps.telegram_bot.notifications.bot.is_configured", return_value=True)
-    @patch("apps.telegram_bot.notifications.bot.send_to_user")
+    @patch("apps.telegram_bot.services.send_message_or_raise")
     def test_club_tournament_notification_goes_only_to_active_club_members(
         self,
         mocked_send_to_user,
         _mocked_is_configured,
     ) -> None:
         """Клубный турнир отправляется только участникам конкретного клуба."""
-        mocked_send_to_user.return_value = True
-
         _send_new_tournament_notification(self.tournament.pk)
 
-        self.assertEqual(mocked_send_to_user.call_count, 1)
-        chat_id, text = mocked_send_to_user.call_args.args
-        self.assertEqual(chat_id, 10101)
-        self.assertIn("Раменский клуб", text)
-        self.assertNotIn("20202", str(mocked_send_to_user.call_args_list))
+        mocked_send_to_user.assert_not_called()
+        delivery = Delivery.objects.get(channel="telegram")
+        self.assertEqual(delivery.user_id, self.member_user.pk)
+        self.assertEqual(delivery.telegram_payload["chat_id"], 10101)
+        self.assertIn("Раменский клуб", delivery.telegram_payload["text"])
+        self.assertFalse(Delivery.objects.filter(user=self.outsider).exists())
 
     def test_club_tournament_message_contains_club_name(self) -> None:
         """В тексте клубного уведомления есть название клуба."""

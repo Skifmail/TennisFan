@@ -6,7 +6,7 @@ from django.urls import path, re_path
 
 from apps.core.geo import REGION_SLUGS
 
-from . import views
+from . import manual_stage_views, views
 from .landing import VARIANT_SLUGS
 
 # Регион и формат — закрытые перечисления, поэтому попадают в регулярное
@@ -16,6 +16,11 @@ _REGION = "|".join(REGION_SLUGS)
 _VARIANT = "|".join(VARIANT_SLUGS)
 
 urlpatterns = [
+    path(
+        "<slug:slug>/manage/stages/",
+        manual_stage_views.manage_stages,
+        name="tournament_manage_stages",
+    ),
     path("", views.tournament_list, name="tournament_list"),
     path("archive/", views.tournament_archive, name="tournament_archive"),
     re_path(

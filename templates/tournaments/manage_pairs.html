@@ -81,6 +81,13 @@
     </div>
     {% endif %}
 
+    {% if state.is_started and not state.rounds and not state.is_complete %}
+    <section class="pairs-card mb-4">
+        <h2 class="pairs-card__title">Нужен отбор перед олимпийскими сетками?</h2>
+        <p>В ручном управлении можно провести один или несколько круговых отборов, затем составить основную и утешительную олимпийские сетки.</p>
+        <a class="btn btn-outline-primary" href="{% url 'tournament_manage_stages' slug=tournament.slug %}">Круговой отбор → две сетки</a>
+    </section>
+    {% endif %}
     {% if state.is_started and not state.is_complete %}
     {% if state.rounds %}
     <section class="pairs-rounds" aria-labelledby="pairs-rounds-title">

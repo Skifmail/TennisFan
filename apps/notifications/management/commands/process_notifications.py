@@ -6,6 +6,8 @@ from django.core.management.base import BaseCommand
 from loguru import logger
 
 from apps.notifications.worker import process_deliveries
+from apps.telegram_bot.announcements import process_announcements
+from apps.telegram_bot.delivery import process_telegram_deliveries
 
 
 class Command(BaseCommand):
@@ -24,4 +26,9 @@ class Command(BaseCommand):
             *args: Позиционные аргументы Django.
             **options: Служебные параметры команды.
         """
-        logger.info("Очередь уведомлений обработана", processed=process_deliveries())
+        logger.info(
+            "Очередь уведомлений обработана",
+            prepared=process_announcements(),
+            processed=process_deliveries(),
+            telegram=process_telegram_deliveries(),
+        )

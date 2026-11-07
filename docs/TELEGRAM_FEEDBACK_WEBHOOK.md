@@ -1,45 +1,39 @@
-# Обратная связь и Telegram
+# Обратная связь: действующие маршруты
 
-## Отдельный бот для поддержки
+Обновлено 6 ноября 2026. Прежняя инструкция двустороннего диалога через
+Telegram больше не соответствует приложению.
 
-Для обратной связи используется **отдельный бот** (не основной бот уведомлений).
+## Поддержка работает на сайте
 
-**Обязательно в .env:**
-- `TELEGRAM_SUPPORT_BOT_TOKEN` — токен бота поддержки ([@BotFather](https://t.me/BotFather))
-- `TELEGRAM_ADMIN_CHAT_ID` — ID чата, куда приходят сообщения (ваш диалог с ботом или группа)
+- `/support/` — авторизованная форма с темой и сообщением.
+- Виджет поддержки — диалог зарегистрированного пользователя или гостя;
+  используется `/api/feedback/submit/` и `/api/feedback/threads/`.
+- `/platform/support/` — интерфейс сотрудников для чтения и ответа.
+- Ответ сохраняется в диалоге, пользователю отправляется email.
 
-**Можно не задавать:**
-- `TELEGRAM_SUPPORT_BOT_USERNAME` — если не задан, ссылка привязки (t.me/Бот?start=...) строится сама: бот запрашивает свой @username у Telegram. Задавать вручную нужно только если по какой-то причине запрос к API не работает.
-- `TELEGRAM_SUPPORT_WEBHOOK_SECRET` — если не задан, webhook принимает все запросы (проверка по секрету отключена). Задавать имеет смысл, если хотите дополнительно убедиться, что на ваш URL шлёт запросы именно Telegram (при setWebhook укажите тот же `secret_token`).
+`/telegram/support-webhook/` и команда `clear_telegram_support_bindings`
+**отсутствуют**. Переменные `TELEGRAM_SUPPORT_BOT_TOKEN`,
+`TELEGRAM_SUPPORT_BOT_USERNAME`, `TELEGRAM_SUPPORT_WEBHOOK_SECRET`
+не включают удалённый функционал. Не настраивайте webhook на этот адрес
+и не очищайте действующие пользовательские привязки.
 
-Сообщения с сайта уходят админу в Telegram. Админ отвечает reply — ответ уходит пользователю в Telegram. Подробная архитектура: [SUPPORT_TELEGRAM_ARCHITECTURE.md](SUPPORT_TELEGRAM_ARCHITECTURE.md).
+## Оспаривание результата из бота
 
-## Webhook бота поддержки
+Результат матча применяется сразу. Кнопка **«⚠️ Оспорить результат»**
+открывает `/support/` с подготовленными номером матча, счётом и ссылкой.
+Пользователь входит на сайт при необходимости, дописывает причину и отправляет
+обращение. Администратор разбирает его в диалоге сайта; автоматического
+отката результата от нажатия кнопки нет.
 
-1. URL должен быть доступен по HTTPS:  
-   `https://ваш-домен/telegram/support-webhook/`
+## Действующий Telegram-webhook
 
-2. Установите webhook для **бота поддержки** (токен `TELEGRAM_SUPPORT_BOT_TOKEN`):
-   ```bash
-   curl "https://api.telegram.org/bot<TELEGRAM_SUPPORT_BOT_TOKEN>/setWebhook?url=https://ваш-домен/telegram/support-webhook/"
-   ```
-   С секретом (если задан `TELEGRAM_SUPPORT_WEBHOOK_SECRET`):
-   ```bash
-   curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://ваш-домен/telegram/support-webhook/&secret_token=<TELEGRAM_SUPPORT_WEBHOOK_SECRET>"
-   ```
+Только пользовательский бот принимает update на
+`POST /telegram/user-bot-webhook/`. Для него обязателен
+`TELEGRAM_USER_BOT_WEBHOOK_SECRET`; настройка выполняется командой
+`set_telegram_webhooks`, без токенов в аргументах URL.
+Отдельный `TELEGRAM_BOT_TOKEN` служит исходящим уведомлениям администраторов,
+а не ответам поддержки.
 
-3. Проверить:  
-   `https://api.telegram.org/bot<TELEGRAM_SUPPORT_BOT_TOKEN>/getWebhookInfo`
-
-4. Удалить:  
-   `https://api.telegram.org/bot<TELEGRAM_SUPPORT_BOT_TOKEN>/deleteWebhook`
-
-## Очистка привязок (смена бота или пробные привязки)
-
-Чтобы удалить все привязки Telegram (например после смены бота или неудачной привязки через старый бот):
-
-```bash
-python manage.py clear_telegram_support_bindings
-```
-
-С `--dry-run` — только показать количество записей без удаления.
+Подробности: [бот](TELEGRAM_USER_BOT.md),
+[архитектура поддержки](SUPPORT_TELEGRAM_ARCHITECTURE.md),
+[безопасный выпуск](telegram-bot-release-plan.md).

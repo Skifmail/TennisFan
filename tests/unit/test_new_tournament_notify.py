@@ -16,6 +16,8 @@ from apps.core.models import (
     OutboundEmail,
     RegistrationOutboundEmail,
 )
+from apps.notifications.models import Delivery
+from apps.notifications.worker import process_deliveries
 from apps.telegram_bot.notifications import (
     _notify_new_tournament_lk_and_email,
     _send_new_tournament_notification,
@@ -121,10 +123,17 @@ class NewTournamentNotifyTestCase(TestCase):
     def test_send_without_telegram_still_notifies_lk_email(
         self, _mock_bot: object
     ) -> None:
-        """Без Telegram-бота ЛК и email всё равно уходят."""
+        """Без Telegram-бота ЛК сохраняется сразу, брендированное письмо отправляет worker."""
         _send_new_tournament_notification(self.tournament.pk)
         self.assertEqual(Notification.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(OutboundEmail.objects.count(), 0)
+        self.assertEqual(
+            Delivery.objects.get(user=self.user, channel="email").status, "queued"
+        )
+        self.assertEqual(process_deliveries(limit=10), 1)
+        self.assertEqual(process_deliveries(limit=10), 0)
         self.assertEqual(OutboundEmail.objects.count(), 1)
+        self.assertIn("TENNISFAN", mail.outbox[0].alternatives[0][0])
 
     def test_admin_proxy_filters_new_tournament(self) -> None:
         """Раздел «Новые турниры» показывает только свою категорию."""

@@ -3,10 +3,12 @@ Core models.
 """
 
 import secrets
+from datetime import timedelta
+from typing import ClassVar
 
 from django.conf import settings
 from django.contrib.admin.models import LogEntry
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from apps.core.geo import GeoRegion, normalize_geo_text
@@ -24,6 +26,8 @@ class UserTelegramLink(models.Model):
     Telegram не позволяет писать пользователю первым — пользователь должен
     хотя бы раз написать боту (например /start с токеном с сайта).
     """
+
+    BINDING_TOKEN_LIFETIME: ClassVar[timedelta] = timedelta(hours=24)
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -66,21 +70,26 @@ class UserTelegramLink(models.Model):
     def __str__(self):
         return f"{self.user} → {self.telegram_chat_id or 'не привязан'}"
 
-    def get_or_create_binding_token(self):
-        """Вернуть токен для привязки; создать новый, если нет или просрочен (24 ч)."""
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        if self.binding_token:
-            if (
-                self.token_created_at
-                and timezone.now() - self.token_created_at < timedelta(hours=24)
-            ):
-                return self.binding_token
-        self.binding_token = secrets.token_urlsafe(32)
-        self.token_created_at = timezone.now()
-        self.save(update_fields=["binding_token", "token_created_at"])
+    @transaction.atomic
+    def get_or_create_binding_token(self) -> str:
+        """Выдать свежий одноразовый токен под блокировкой сохранённой привязки."""
+        fresh = type(self).objects.select_for_update().get(pk=self.pk)
+        now = timezone.now()
+        if not (
+            fresh.binding_token
+            and fresh.token_created_at
+            and timedelta(0)
+            <= now - fresh.token_created_at
+            < self.BINDING_TOKEN_LIFETIME
+        ):
+            fresh.binding_token = secrets.token_urlsafe(32)
+            fresh.token_created_at = now
+            fresh.save(
+                update_fields=["binding_token", "token_created_at", "updated_at"]
+            )
+        self.binding_token = fresh.binding_token
+        self.token_created_at = fresh.token_created_at
+        self.user_bot_chat_id = fresh.user_bot_chat_id
         return self.binding_token
 
     def migrate_guest_messages(self):

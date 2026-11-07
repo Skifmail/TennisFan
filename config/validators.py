@@ -2,14 +2,21 @@
 Общие валидаторы и утилиты для изображений.
 """
 
+from __future__ import annotations
+
 import io
-import logging
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from django.core.exceptions import ValidationError
+from django.core.files import File
 from django.core.files.base import ContentFile
 from django.db import models
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    _ImageModel = models.Model
+else:
+    _ImageModel = object
 
 # Лимит размера файла: 500 КБ. Все загружаемые фото сжимаются до этого размера при сохранении.
 MAX_IMAGE_SIZE_KB = 500
@@ -19,7 +26,7 @@ MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_KB * 1024
 MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 МБ
 
 
-def validate_image_max_2mb(value):
+def validate_image_max_2mb(value: File[bytes] | None) -> None:
     """
     Валидатор размера изображения (имя сохранено для совместимости).
     Файлы > 10 МБ отклоняются (платформа может обрывать большие загрузки через 5–10 с).
@@ -34,7 +41,10 @@ def validate_image_max_2mb(value):
         )
 
 
-def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
+def compress_image_to_max_bytes(
+    file_like: bytes | File[bytes] | BinaryIO,
+    max_bytes: int = MAX_IMAGE_SIZE_BYTES,
+) -> tuple[bytes, str]:
     """
     Сжимает изображение до размера не более max_bytes с минимальной потерей качества.
     Сначала плавно снижает качество JPEG (начиная с 92), при необходимости уменьшает разрешение
@@ -52,7 +62,7 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
             "Pillow не установлен. Установите: pip install Pillow"
         ) from err
 
-    if hasattr(file_like, "read"):
+    if not isinstance(file_like, bytes):
         file_like.seek(0)
         data = file_like.read()
     else:
@@ -113,13 +123,14 @@ def compress_image_to_max_bytes(file_like, max_bytes=MAX_IMAGE_SIZE_BYTES):
         return buf.getvalue(), out_ext
 
 
-class CompressImageFieldsMixin:
+class CompressImageFieldsMixin(_ImageModel):
     """
     Миксин для моделей с ImageField. При сохранении все загруженные изображения
     размером больше MAX_IMAGE_SIZE_BYTES (500 КБ) автоматически сжимаются до этого лимита.
     """
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Сжать новые изображения и сохранить модель через следующий класс MRO."""
         for field in self._meta.get_fields():
             if not isinstance(field, models.ImageField):
                 continue
@@ -138,7 +149,7 @@ class CompressImageFieldsMixin:
                 new_file = ContentFile(compressed_bytes, name=name)
                 setattr(self, field.name, new_file)
                 logger.info(
-                    "Сжато изображение %s.%s: было %s байт, стало %s байт",
+                    "Сжато изображение {}.{}: было {} байт, стало {} байт",
                     self.__class__.__name__,
                     field.name,
                     file_obj.size,
@@ -146,12 +157,12 @@ class CompressImageFieldsMixin:
                 )
             except Exception as e:
                 logger.warning(
-                    "Не удалось сжать изображение %s.%s: %s",
+                    "Не удалось сжать изображение {}.{}: {}",
                     self.__class__.__name__,
                     field.name,
                     e,
                 )
-        fresh_names = []
+        fresh_names: list[str] = []
         for field in self._meta.get_fields():
             if not isinstance(field, models.ImageField):
                 continue
@@ -185,7 +196,7 @@ class CompressImageFieldsMixin:
                 )
             except Exception as exc:
                 logger.warning(
-                    "Не удалось записать копии %s.%s: %s",
+                    "Не удалось записать копии {}.{}: {}",
                     self.__class__.__name__,
                     field_name,
                     exc,

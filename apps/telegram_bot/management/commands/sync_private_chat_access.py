@@ -4,15 +4,16 @@
 
 from __future__ import annotations
 
-import logging
+from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
+from django.db import transaction
+from loguru import logger
 
 from apps.core.models import UserTelegramLink
 from apps.telegram_bot import services as bot_services
+from apps.telegram_bot.binding import lock_user_bot_link
 from apps.telegram_bot.private_chat import user_has_private_chat_access
-
-logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -24,17 +25,18 @@ class Command(BaseCommand):
     """
 
     help = "Синхронизировать доступ к приватному Telegram-чату по подпискам."
-    _ACTIVE_STATUSES = {"member", "administrator", "creator", "restricted"}
-    _INACTIVE_STATUSES = {"left", "kicked"}
+    _REMOVABLE_STATUSES = {"member", "restricted"}
 
-    def add_arguments(self, parser) -> None:
+    def add_arguments(self, parser: CommandParser) -> None:
+        """Добавить безопасный предварительный просмотр удаления."""
         parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Только показать, кого нужно удалить, без фактического удаления.",
         )
 
-    def handle(self, *args, **options) -> None:
+    def handle(self, *args: Any, **options: Any) -> None:
+        """Проверить доступ дважды и не удалять администраторов при любом тарифе."""
         dry_run: bool = options.get("dry_run", False)
 
         if not bot_services.is_configured():
@@ -49,7 +51,7 @@ class Command(BaseCommand):
             return
 
         links_qs = (
-            UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False)
+            UserTelegramLink.objects.filter(user_bot_chat_id__gt=0)
             .select_related("user")
             .order_by("pk")
         )
@@ -64,40 +66,36 @@ class Command(BaseCommand):
             if user_has_private_chat_access(link.user):
                 continue
 
-            user_chat_id = int(link.user_bot_chat_id)
+            assert link.user_bot_chat_id is not None
+            user_chat_id = link.user_bot_chat_id
             status = bot_services.get_private_chat_member_status(user_chat_id)
-            # Если пользователь уже не участник чата, удалять не требуется.
-            if status in self._INACTIVE_STATUSES:
-                continue
-            # Неизвестный статус (None) может означать ошибку getChatMember
-            # (например, недостаточно прав бота). В этом случае всё равно
-            # пробуем удалить, чтобы не оставлять "висящий" доступ.
-            if status is None:
-                logger.warning(
-                    "sync_private_chat_access: unknown member status for user_id=%s chat_id=%s; "
-                    "attempting forced removal",
-                    link.user_id,
-                    user_chat_id,
-                )
-            elif status not in self._ACTIVE_STATUSES:
-                logger.warning(
-                    "sync_private_chat_access: unexpected member status=%s for user_id=%s chat_id=%s; "
-                    "skipping",
-                    status,
-                    link.user_id,
-                    user_chat_id,
-                )
+            if status not in self._REMOVABLE_STATUSES:
+                if status is None:
+                    logger.warning(
+                        "Закрытый чат: статус не получен, удаление пропущено; user_id={}",
+                        link.user_id,
+                    )
                 continue
 
-            to_remove += 1
-            if dry_run:
-                self.stdout.write(
-                    "[DRY-RUN] remove chat member: "
-                    f"user_id={link.user_id}, chat_id={user_chat_id}, status={status}"
+            # Во время getChatMember могли продлить подписку или отключить бота.
+            with transaction.atomic():
+                fresh_link = lock_user_bot_link(
+                    user_chat_id, user_id=link.user_id, require_active=False
                 )
-                continue
+                if fresh_link is None or user_has_private_chat_access(
+                    fresh_link.user, lock=True
+                ):
+                    continue
 
-            ok = bot_services.kick_from_private_chat(user_chat_id)
+                to_remove += 1
+                if dry_run:
+                    self.stdout.write(
+                        "[DRY-RUN] remove chat member: "
+                        f"user_id={link.user_id}, chat_id={user_chat_id}, status={status}"
+                    )
+                    continue
+
+                ok = bot_services.kick_from_private_chat(user_chat_id)
             if ok:
                 removed += 1
                 self.stdout.write(
@@ -108,7 +106,7 @@ class Command(BaseCommand):
             else:
                 failed += 1
                 logger.warning(
-                    "sync_private_chat_access: failed to remove user_id=%s chat_id=%s",
+                    "Закрытый чат: не удалось удалить user_id={}, chat_id={}",
                     link.user_id,
                     user_chat_id,
                 )

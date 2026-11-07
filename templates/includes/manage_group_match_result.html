@@ -4,6 +4,7 @@
     {% elif match.is_no_show_walkover %}
     <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form{% if match.can_reopen_by_deadline %} data-deadline-reopen="{% if match.is_no_show_walkover %}wo{% else %}rt{% endif %}"{% endif %}>
         {% csrf_token %}
+        {% if stage_next_url %}<input type="hidden" name="next" value="{{ stage_next_url }}">{% endif %}
         <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
         <input
             id="deadline-{{ match.pk }}"
@@ -23,6 +24,7 @@
     {% if not match.is_no_show_walkover %}
     <form action="{% url 'tournament_manage_match_deadline' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-deadline-form" data-deadline-form{% if match.can_reopen_by_deadline %} data-deadline-reopen="{% if match.is_no_show_walkover %}wo{% else %}rt{% endif %}"{% endif %}>
         {% csrf_token %}
+        {% if stage_next_url %}<input type="hidden" name="next" value="{{ stage_next_url }}">{% endif %}
         <label class="bracket-deadline-label" for="deadline-{{ match.pk }}">Дедлайн</label>
         <input
             id="deadline-{{ match.pk }}"
@@ -40,6 +42,7 @@
     {% if not match.is_no_show_walkover %}
     <form action="{% url 'tournament_manage_match_result' slug=tournament.slug pk=match.pk %}" method="post" class="bracket-match-form">
         {% csrf_token %}
+        {% if stage_next_url %}<input type="hidden" name="next" value="{{ stage_next_url }}">{% endif %}
         <div class="bracket-match-players">
             <div class="bracket-match-player bracket-match-player--input">
                 <span class="bracket-player-name">{{ match.get_player1_display|default:"TBD" }}</span>

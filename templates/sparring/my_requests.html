@@ -208,7 +208,8 @@
                     <div class="sparring-card__col sparring-card__col--cta">
                         <div class="sparring-card__actions">
                             <a href="{% url 'doubles_detail' pk=req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Подробнее</a>
-                            {% if req.status != 'completed' and req.status != 'cancelled' %}
+                            {% if not req.confirmed_at and not req.match_id %}
+                            {% if req.status != 'confirmed' and req.status != 'cancelled' %}
                             <form action="{% url 'doubles_cancel_request' pk=req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Отменить заявку?');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Отменить</button>
@@ -218,6 +219,7 @@
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Удалить</button>
                             </form>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

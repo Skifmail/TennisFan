@@ -9,6 +9,7 @@ from django.core import mail
 from django.test import TestCase, override_settings
 
 from apps.core.models import UserTelegramLink
+from apps.notifications.models import Delivery
 from apps.telegram_bot import services as bot_services
 from apps.telegram_bot.notifications import send_to_user_by_user
 from apps.telegram_bot.telegram_http import (
@@ -47,10 +48,14 @@ class TelegramNotificationFallbackTestCase(TestCase):
 
     def test_send_to_user_by_user_falls_back_to_email(self) -> None:
         user = make_user(email="tg-fallback@test.local")
-        with override_settings(USER_NOTIFICATIONS_EMAIL_ENABLED=True):
+        with (
+            override_settings(USER_NOTIFICATIONS_EMAIL_ENABLED=True),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             ok = send_to_user_by_user(user, "<b>Тест</b> уведомления")
+            self.assertFalse(ok)
+            self.assertEqual(len(mail.outbox), 0)
 
-        self.assertTrue(ok)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["tg-fallback@test.local"])
         self.assertIn("уведомления", mail.outbox[0].body)
@@ -58,14 +63,20 @@ class TelegramNotificationFallbackTestCase(TestCase):
     def test_send_to_user_by_user_uses_telegram_when_linked(self) -> None:
         user = make_user(email="tg-linked@test.local")
         UserTelegramLink.objects.create(user=user, user_bot_chat_id=999888)
-        with patch(
-            "apps.telegram_bot.notifications.bot.send_to_user",
-            return_value=True,
-        ) as mocked_send:
+        with (
+            override_settings(USER_NOTIFICATIONS_EMAIL_ENABLED=True),
+            patch("apps.telegram_bot.services.send_message_or_raise") as network,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             ok = send_to_user_by_user(user, "Привет")
+            self.assertEqual(len(mail.outbox), 0)
 
         self.assertTrue(ok)
-        mocked_send.assert_called_once_with(999888, "Привет", reply_markup=None)
+        network.assert_not_called()
+        delivery = Delivery.objects.get(channel="telegram", user=user)
+        self.assertEqual(delivery.status, "queued")
+        self.assertEqual(delivery.telegram_payload["chat_id"], 999888)
+        self.assertEqual(delivery.telegram_payload["text"], "Привет")
         self.assertEqual(len(mail.outbox), 1)
 
 

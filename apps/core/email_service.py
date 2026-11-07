@@ -73,6 +73,7 @@ def _send_html_email(
     category: str = "",
     timeout_seconds: float | None = None,
     notification_url: str = "",
+    raise_on_failure: bool = False,
 ) -> bool:
     """Отправить HTML-письмо с текстовой fallback-версией.
 
@@ -85,6 +86,7 @@ def _send_html_email(
         category (str): Раздел письма для журнала ``OutboundEmail``.
         timeout_seconds: Ограничение ожидания почтового транспорта для фоновых задач.
         notification_url: Относительный адрес раздела с подробностями для ЛК и push.
+        raise_on_failure: Передать ошибку SMTP worker для честного uncertain.
 
     Returns:
         bool: ``True`` при успешной отправке, иначе ``False``.
@@ -114,6 +116,8 @@ def _send_html_email(
             msg.outbound_category = category
         return bool(msg.send(fail_silently=False))
     except Exception as exc:
+        if raise_on_failure:
+            raise
         logger.exception("_send_html_email: send failed to %s: %s", recipient, exc)
         return False
 
@@ -1086,12 +1090,20 @@ def send_email_verification(user: User) -> bool:
     )
 
 
-def send_new_tournament_email(user: User, tournament: Tournament) -> bool:
+def send_new_tournament_email(
+    user: User,
+    tournament: Tournament,
+    *,
+    raise_on_failure: bool = False,
+    timeout_seconds: float | None = None,
+) -> bool:
     """Отправить branded-письмо о старте нового турнира.
 
     Args:
         user (User): Получатель письма.
         tournament (Tournament): Созданный турнир.
+        raise_on_failure: Передать ошибку SMTP worker без слепого повтора.
+        timeout_seconds: Ограничить время сетевой попытки из очереди.
 
     Returns:
         bool: ``True``, если письмо отправлено.
@@ -1135,6 +1147,8 @@ def send_new_tournament_email(user: User, tournament: Tournament) -> bool:
         recipient=email,
         category="new_tournament",
         event_key="tournament.created",
+        raise_on_failure=raise_on_failure,
+        timeout_seconds=timeout_seconds,
     )
 
 

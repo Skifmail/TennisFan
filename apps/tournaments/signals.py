@@ -65,6 +65,11 @@ def _handle_manual_bracket_completion(
     """
     if tournament is None or not tournament.uses_manual_pairing():
         return False
+    from .manual_stages import handle_result, has_manual_stages
+
+    if has_manual_stages(tournament):
+        handle_result(tournament, match)
+        return True
     if match.is_consolation:
         return True
     if tournament.format == TournamentFormat.SINGLE_ELIMINATION:
@@ -160,116 +165,90 @@ def _revert_match_result_effects(snapshot: dict[str, Any], match: Match) -> None
     Returns:
         None
     """
-    from apps.users.models import Player
     from apps.users.sport_rating import adjust_wins
 
-    sport = match.sport
-    _revert_player_rating(
-        match.player1, snapshot.get("rating_delta_player1") or 0.0, sport
-    )
-    _revert_player_rating(
-        match.player2, snapshot.get("rating_delta_player2") or 0.0, sport
-    )
+    from .utils import get_match_participants, get_match_player_side
 
     old_winner_id = snapshot.get("winner_id")
-    new_winner_id = match.winner_id
-    if old_winner_id == new_winner_id:
-        return
-
-    is_doubles = bool(match.team1_id and match.team2_id)
-    if is_doubles:
-        old_team_id = snapshot.get("winner_team_id")
-        new_team_id = match.winner_team_id
-        if old_team_id == new_team_id:
-            return
-        old_team = match.team1 if old_team_id == match.team1_id else match.team2
-        new_team = match.winner_team
-        if old_team:
-            for player in (old_team.player1, old_team.player2):
-                if player and not getattr(player, "is_bye", False):
-                    adjust_wins(player, sport, -1)
-        if new_team:
-            for player in (new_team.player1, new_team.player2):
-                if player and not getattr(player, "is_bye", False):
-                    adjust_wins(player, sport, 1)
-        return
-
-    if old_winner_id:
-        old_winner = Player.objects.filter(pk=old_winner_id).first()
-        adjust_wins(old_winner, sport, -1)
-    if new_winner_id and match.winner and not getattr(match.winner, "is_bye", False):
-        adjust_wins(match.winner, sport, 1)
+    for player in sorted(get_match_participants(match), key=lambda player: player.pk):
+        if player.is_bye:
+            continue
+        side = get_match_player_side(match, player)
+        if side is None:
+            continue
+        if match.team1_id and match.team2_id:
+            team_id = match.team1_id if side == 1 else match.team2_id
+            old_won = snapshot.get("winner_team_id") == team_id
+            new_won = match.winner_team_id == team_id
+        else:
+            side_ids = (
+                (match.player1_id, match.partner1_id)
+                if side == 1
+                else (match.player2_id, match.partner2_id)
+            )
+            old_won = old_winner_id is not None and old_winner_id in side_ids
+            new_won = match.winner_id is not None and match.winner_id in side_ids
+        delta = float(snapshot.get(f"rating_delta_player{side}") or 0.0)
+        _revert_player_rating(player, delta, match.sport)
+        adjust_wins(player, match.sport, int(new_won) - int(old_won))
 
 
 @receiver(post_save, sender=Match)
-def notify_telegram_match_created(sender, instance, created, **kwargs):
-    """После создания матча с участниками — уведомление в Telegram и в ЛК."""
+def notify_telegram_match_created(
+    sender: type[Match], instance: Match, created: bool, **kwargs: Any
+) -> None:
+    """Сохранить обязательные уведомления в транзакции создания матча, не подавляя отказ."""
     if not created:
+        return
+    if instance.manual_stage_id and not (instance.player1_id and instance.player2_id):
         return
     if not instance.player1_id and not instance.team1_id:
         return
     if instance.is_bye_match():
         return
-    try:
-        from apps.telegram_bot.notifications import notify_match_created
+    from django.urls import reverse
 
-        notify_match_created(instance)
-    except Exception as e:
-        logger.exception("Telegram notify_match_created failed: %s", e)
+    from apps.telegram_bot.notifications import notify_match_created
+    from apps.tournaments.utils import (
+        get_match_opponents_for_player,
+        get_match_participants,
+        get_opponents_contacts_short,
+    )
 
-    try:
-        from django.urls import reverse
-
-        from apps.tournaments.utils import (
-            get_match_opponents_for_player,
-            get_match_participants,
-            get_opponents_contacts_short,
+    notify_match_created(instance)
+    deadline_str = (
+        instance.deadline.strftime("%d.%m.%Y %H:%M")
+        if instance.deadline
+        else "не указан"
+    )
+    url = reverse("match_detail", args=[instance.pk])
+    participants = sorted(
+        (
+            player
+            for player in get_match_participants(instance)
+            if not player.is_bye and player.user_id
+        ),
+        key=lambda player: player.pk,
+    )
+    for player in participants:
+        opponents = get_match_opponents_for_player(instance, player)
+        contacts = get_opponents_contacts_short(opponents)
+        msg = (
+            f"Новый матч: {instance.get_player1_display()} — {instance.get_player2_display()}. "
+            f"Дедлайн: {deadline_str}. Контакты соперника: {contacts}. Подробнее в «Мои матчи»."
         )
-
-        deadline_str = (
-            instance.deadline.strftime("%d.%m.%Y %H:%M")
-            if instance.deadline
-            else "не указан"
+        if len(msg) > 255:
+            msg = msg[:252] + "..."
+        create_notification(
+            user=player.user, message=msg, url=url, event_key="match.created"
         )
-        url = reverse("match_detail", args=[instance.pk])
-        participants = [
-            p
-            for p in get_match_participants(instance)
-            if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
-        ]
-        for player in participants:
-            opponents = get_match_opponents_for_player(instance, player)
-            contacts = get_opponents_contacts_short(opponents)
-            # Сообщение персональное: контакты — соперника конкретного получателя.
-            msg = (
-                f"Новый матч: {instance.get_player1_display()} — "
-                f"{instance.get_player2_display()}. "
-                f"Дедлайн: {deadline_str}. Контакты соперника: {contacts}. "
-                "Подробнее в «Мои матчи»."
-            )
-            if len(msg) > 255:
-                msg = msg[:252] + "..."
-            try:
-                create_notification(
-                    user=player.user, message=msg, url=url, event_key="match.created"
-                )
-            except Exception as e:
-                logger.warning(
-                    "notify_match_created LK for user %s: %s",
-                    getattr(player, "user_id", None),
-                    e,
-                )
-    except Exception as e:
-        logger.exception("LK notify_match_created failed: %s", e)
 
 
 @receiver(pre_save, sender=Match)
-def prepare_match_completion(sender, instance, **kwargs):
-    """
-    Handle pre-save logic:
-    1. Store old status to detect transitions.
-    2. Mark completed matches as pending_calc for FAN rating.
-    """
+def prepare_match_completion(
+    sender: type[Match], instance: Match, **kwargs: Any
+) -> None:
+    """Определить переход результата по уже заблокированному матчу и защитить повтор."""
     instance._result_changed = False
     instance._old_match_snapshot = None
 
@@ -290,6 +269,16 @@ def prepare_match_completion(sender, instance, **kwargs):
                 instance._result_changed = True
                 instance._old_match_snapshot = _match_result_snapshot(old_instance)
                 instance.rating_status = Match.RatingCalcStatus.PENDING
+            elif (
+                was_completed
+                and old_instance.rating_status == Match.RatingCalcStatus.CALCULATED
+            ):
+                # Старая копия pending с тем же результатом не может сбросить
+                # однократность расчёта и затереть сохранённые дельты.
+                instance.rating_status = old_instance.rating_status
+                instance.rating_delta_player1 = old_instance.rating_delta_player1
+                instance.rating_delta_player2 = old_instance.rating_delta_player2
+                instance.completed_datetime = old_instance.completed_datetime
         except Match.DoesNotExist:
             instance._old_status = None
     else:
@@ -302,10 +291,13 @@ def prepare_match_completion(sender, instance, **kwargs):
             Match.MatchStatus.COMPLETED,
             Match.MatchStatus.WALKOVER,
         ]
-        if not was_completed:
+        if instance.is_friendly_sparring():
+            instance.rating_status = Match.RatingCalcStatus.NOT_APPLICABLE
+        elif not was_completed:
             if instance.rating_status == Match.RatingCalcStatus.NOT_APPLICABLE:
                 if not instance.is_deadline_auto_rt():
                     instance.rating_status = Match.RatingCalcStatus.PENDING
+        if not was_completed:
             if not instance.completed_datetime:
                 instance.completed_datetime = timezone.now()
 
@@ -337,6 +329,10 @@ def update_player_stats(sender, instance, created, **kwargs):
 
     already_processed = instance.rating_status == Match.RatingCalcStatus.CALCULATED
     result_changed = bool(getattr(instance, "_result_changed", False))
+
+    if instance.manual_stage_id and not (instance.player1_id and instance.player2_id):
+        # Проход без игры не является сыгранным матчем и не даёт статистику.
+        return
 
     if not is_completed:
         logger.debug("Match %s: skipping - not completed", instance.pk)
@@ -999,7 +995,10 @@ def apply_proposal_on_admin_accept(sender, instance, created, **kwargs):
     При подтверждении через ЛК (confirm_proposal) apply_proposal вызывается из view,
     матч уже обновлён, поэтому пропускаем (match.status in COMPLETED/WALKOVER).
     """
-    if instance.status != Match.ProposalStatus.ACCEPTED:
+    if (
+        instance.status != Match.ProposalStatus.ACCEPTED
+        or instance.applied_at is not None
+    ):
         return
     match = instance.match
     if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):

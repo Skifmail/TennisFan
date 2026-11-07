@@ -1034,6 +1034,11 @@ def save_manual_round(
         tuple[bool, str]: Успех и сообщение.
     """
     _ensure_supported(tournament)
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return False, "Используйте страницу ручных этапов этого турнира."
+
     if not tournament.manual_pairing_has_started():
         return False, "Сначала запустите турнир в ручном режиме."
     if tournament.status in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED):
@@ -1141,6 +1146,11 @@ def ensure_round_robin_schedule(
     Returns:
         tuple[bool, str]: Успех и сообщение.
     """
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return False, "Турнир использует ручные этапы."
+
     if getattr(tournament, "format", None) != TournamentFormat.ROUND_ROBIN:
         return False, "Формат турнира не круговой."
     if not tournament.manual_pairing_has_started():
@@ -1183,6 +1193,11 @@ def update_manual_pair(
         tuple[bool, str]: Успех и сообщение.
     """
     _ensure_supported(tournament)
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return False, "Используйте страницу ручных этапов этого турнира."
+
     if not tournament.manual_pairing_has_started():
         return False, "Ручной режим не запущен."
     if match.tournament_id != tournament.pk:
@@ -1299,6 +1314,11 @@ def maybe_autoadvance_manual(tournament: Tournament) -> None:
     Args:
         tournament: Турнир.
     """
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return
+
     if (
         not tournament.uses_manual_pairing()
         or getattr(tournament, "format", None) != TournamentFormat.SINGLE_ELIMINATION

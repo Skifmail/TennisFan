@@ -132,7 +132,15 @@ def build_bracket_layout(tournament: Tournament) -> BracketLayout:
     generated = bool(tournament.bracket_generated)
     boards: tuple[BracketBoard, ...]
     tables: tuple[ChessTable, ...]
-    if tournament.format == TournamentFormat.ROUND_ROBIN:
+    from apps.tournaments.manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        tables, boards = _manual_stage_layout(tournament, doubles)
+        footnote = (
+            "Круговой отбор; ручной посев в основную и утешительную олимпийские сетки."
+        )
+        kind = "manual_stages"
+    elif tournament.format == TournamentFormat.ROUND_ROBIN:
         boards = ()
         tables = (_round_robin_table(tournament, doubles, generated),)
         footnote = ""
@@ -156,6 +164,44 @@ def build_bracket_layout(tournament: Tournament) -> BracketLayout:
         tables=tables,
         footnote=footnote,
     )
+
+
+def _manual_stage_layout(
+    tournament: Tournament, doubles: bool
+) -> tuple[tuple[ChessTable, ...], tuple[BracketBoard, ...]]:
+    """Отдельные шахматки отборов и отдельные деревья обеих ручных сеток."""
+    from apps.tournaments.manual_pairing import load_entities
+    from apps.tournaments.models import ManualTournamentStage
+    from apps.tournaments.round_robin import (
+        compute_standings_for_entities,
+        get_match_matrix_for_entities,
+    )
+
+    by_token = {entity.token: entity for entity in load_entities(tournament)}
+    tables: list[ChessTable] = []
+    boards: list[BracketBoard] = []
+    for stage in tournament.manual_stages.all():
+        matches = list(stage.matches.order_by("round_index", "round_order"))
+        if stage.kind == ManualTournamentStage.Kind.QUALIFIER:
+            entities = [
+                by_token[t].team or by_token[t].player
+                for t in stage.member_tokens
+                if t in by_token
+            ]
+            standings = compute_standings_for_entities(tournament, entities, matches)
+            entities, matrix = get_match_matrix_for_entities(
+                tournament, entities, matches
+            )
+            entities, matrix = order_matrix_by_standings(entities, matrix, standings)
+            by_id = {(row["team"] or row["player"]).pk: row for row in standings}
+            tables.append(_chess_from_matrix(stage.name, entities, matrix, by_id))
+        else:
+            boards.append(
+                BracketBoard(
+                    stage.name, _paginate(_rounds_from_matches(matches, doubles))
+                )
+            )
+    return tuple(tables), tuple(boards)
 
 
 def _elimination_boards(

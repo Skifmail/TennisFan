@@ -3,12 +3,15 @@
 Атомарные операции с select_for_update, проверки бизнес-логики.
 """
 
-import logging
+from __future__ import annotations
+
 from datetime import timedelta
 from typing import TYPE_CHECKING, cast
 
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
+from loguru import logger
 
 from apps.notifications.services import create_notification
 from apps.tournaments.models import Match
@@ -29,8 +32,6 @@ from .models import (
 if TYPE_CHECKING:
     from apps.users.models import Player
 
-logger = logging.getLogger(__name__)
-
 
 def _normalize_team_side(target_side: str) -> str:
     """Нормализует значение стороны команды, включая старые краткие формы."""
@@ -47,14 +48,126 @@ def _normalize_team_side(target_side: str) -> str:
     return cast(str, result)
 
 
+def _lock_request(match_request_id: int) -> DoublesMatchRequest:
+    """Заблокировать свежую заявку до чтения откликов, команд и игроков."""
+    request = (
+        DoublesMatchRequest.objects.select_for_update()
+        .filter(pk=match_request_id)
+        .first()
+    )
+    if request is None:
+        raise ValueError("Заявка не найдена.")
+    return request
+
+
+def _assert_unconfirmed(request: DoublesMatchRequest) -> None:
+    """Не менять контекст созданных матчей даже после ручной смены статуса заявки."""
+    if (
+        request.confirmed_at is not None
+        or request.match_id is not None
+        or request.series_matches.exists()
+    ):
+        raise ValueError(
+            "Матчи уже созданы. Нельзя повторно формировать серию, менять состав или удалять её заявку."
+        )
+
+
+def _pending_join(
+    request: DoublesMatchRequest, join_request_id: int
+) -> DoublesJoinRequest:
+    """Обработать старую кнопку как бизнес-отказ, а не техническую ошибку БД."""
+    join = (
+        DoublesJoinRequest.objects.select_for_update()
+        .filter(
+            pk=join_request_id,
+            match_request=request,
+            status=DoublesJoinRequestStatus.PENDING,
+        )
+        .first()
+    )
+    if join is None:
+        raise ValueError("Отклик уже обработан или не найден.")
+    return join
+
+
+def _validate_join_ids(player_ids: list[int], submitter_id: int) -> None:
+    """В отклике должны быть один или два разных игрока, включая заявителя."""
+    if not player_ids or len(player_ids) > 2:
+        raise ValueError("Укажите 1 или 2 игроков.")
+    if len(set(player_ids)) != len(player_ids):
+        raise ValueError("Участники отклика должны быть разными игроками.")
+    if submitter_id not in player_ids:
+        raise ValueError("Заявитель должен входить в состав отклика.")
+
+
+def _load_players(player_ids: list[int], sport: str) -> tuple[Player, ...]:
+    """Прочитать активных игроков под блокировками в едином порядке по идентификатору."""
+    from apps.users.models import Player
+
+    players = tuple(
+        Player.objects.select_for_update(of=("self",))
+        .filter(pk__in=player_ids, is_bye=False, user__is_active=True)
+        .order_by("pk")
+    )
+    if len(players) != len(set(player_ids)):
+        raise ValueError("Один из участников больше недоступен.")
+    ensure_tennis_participants(players, sport)
+    return players
+
+
+def _roster_ids(
+    author_team: DoublesTeam, opponent_team: DoublesTeam
+) -> tuple[list[int], list[int]]:
+    """Проверить четыре разных участника и сохранить порядок капитанов обеих сторон."""
+    author_ids = list(
+        author_team.members.order_by("-is_captain", "pk").values_list(
+            "player_id", flat=True
+        )
+    )
+    opponent_ids = list(
+        opponent_team.members.order_by("-is_captain", "pk").values_list(
+            "player_id", flat=True
+        )
+    )
+    if len(author_ids) != 2 or len(opponent_ids) != 2:
+        raise ValueError("Обе команды должны быть по 2 человека.")
+    if len(set(author_ids + opponent_ids)) != 4:
+        raise ValueError("Один игрок не может входить в обе команды.")
+    if author_team.match_request.created_by_id not in author_ids:
+        raise ValueError("Автор должен входить в свою команду.")
+    return author_ids, opponent_ids
+
+
+def _notify_join_accepted(
+    request: DoublesMatchRequest, join: DoublesJoinRequest
+) -> None:
+    """Сохранить уведомления всех участников отклика вместе с принятием состава."""
+    from apps.telegram_bot.notifications import notify_doubles_join_accepted
+
+    context = (
+        "командный спарринг"
+        if request.kind == DoublesMatchKind.TEAM
+        else "парный матч 2×2"
+    )
+    message = f"Ваш отклик на {context} №{request.pk} принят. Ожидайте формирования матчей автором заявки."
+    for member in join.members.select_related("player__user").order_by("order"):
+        create_notification(
+            user=member.player.user,
+            message=message,
+            url=reverse("doubles_detail", args=[request.pk]),
+            event_key="sparring.doubles_joined",
+        )
+    notify_doubles_join_accepted(join)
+
+
 def create_doubles_request(
     *,
-    created_by: "Player",
+    created_by: Player,
     city: str = "",
     preferred_gender: str = "",
     is_friendly: bool = False,
     description: str = "",
-    partner: "Player | None" = None,
+    partner: Player | None = None,
     preferred_days: str = "",
     preferred_time: str = "",
     desired_level: str = "",
@@ -102,18 +215,16 @@ def create_doubles_request(
             )
         req.status = DoublesMatchRequestStatus.FORMING
         req.save(update_fields=["status"])
-        logger.info(
-            "Created doubles match request %s by player %s", req.pk, created_by.id
-        )
-        return cast(DoublesMatchRequest, req)
+        logger.info("Создана парная заявка {}: author_id={}", req.pk, created_by.id)
+        return req
 
 
 def create_join_request(
     *,
     match_request_id: int,
-    created_by: "Player",
+    created_by: Player,
     target_side: str,
-    players: list["Player"],
+    players: list[Player],
 ) -> DoublesJoinRequest:
     """
     Подать заявку на присоединение (1 или 2 игрока).
@@ -124,7 +235,10 @@ def create_join_request(
     target_side = _normalize_team_side(target_side)
 
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
+        _assert_unconfirmed(req)
+        player_ids = [player.pk for player in players]
+        _validate_join_ids(player_ids, created_by.pk)
         current_status: str = req.status
         if current_status not in (
             DoublesMatchRequestStatus.OPEN,
@@ -141,8 +255,8 @@ def create_join_request(
         if current_in_team + len(players) > 2:
             raise ValueError("В команде не может быть больше 2 человек")
 
-        ensure_tennis_participants(tuple(players), req.sport)
-        for p in players:
+        fresh_players = _load_players(player_ids, req.sport)
+        for p in fresh_players:
             if p.id == req.created_by_id and target_side == TeamSide.AUTHOR:
                 raise ValueError("Автор уже в команде")
             if DoublesTeamMember.objects.filter(
@@ -162,77 +276,73 @@ def create_join_request(
             status=DoublesJoinRequestStatus.PENDING,
             created_by=created_by,
         )
-        for i, p in enumerate(players, start=1):
+        for i, player_id in enumerate(player_ids, start=1):
             DoublesJoinRequestMember.objects.create(
                 join_request=jr,
-                player=p,
+                player_id=player_id,
                 order=i,
             )
         logger.info(
-            "Join request %s created for match_request %s, target_side=%s, players=%s",
+            "Создан отклик {}: request_id={}, side={}, player_ids={}",
             jr.pk,
             match_request_id,
             target_side,
             [p.id for p in players],
         )
-        return cast(DoublesJoinRequest, jr)
+        return jr
 
 
 def accept_join_request(
     *,
     match_request_id: int,
     join_request_id: int,
-    accepted_by: "Player",
+    accepted_by: Player,
 ) -> None:
     """Принять заявку на присоединение и добавить игроков в целевую команду. Только автор заявки."""
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != accepted_by.id:
             raise PermissionError("Только автор заявки может принимать отклики")
+        _assert_unconfirmed(req)
         if req.status not in (
             DoublesMatchRequestStatus.OPEN,
             DoublesMatchRequestStatus.FORMING,
         ):
             raise ValueError("Заявка не в статусе приёма игроков")
 
-        jr = DoublesJoinRequest.objects.select_for_update().get(
-            pk=join_request_id,
-            match_request=req,
-            status=DoublesJoinRequestStatus.PENDING,
-        )
-        team = req.teams.filter(side=jr.target_side).first()
+        jr = _pending_join(req, join_request_id)
+        target_side = _normalize_team_side(jr.target_side)
+        team = req.teams.filter(side=target_side).first()
         if team is None:
-            if jr.target_side != TeamSide.OPPONENT:
+            if target_side != TeamSide.OPPONENT:
                 raise ValueError("Команда автора должна существовать")
             team = DoublesTeam.objects.create(match_request=req, side=TeamSide.OPPONENT)
 
         members_to_add = list(
             jr.members.order_by("order").values_list("player_id", flat=True)
         )
-        if not members_to_add:
-            raise ValueError("В заявке нет участников")
+        _validate_join_ids(members_to_add, jr.created_by_id)
         current_count = team.members.count()
         if current_count + len(members_to_add) > 2:
             raise ValueError("В команде не может быть больше 2 человек")
 
-        from apps.users.models import Player
-
-        ensure_tennis_participants(
-            tuple(Player.objects.filter(pk__in=members_to_add)), req.sport
-        )
+        _load_players(members_to_add, req.sport)
+        if DoublesTeamMember.objects.filter(
+            team__match_request=req, player_id__in=members_to_add
+        ).exists():
+            raise ValueError("Один из участников уже входит в команду этой заявки.")
         for player_id in members_to_add:
-            DoublesTeamMember.objects.get_or_create(
-                team=team,
-                player_id=player_id,
-                defaults={"is_captain": False},
+            DoublesTeamMember.objects.create(
+                team=team, player_id=player_id, is_captain=False
             )
         jr.status = DoublesJoinRequestStatus.ACCEPTED
         jr.processed_at = timezone.now()
         jr.save(update_fields=["status", "processed_at", "updated_at"])
 
         _recompute_request_status(req)
+        _notify_join_accepted(req, jr)
         logger.info(
-            "Join request %s accepted, match_request %s",
+            "Принят отклик {}: request_id={}",
             join_request_id,
             match_request_id,
         )
@@ -242,57 +352,60 @@ def reject_join_request(
     *,
     match_request_id: int,
     join_request_id: int,
-    rejected_by: "Player",
+    rejected_by: Player,
 ) -> None:
     """Отклонить заявку на присоединение. Только автор заявки."""
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != rejected_by.id:
             raise PermissionError("Только автор заявки может отклонять отклики")
 
-        jr = DoublesJoinRequest.objects.select_for_update().get(
-            pk=join_request_id,
-            match_request=req,
-            status=DoublesJoinRequestStatus.PENDING,
-        )
+        jr = _pending_join(req, join_request_id)
         jr.status = DoublesJoinRequestStatus.REJECTED
         jr.processed_at = timezone.now()
         jr.save(update_fields=["status", "processed_at", "updated_at"])
-        logger.info("Join request %s rejected", join_request_id)
+        logger.info("Отклонён отклик {}", join_request_id)
 
 
 def cancel_join_request(
     *,
     join_request_id: int,
-    cancelled_by: "Player",
+    cancelled_by: Player,
 ) -> None:
     """Отменить свою заявку на присоединение (только pending)."""
     with transaction.atomic():
-        jr = DoublesJoinRequest.objects.select_for_update().get(pk=join_request_id)
+        request_id = (
+            DoublesJoinRequest.objects.filter(pk=join_request_id)
+            .values_list("match_request_id", flat=True)
+            .first()
+        )
+        if request_id is None:
+            raise ValueError("Отклик не найден.")
+        req = _lock_request(request_id)
+        jr = _pending_join(req, join_request_id)
         if jr.status != DoublesJoinRequestStatus.PENDING:
             raise ValueError("Можно отменить только ожидающую заявку")
         if jr.created_by_id != cancelled_by.id:
             raise PermissionError("Можно отменить только свою заявку")
         jr.status = DoublesJoinRequestStatus.CANCELLED
         jr.save(update_fields=["status", "updated_at"])
-        logger.info(
-            "Join request %s cancelled by player %s", join_request_id, cancelled_by.id
-        )
+        logger.info("Отменён отклик {}: player_id={}", join_request_id, cancelled_by.id)
 
 
 def add_partner_to_author_team(
     *,
     match_request_id: int,
     player_id: int,
-    added_by: "Player",
+    added_by: Player,
 ) -> None:
     """Добавить партнёра в команду автора. Только автор заявки, только в свою команду, не более 2 человек."""
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != added_by.id:
             raise PermissionError(
                 "Только автор может добавлять партнёра в свою команду"
             )
+        _assert_unconfirmed(req)
         current_status: str = req.status
         if current_status not in (
             DoublesMatchRequestStatus.OPEN,
@@ -310,9 +423,7 @@ def add_partner_to_author_team(
         ).exists():
             raise ValueError("Этот игрок уже в одной из команд")
 
-        from apps.users.models import Player
-
-        ensure_tennis_participants((Player.objects.get(pk=player_id),), req.sport)
+        _load_players([player_id], req.sport)
         DoublesTeamMember.objects.create(
             team=author_team,
             player_id=player_id,
@@ -320,7 +431,7 @@ def add_partner_to_author_team(
         )
         _recompute_request_status(req)
         logger.info(
-            "Partner %s added to author team (match_request %s)",
+            "Партнёр {} добавлен в команду автора: request_id={}",
             player_id,
             match_request_id,
         )
@@ -331,13 +442,14 @@ def remove_team_member(
     match_request_id: int,
     team_side: str,
     player_id: int,
-    removed_by: "Player",
+    removed_by: Player,
 ) -> None:
     """Удалить участника из команды. Только автор заявки. Нельзя удалить автора из команды автора."""
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != removed_by.id:
             raise PermissionError("Только автор заявки может менять состав")
+        _assert_unconfirmed(req)
         if req.status not in (
             DoublesMatchRequestStatus.OPEN,
             DoublesMatchRequestStatus.FORMING,
@@ -345,27 +457,39 @@ def remove_team_member(
         ):
             raise ValueError("Состав нельзя менять в текущем статусе")
 
-        team = req.teams.get(side=team_side)
+        team_side = _normalize_team_side(team_side)
+        team = req.teams.filter(side=team_side).first()
+        if team is None:
+            raise ValueError("Команда не найдена.")
         if team_side == TeamSide.AUTHOR and player_id == req.created_by_id:
             raise ValueError("Нельзя удалить автора из команды автора")
 
-        member = DoublesTeamMember.objects.get(team=team, player_id=player_id)
+        member = DoublesTeamMember.objects.filter(
+            team=team, player_id=player_id
+        ).first()
+        if member is None:
+            raise ValueError("Участник уже удалён из команды.")
         member.delete()
         _recompute_request_status(req)
         logger.info(
-            "Removed player %s from team %s (match_request %s)",
+            "Участник {} удалён из команды {}: request_id={}",
             player_id,
             team_side,
             match_request_id,
         )
 
 
-def confirm_match(match_request_id: int, confirmed_by: "Player") -> Match:
+def confirm_match(match_request_id: int, confirmed_by: Player) -> Match:
     """Подтвердить состав и создать матч. Только автор, только при status=ready."""
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != confirmed_by.id:
             raise PermissionError("Только автор может подтвердить матч")
+        _assert_unconfirmed(req)
+        if req.kind != DoublesMatchKind.CLASSIC:
+            raise ValueError(
+                "Для командного спарринга нужно сформировать всю серию матчей."
+            )
         if req.status != DoublesMatchRequestStatus.READY:
             raise ValueError(
                 "Матч можно подтвердить только при полных составах (ready)"
@@ -380,7 +504,6 @@ def confirm_match(match_request_id: int, confirmed_by: "Player") -> Match:
             author_team=author_team,
             opponent_team=opponent_team,
             is_friendly=req.is_friendly,
-            request_created_at=req.created_at,
             team_request=req,
         )
         req.status = DoublesMatchRequestStatus.CONFIRMED
@@ -388,33 +511,34 @@ def confirm_match(match_request_id: int, confirmed_by: "Player") -> Match:
         req.match = match
         req.save(update_fields=["status", "confirmed_at", "match", "updated_at"])
         logger.info(
-            "Doubles match request %s confirmed, match %s created",
+            "Подтверждена парная заявка {}: match_id={}",
             match_request_id,
             match.pk,
         )
         return match
 
 
-def cancel_match_request(match_request_id: int, cancelled_by: "Player") -> None:
+def cancel_match_request(match_request_id: int, cancelled_by: Player) -> None:
     """Отменить заявку на парный матч. Только автор."""
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != cancelled_by.id:
             raise PermissionError("Только автор может отменить заявку")
+        _assert_unconfirmed(req)
         if req.status == DoublesMatchRequestStatus.CONFIRMED:
             raise ValueError("Подтверждённую заявку отменить нельзя")
         if req.status == DoublesMatchRequestStatus.CANCELLED:
             return
         req.status = DoublesMatchRequestStatus.CANCELLED
         req.save(update_fields=["status", "updated_at"])
-        logger.info("Doubles match request %s cancelled", match_request_id)
+        logger.info("Отменена парная заявка {}", match_request_id)
 
 
-def delete_match_request(match_request_id: int, deleted_by: "Player") -> str:
+def delete_match_request(match_request_id: int, deleted_by: Player) -> str:
     """Удалить заявку на парный или командный спарринг. Только автор.
 
-    Команды и отклики удаляются вместе с заявкой. Уже созданные матчи
-    остаются: связь с заявкой обнуляется.
+    Команды и отклики удаляются вместе с неподтверждённой заявкой. Если матчи
+    уже созданы, удаление запрещено: их состав, режим и контекст списания сохраняются.
 
     Args:
         match_request_id: Идентификатор заявки.
@@ -424,17 +548,18 @@ def delete_match_request(match_request_id: int, deleted_by: "Player") -> str:
         str: Тип заявки (``classic`` или ``team``) до удаления.
 
     Raises:
-        DoublesMatchRequest.DoesNotExist: Если заявки нет.
+        ValueError: Если заявки нет или матчи уже созданы.
         PermissionError: Если удаляет не автор.
     """
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != deleted_by.id:
             raise PermissionError("Только автор может удалить заявку")
+        _assert_unconfirmed(req)
         kind = str(req.kind)
         req.delete()
         logger.info(
-            "Doubles match request %s deleted by player %s",
+            "Удалена парная заявка {}: player_id={}",
             match_request_id,
             deleted_by.id,
         )
@@ -442,12 +567,16 @@ def delete_match_request(match_request_id: int, deleted_by: "Player") -> str:
 
 
 def _recompute_request_status(req: DoublesMatchRequest) -> None:
+    """Пересчитать готовность только для непротиворечивого, ещё не созданного состава."""
+    _assert_unconfirmed(req)
     author_team = req.teams.filter(side=TeamSide.AUTHOR).first()
     opponent_team = req.teams.filter(side=TeamSide.OPPONENT).first()
     a_full = author_team is not None and author_team.members.count() == 2
     o_full = opponent_team is not None and opponent_team.members.count() == 2
     old_status: str = req.status
     if a_full and o_full:
+        assert author_team is not None and opponent_team is not None
+        _roster_ids(author_team, opponent_team)
         req.status = DoublesMatchRequestStatus.READY
     else:
         req.status = DoublesMatchRequestStatus.FORMING
@@ -465,31 +594,18 @@ def _create_doubles_match_from_teams(
     author_team: DoublesTeam,
     opponent_team: DoublesTeam,
     is_friendly: bool,
-    request_created_at,
     team_request: DoublesMatchRequest | None = None,
 ) -> Match:
     """Создать Match (2×2) из двух DoublesTeam. Использует player1/partner1 и player2/partner2."""
-    a_members = list(
-        author_team.members.order_by("-is_captain").values_list("player_id", flat=True)
-    )
-    o_members = list(
-        opponent_team.members.order_by("-is_captain").values_list(
-            "player_id", flat=True
+    a_members, o_members = _roster_ids(author_team, opponent_team)
+    players = {
+        player.pk: player
+        for player in _load_players(
+            a_members + o_members, team_request.sport if team_request else "tennis"
         )
-    )
-    if len(a_members) != 2 or len(o_members) != 2:
-        raise ValueError("Обе команды должны быть по 2 человека")
-
-    from apps.users.models import Player
-
-    p1 = Player.objects.get(pk=a_members[0])
-    p1_partner = Player.objects.get(pk=a_members[1])
-    p2 = Player.objects.get(pk=o_members[0])
-    p2_partner = Player.objects.get(pk=o_members[1])
-    ensure_tennis_participants(
-        (p1, p1_partner, p2, p2_partner),
-        team_request.sport if team_request else "tennis",
-    )
+    }
+    p1, p1_partner = players[a_members[0]], players[a_members[1]]
+    p2, p2_partner = players[o_members[0]], players[o_members[1]]
 
     rating_status = (
         Match.RatingCalcStatus.NOT_APPLICABLE
@@ -511,7 +627,7 @@ def _create_doubles_match_from_teams(
         rating_status=rating_status,
         sport=team_request.sport if team_request is not None else "tennis",
     )
-    return cast(Match, match)
+    return match
 
 
 def _create_team_sparring_singles(
@@ -526,25 +642,10 @@ def _create_team_sparring_singles(
 
     Каждый игрок команды A играет с каждым игроком команды B (4 матча 1×1).
     """
-    from apps.users.models import Player
-
-    a_ids = list(
-        author_team.members.order_by("-is_captain").values_list("player_id", flat=True)
-    )
-    o_ids = list(
-        opponent_team.members.order_by("-is_captain").values_list(
-            "player_id", flat=True
-        )
-    )
-    if len(a_ids) != 2 or len(o_ids) != 2:
-        raise ValueError(
-            "Обе команды должны быть по 2 человека для командного спарринга"
-        )
-
-    players = {p.id: p for p in Player.objects.filter(id__in=[*a_ids, *o_ids])}
-    ensure_tennis_participants(tuple(players.values()), team_request.sport)
-    if len(players) != 4:
-        raise ValueError("Не удалось загрузить всех игроков для командного спарринга")
+    a_ids, o_ids = _roster_ids(author_team, opponent_team)
+    players = {
+        player.pk: player for player in _load_players(a_ids + o_ids, team_request.sport)
+    }
 
     rating_status = (
         Match.RatingCalcStatus.NOT_APPLICABLE
@@ -573,12 +674,12 @@ def _create_team_sparring_singles(
             rating_status=rating_status,
             sport=team_request.sport,
         )
-        matches.append(cast(Match, match))
+        matches.append(match)
     return matches
 
 
 def confirm_team_sparring_series(
-    match_request_id: int, confirmed_by: "Player"
+    match_request_id: int, confirmed_by: Player
 ) -> list[Match]:
     """
     Подтвердить состав командного спарринга и создать серию матчей.
@@ -587,9 +688,10 @@ def confirm_team_sparring_series(
     и один парный матч 2×2 между командами.
     """
     with transaction.atomic():
-        req = DoublesMatchRequest.objects.select_for_update().get(pk=match_request_id)
+        req = _lock_request(match_request_id)
         if req.created_by_id != confirmed_by.id:
             raise PermissionError("Только автор может сформировать матчи")
+        _assert_unconfirmed(req)
         if req.kind != DoublesMatchKind.TEAM:
             raise ValueError("Эта заявка не является командным спаррингом")
         if req.status != DoublesMatchRequestStatus.READY:
@@ -612,7 +714,6 @@ def confirm_team_sparring_series(
             author_team=author_team,
             opponent_team=opponent_team,
             is_friendly=req.is_friendly,
-            request_created_at=req.created_at,
             team_request=req,
         )
 
@@ -621,8 +722,8 @@ def confirm_team_sparring_series(
         req.match = doubles_match
         req.save(update_fields=["status", "confirmed_at", "match", "updated_at"])
         logger.info(
-            "Team sparring request %s confirmed, %s matches created "
-            "(%s singles, doubles match %s)",
+            "Подтверждена командная заявка {}: создано {} матчей "
+            "({} одиночных, парный match_id={})",
             match_request_id,
             len(singles_matches) + 1,
             len(singles_matches),
@@ -633,39 +734,15 @@ def confirm_team_sparring_series(
 
 def _notify_team_sparring_ready(req: DoublesMatchRequest) -> None:
     """Уведомить автора командного спарринга о готовности команд (4 участника)."""
-    from django.urls import reverse
+    from apps.telegram_bot.notifications import notify_team_sparring_ready
 
-    try:
-        author_user = req.created_by.user
-    except Exception:
-        author_user = None
-
-    if author_user is not None:
-        try:
-            url = reverse("doubles_detail", args=[req.pk])
-            message = (
-                "Командный спарринг: все заявки одобрены, команды сформированы. "
-                "Нажмите «Сформировать матчи», чтобы создать одиночные и парный матчи."
-            )
-            create_notification(
-                user=author_user,
-                message=message,
-                url=url,
-                event_key="sparring.team_ready",
-            )
-        except Exception as exc:  # pragma: no cover - защитное логирование
-            logger.warning(
-                "Failed to create Notification for team sparring ready "
-                "(request=%s): %s",
-                req.pk,
-                exc,
-            )
-
-    try:
-        from apps.telegram_bot.notifications import notify_team_sparring_ready
-
-        notify_team_sparring_ready(req)
-    except Exception as exc:  # pragma: no cover - защитное логирование
-        logger.warning(
-            "notify_team_sparring_ready failed for request %s: %s", req.pk, exc
-        )
+    create_notification(
+        user=req.created_by.user,
+        message=(
+            "Командный спарринг: все заявки одобрены, команды сформированы. "
+            "Нажмите «Сформировать матчи», чтобы создать одиночные и парный матчи."
+        ),
+        url=reverse("doubles_detail", args=[req.pk]),
+        event_key="sparring.team_ready",
+    )
+    notify_team_sparring_ready(req)

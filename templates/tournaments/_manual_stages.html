@@ -1,0 +1,34 @@
+{% for item in manual_stage_views %}
+<section class="pairs-card mb-4" aria-labelledby="stage-{{ item.stage.pk }}">
+    <h2 id="stage-{{ item.stage.pk }}" class="h4">{{ item.stage.name }}</h2>
+    {% if item.standings %}
+    <div class="table-responsive">
+        <table class="table"><thead><tr><th scope="col">Место</th><th scope="col">Участник</th><th scope="col">Матчи</th><th scope="col">Победы</th><th scope="col">Сеты</th><th scope="col">Геймы</th></tr></thead>
+        <tbody>{% for row in item.standings %}<tr>
+            <td>{{ row.place|default_if_none:"—" }}</td><td>{% if row.team %}{{ row.team.get_display_name }}{% else %}{{ row.player.get_display_name }}{% endif %}</td>
+            <td>{{ row.matches }}</td><td>{{ row.wins }}</td><td>{{ row.sets }}</td><td>{{ row.games }}</td>
+        </tr>{% endfor %}</tbody></table>
+    </div>
+    {% endif %}
+    {% for match in item.matches %}
+    <article class="bracket-match mb-3" id="stage-match-{{ match.pk }}">
+        <p class="text-secondary">{{ match.round_name }} · <a href="{% url 'match_detail' pk=match.pk %}">Открыть матч</a></p>
+        <p><strong>{{ match.get_player1_display|default:"Ожидает победителя" }}</strong> — <strong>{{ match.get_player2_display|default:"Ожидает победителя" }}</strong></p>
+        {% if match.status == 'completed' or match.status == 'walkover' %}
+            <p>{{ match.get_status_display }} · {% if match.winner_team %}{{ match.winner_team.get_display_name }}{% else %}{{ match.winner.get_display_name }}{% endif %}
+            {% if match.player1_set1 is not None %} · {{ match.player1_set1 }}:{{ match.player2_set1 }}{% endif %}
+            {% if match.player1_set2 is not None %} {{ match.player1_set2 }}:{{ match.player2_set2 }}{% endif %}
+            {% if match.player1_set3 is not None %} {{ match.player1_set3 }}:{{ match.player2_set3 }}{% endif %}</p>
+            {% if not match.player2_id %}<p>Проход без игры.</p>{% endif %}
+            {% if can_manage_stages and not stages_closed and not knockouts_created and item.stage.kind == 'qualifier' %}
+            <details><summary>Исправить результат отбора</summary>
+                {% include 'includes/manage_group_match_result.html' with match=match tournament=tournament %}
+            </details>
+            {% endif %}
+        {% elif can_manage_stages and not stages_closed and match.player1_id and match.player2_id %}
+            {% include 'includes/manage_group_match_result.html' with match=match tournament=tournament %}
+        {% else %}<p class="text-secondary">{{ match.get_status_display }}</p>{% endif %}
+    </article>
+    {% endfor %}
+</section>
+{% endfor %}

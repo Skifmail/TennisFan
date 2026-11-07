@@ -2,10 +2,13 @@
 Tournament models: Tournaments, Matches, Ratings.
 """
 
-from typing import cast
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, cast
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Case, IntegerField, When
 from django.utils import timezone
 
@@ -13,6 +16,9 @@ from apps.core.geo import GeoRegion, city_uses_moscow_geo
 from apps.core.sports import Sport
 from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
+if TYPE_CHECKING:
+    from apps.users.models import User
 
 
 class TournamentType(models.TextChoices):
@@ -112,7 +118,7 @@ class TournamentAllowedCategoryQuerySet(models.QuerySet):
     Сортировка по возрастанию уровня (Новичок → … → Профессионал).
     """
 
-    def ordered_by_skill(self) -> "TournamentAllowedCategoryQuerySet":
+    def ordered_by_skill(self) -> TournamentAllowedCategoryQuerySet:
         """
         Возвращает queryset с сортировкой категорий от меньшего уровня к большему.
 
@@ -1273,7 +1279,17 @@ class TVDGroupMember(models.Model):
 
 
 class Match(models.Model):
-    """Match between two players."""
+    """Матч между двумя игроками или командами."""
+
+    # Служебные атрибуты сигналов: только типы, без полей БД и runtime-значений.
+    _no_show_penalty_side1: float
+    _no_show_penalty_side2: float
+    _no_show_penalty: float
+    _force_wo_recalc: bool
+
+    _result_changed: bool
+    _old_match_snapshot: dict[str, Any] | None
+    _old_status: str | None
 
     class MatchStatus(models.TextChoices):
         PENDING = "pending", "Ожидает участников"
@@ -1365,6 +1381,14 @@ class Match(models.Model):
     is_consolation = models.BooleanField(
         "Подвал (матч вылетевших)",
         default=False,
+    )
+    manual_stage = models.ForeignKey(
+        "ManualTournamentStage",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+        related_name="matches",
+        verbose_name="Ручной этап",
     )
     tvd_group = models.ForeignKey(
         TVDGroup,
@@ -1558,9 +1582,83 @@ class Match(models.Model):
         verbose_name_plural = "Матчи"
         ordering = ["-scheduled_datetime"]
 
-    def save(self, *args, **kwargs) -> None:
-        """Синхронизировать вид спорта турнирного матча с турниром."""
+    @transaction.atomic
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Сохранить матч и его эффекты под общими блокировками до запуска сигналов."""
+        from django.core.exceptions import ValidationError
+
+        from apps.sparring.models import DoublesMatchRequest
+
+        from .manual_stages import result_is_locked
+        from .match_locking import lock_match, lock_match_participants
+
+        if self.manual_stage_id:
+            if self.manual_stage.tournament_id != self.tournament_id:
+                raise ValidationError("Этап не принадлежит этому турниру.")
+            # Один турнир сериализует результаты и переход между этапами.
+            locked_tournament = Tournament.objects.select_for_update().get(
+                pk=self.tournament_id
+            )
+            previous = Match.objects.filter(pk=self.pk).first() if self.pk else None
+            result_fields = (
+                "status",
+                "winner_id",
+                "winner_team_id",
+                "player1_id",
+                "player2_id",
+                "team1_id",
+                "team2_id",
+                "walkover_no_show_side1",
+                "walkover_no_show_side2",
+                "player1_set1",
+                "player2_set1",
+                "player1_set2",
+                "player2_set2",
+                "player1_set3",
+                "player2_set3",
+            )
+            requested = kwargs.get("update_fields")
+            changed = previous and any(
+                (
+                    requested is None
+                    or field in requested
+                    or field.removesuffix("_id") in requested
+                )
+                and getattr(previous, field) != getattr(self, field)
+                for field in result_fields
+            )
+            if changed and (
+                locked_tournament.status
+                in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED)
+                or result_is_locked(previous)
+            ):
+                raise ValidationError(
+                    "Результат зафиксирован следующим этапом или завершением турнира."
+                )
         update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = frozenset(update_fields)
+            if not update_fields:
+                return
+            kwargs["update_fields"] = update_fields
+        old = (
+            lock_match(self.pk, additional_request_id=self.sparring_team_request_id)
+            if self.pk and not self._state.adding
+            else None
+        )
+        if old is None and self.sparring_team_request_id:
+            DoublesMatchRequest.objects.select_for_update(no_key=True).get(
+                pk=self.sparring_team_request_id
+            )
+        if old is not None and update_fields is not None:
+            # Сигналы должны видеть сохраняемое состояние, а не старую копию
+            # полей, которые update_fields вообще не записывает в БД.
+            for field in self._meta.concrete_fields:
+                if not field.primary_key and not {
+                    field.name,
+                    field.attname,
+                }.intersection(update_fields):
+                    setattr(self, field.attname, getattr(old, field.attname))
         if self.tournament_id and update_fields is None:
             tournament_sport = (
                 self.tournament.sport
@@ -1572,7 +1670,26 @@ class Match(models.Model):
             )
             if tournament_sport:
                 self.sport = tournament_sport
+        completed = self.status in (
+            self.MatchStatus.COMPLETED,
+            self.MatchStatus.WALKOVER,
+        )
+        if completed or (
+            old is not None
+            and old.status in (self.MatchStatus.COMPLETED, self.MatchStatus.WALKOVER)
+        ):
+            lock_match_participants(self, *([old] if old is not None else []))
+        completion_fields = {
+            "rating_status",
+            "rating_delta_player1",
+            "rating_delta_player2",
+            "completed_datetime",
+        }
+        if completed and update_fields is not None:
+            kwargs["update_fields"] = update_fields | completion_fields
         super().save(*args, **kwargs)
+        if completed:
+            self.refresh_from_db(fields=completion_fields)
 
     def __str__(self) -> str:
         if self.team1 and self.team2:
@@ -1586,21 +1703,32 @@ class Match(models.Model):
         return bool(self.match_type == self.MatchType.SPARRING)
 
     def is_friendly_sparring(self) -> bool:
-        """Проверка, является ли матч дружеским спаррингом (результат не влияет на рейтинг)."""
+        """Прочитать свежий дружеский режим заявки, серии или прямого приглашения."""
         if not self.is_sparring():
             return False
-        try:
-            if self.sparring_response_id:
-                request = self.sparring_response.sparring_request
-                return bool(getattr(request, "is_friendly", False))
-            rel = getattr(self, "doubles_match_request", None)
-            if rel is not None:
-                req = rel.first() if hasattr(rel, "first") else rel
-                if req is not None:
-                    return bool(getattr(req, "is_friendly", False))
-        except Exception:
-            pass
-        return False
+        from apps.sparring.models import DoublesMatchRequest, SparringResponse
+
+        if self.sparring_team_request_id:
+            return bool(
+                DoublesMatchRequest.objects.filter(pk=self.sparring_team_request_id)
+                .values_list("is_friendly", flat=True)
+                .first()
+            )
+        if self.sparring_response_id:
+            return bool(
+                SparringResponse.objects.filter(pk=self.sparring_response_id)
+                .values_list("sparring_request__is_friendly", flat=True)
+                .first()
+            )
+        if self.pk is None:
+            # У ещё не сохранённого матча обратных связей быть не может,
+            # а обращение к ним до INSERT поднимает ValueError.
+            return False
+        if self.sparring_invitation_records.filter(is_friendly=True).exists():
+            return True
+        return bool(
+            self.doubles_match_request.values_list("is_friendly", flat=True).first()
+        )
 
     def is_doubles_sparring(self) -> bool:
         """Проверка, создан ли матч из заявки на парный спарринг (2×2)."""
@@ -1834,7 +1962,9 @@ class Match(models.Model):
 
 
 class MatchResultProposal(models.Model):
-    """Pending match result that requires opponent confirmation."""
+    """Заявка на результат с отдельной отметкой его однократного применения."""
+
+    _confirmed_by_user: User | None
 
     match = models.ForeignKey(
         Match,
@@ -1870,6 +2000,11 @@ class MatchResultProposal(models.Model):
     )
 
     created_at = models.DateTimeField("Создано", auto_now_add=True)
+    applied_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField(
+            "Результат применён", null=True, blank=True, editable=False
+        )
+    )
 
     class Meta:
         verbose_name = "Предложенный результат"
@@ -1997,6 +2132,35 @@ class SeasonRating(models.Model):
 
     def __str__(self) -> str:
         return f"{self.player} - {self.season} ({self.points} очков)"
+
+
+class ManualTournamentStage(models.Model):
+    """Этап свободного ручного сценария без изменения формата турнира."""
+
+    class Kind(models.TextChoices):
+        QUALIFIER = "qualifier", "Круговой отбор"
+        MAIN = "main", "Основная олимпийская сетка"
+        CONSOLATION = "consolation", "Утешительная олимпийская сетка"
+
+    tournament = models.ForeignKey(
+        Tournament, on_delete=models.CASCADE, related_name="manual_stages"
+    )
+    name = models.CharField("Название", max_length=80)
+    kind = models.CharField("Тип этапа", max_length=16, choices=Kind.choices)
+    order = models.PositiveSmallIntegerField("Порядок", default=1)
+    member_tokens = models.JSONField("Участники в порядке посева", default=list)
+
+    class Meta:
+        ordering = ["order", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tournament", "name"], name="unique_manual_stage_name"
+            )
+        ]
+
+    def __str__(self) -> str:
+        name: str = self.name
+        return name
 
 
 class TournamentPlayerResult(models.Model):

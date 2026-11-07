@@ -11,7 +11,7 @@ from apps.chat.models import ChatMembership, ChatMessage, ChatRoom
 from apps.core.models import City
 from tests.support.factories import make_user
 
-pytestmark = pytest.mark.django_db
+pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def test_migration_when_legacy_rooms_differ_should_preserve_history_members_and_closures() -> (

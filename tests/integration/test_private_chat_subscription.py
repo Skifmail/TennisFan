@@ -1,4 +1,4 @@
-"""Реальные подписки сохраняют правила доступа и возврата на Free."""
+"""Свежая проверка доступа не меняет тариф, даты и баланс реальной подписки."""
 
 from datetime import timedelta
 
@@ -26,8 +26,8 @@ def test_private_chat_access_when_real_subscription_checked_should_preserve_secu
     includes_chat: bool,
     allowed: bool,
 ) -> None:
-    """Истечение возвращает на Free, а баланс и запрет доступа сохраняются."""
-    free, _ = SubscriptionTier.objects.update_or_create(
+    """Истёкшая подписка не даёт доступ, но её проверка не переписывает тариф."""
+    SubscriptionTier.objects.update_or_create(
         name="free", defaults={"display_name": "Free", "has_private_chat": False}
     )
     user = make_user()
@@ -42,7 +42,10 @@ def test_private_chat_access_when_real_subscription_checked_should_preserve_secu
     subscription.is_active = active
     subscription.fancoin_balance = 17
     subscription.save()
+    end_date = subscription.end_date
     assert get_private_chat_access_status(user)[0] is allowed
     subscription.refresh_from_db()
     assert subscription.fancoin_balance == 17
-    assert subscription.tier_id == (free.pk if expired else tier.pk)
+    assert subscription.tier_id == tier.pk
+    assert subscription.end_date == end_date
+    assert subscription.is_active is active

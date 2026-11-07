@@ -3,49 +3,69 @@
 Отправка по User или chat_id; тексты для регистрации, матча, предложения результата.
 """
 
+from __future__ import annotations
+
 import html
-import logging
-import threading
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urlencode
 
 from django.conf import settings
+from django.db import transaction
+from django.db.models import QuerySet
+from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import strip_tags
+from loguru import logger
 
-from apps.core.db_context import background_connection
 from apps.core.models import UserTelegramLink
 from apps.notifications.infrastructure.email import send_event_mail as send_mail
-from apps.notifications.services import center_enabled, create_notification
+from apps.notifications.services import (
+    capture_email_event,
+    center_enabled,
+    create_notification,
+)
+from apps.tournaments.models import Match, MatchResultProposal
 from apps.tournaments.utils import (
     get_match_opponent_users,
     get_match_participant_users,
     get_tournament_participant_users,
 )
-from apps.users.models import SkillLevel
+from apps.users.models import Player, SkillLevel, User
 
 from . import services as bot
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from apps.sparring.models import (
+        DoublesJoinRequest,
+        DoublesMatchRequest,
+        SparringInvitation,
+        SparringResponse,
+    )
+    from apps.subscriptions.models import UserSubscription
+    from apps.tournaments.models import DeadlineExtensionRequest, Tournament
 
 
-def get_chat_id_for_user(user) -> int | None:
+def get_chat_id_for_user(user: User | None) -> int | None:
     """chat_id для пользовательского бота (None если пользователь ещё не нажал /start в чате с ботом)."""
-    if not user:
+    if not user or not user.is_active:
         return None
-    try:
-        link = user.telegram_link
-        return link.user_bot_chat_id if link.user_bot_chat_id else None
-    except (AttributeError, UserTelegramLink.DoesNotExist):
-        return None
+    chat_id: int | None = (
+        UserTelegramLink.objects.filter(user_id=user.pk, user_bot_chat_id__gt=0)
+        .values_list("user_bot_chat_id", flat=True)
+        .first()
+    )
+    return chat_id
 
 
 def send_to_user_by_user(
-    user,
+    user: User | None,
     text: str,
-    reply_markup: dict | None = None,
+    reply_markup: dict[str, Any] | None = None,
     *,
     skip_email: bool = False,
     event_key: str = "platform.user_message",
 ) -> bool:
-    """Отправить сообщение пользователю по User (если привязан Telegram).
+    """Поставить Telegram в очередь и при необходимости отправить email-дубль.
 
     Args:
         user: Пользователь-получатель.
@@ -55,31 +75,33 @@ def send_to_user_by_user(
         event_key: Явный код события для политики почтового канала.
 
     Returns:
-        bool: ``True``, если доставлено хотя бы в один канал.
+        bool: ``True``, если Telegram сохранён в очереди либо email принят SMTP.
+        Приём Telegram подтверждается отдельно статусом Delivery.accepted.
     """
+    from .delivery import enqueue_message
+
+    telegram_queued = (
+        enqueue_message(user, text, reply_markup, event_key=event_key) is not None
+    )
     email_ok = False
     if not skip_email:
         email_ok = _send_notification_email_to_user(
             user=user, text=text, event_key=event_key
         )
-    chat_id = get_chat_id_for_user(user)
-    if chat_id is None:
-        return email_ok
-    telegram_ok = bot.send_to_user(chat_id, text, reply_markup=reply_markup)
-    return telegram_ok or email_ok
+    return telegram_queued or email_ok
 
 
 def _send_notification_email_to_user(
-    user, text: str, *, event_key: str = "platform.user_message"
+    user: User | None, text: str, *, event_key: str = "platform.user_message"
 ) -> bool:
-    """Отправить пользователю email-дубль Telegram-уведомления.
+    """Сохранить ЛК/push почтового события и отправить email после коммита.
 
     Args:
         user: Пользователь-получатель уведомления.
         text (str): Текст Telegram-уведомления (HTML-формат).
 
     Returns:
-        bool: ``True``, если email отправлен успешно, иначе ``False``.
+        bool: ``True`` только после приёма письма SMTP; отложенная отправка — ``False``.
     """
     if (
         not bool(getattr(settings, "USER_NOTIFICATIONS_EMAIL_ENABLED", True))
@@ -88,38 +110,53 @@ def _send_notification_email_to_user(
         return False
     if user is None:
         return False
+    if center_enabled():
+        user = User.objects.filter(pk=user.pk, is_active=True).first()
+        if user is None:
+            return False
     recipient = str(getattr(user, "email", "") or "").strip()
     if not recipient or "@" not in recipient:
         return False
 
-    body = strip_tags(text or "").strip()
+    body = html.unescape(strip_tags(text or "")).strip()
     if not body:
         return False
     subject = _build_user_email_subject(body)
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@tennisfan.ru")
+    delivery_allowed = bool(getattr(settings, "USER_NOTIFICATIONS_EMAIL_ENABLED", True))
+    if center_enabled():
+        # Обязательные локальные каналы фиксируются вместе с исходным действием.
+        # Повторный захват события в SMTP-callback ниже запрещён.
+        capture_email_event(event_key, user)
 
-    try:
-        return bool(
-            send_mail(
-                subject=subject,
-                message=body,
-                from_email=from_email,
-                recipient_list=[recipient],
-                fail_silently=False,
-                event_key=event_key,
-                delivery_allowed=bool(
-                    getattr(settings, "USER_NOTIFICATIONS_EMAIL_ENABLED", True)
-                ),
+    def deliver() -> bool:
+        """Отправить подготовленное письмо только после успешной фиксации результата."""
+        try:
+            return bool(
+                send_mail(
+                    subject=subject,
+                    message=body,
+                    from_email=from_email,
+                    recipient_list=[recipient],
+                    fail_silently=False,
+                    event_key=event_key,
+                    capture_event=False,
+                    delivery_allowed=delivery_allowed,
+                )
             )
-        )
-    except Exception as exc:
-        logger.warning(
-            "User notification email failed for user_id=%s email=%s: %s",
-            getattr(user, "pk", None),
-            recipient,
-            exc,
-        )
+        except Exception as exc:
+            logger.warning(
+                "Email-дубль уведомления не отправлен: user_id={}, error={}",
+                user.pk,
+                type(exc).__name__,
+            )
+            return False
+
+    if transaction.get_connection().in_atomic_block:
+        transaction.on_commit(deliver)
+        # SMTP пока не подтвердил отправку. При откате callback будет удалён.
         return False
+    return deliver()
 
 
 def _build_user_email_subject(body: str) -> str:
@@ -156,15 +193,16 @@ def _build_user_email_subject(body: str) -> str:
 
 
 def _get_site_base_url() -> str:
+    """Получить базовый адрес сайта для ссылок из уведомлений."""
     from django.conf import settings
 
-    base = getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or ""
+    base = str(getattr(settings, "TELEGRAM_BOT_SITE_BASE_URL", None) or "")
     if base:
         return base.rstrip("/") + "/"
     return "http://localhost:8000/" if settings.DEBUG else "https://tennisfan.ru/"
 
 
-def notify_tournament_registered(user, tournament) -> None:
+def notify_tournament_registered(user: User, tournament: Tournament) -> None:
     """Уведомление о регистрации на турнир."""
     if not bot.is_configured():
         return
@@ -183,7 +221,9 @@ def notify_tournament_registered(user, tournament) -> None:
     send_to_user_by_user(user, text, event_key="tournament.registered")
 
 
-def notify_tournament_removed_refund(user, tournament, feedback_url: str) -> None:
+def notify_tournament_removed_refund(
+    user: User, tournament: Tournament, feedback_url: str
+) -> None:
     """Уведомление о снятии с турнира и возврате взноса — ссылка на форму обратной связи."""
     if not bot.is_configured():
         return
@@ -206,7 +246,7 @@ def notify_tournament_removed_refund(user, tournament, feedback_url: str) -> Non
 
 
 def notify_postpayment_opened(
-    user, tournament, amount: str, due_at_text: str, payment_url: str
+    user: User, tournament: Tournament, amount: str, due_at_text: str, payment_url: str
 ) -> None:
     """Уведомить игрока о старте окна постоплаты турнира."""
     if not bot.is_configured():
@@ -222,7 +262,7 @@ def notify_postpayment_opened(
 
 
 def notify_postpayment_1h_reminder(
-    user, tournament, due_at_text: str, payment_url: str
+    user: User, tournament: Tournament, due_at_text: str, payment_url: str
 ) -> None:
     """Уведомить игрока о скором завершении окна постоплаты."""
     if not bot.is_configured():
@@ -236,7 +276,7 @@ def notify_postpayment_1h_reminder(
     send_to_user_by_user(user, text, event_key="tournament.payment_reminder")
 
 
-def notify_postpayment_removed(user, tournament) -> None:
+def notify_postpayment_removed(user: User, tournament: Tournament) -> None:
     """Уведомить игрока об удалении из турнира за неоплату."""
     if not bot.is_configured():
         return
@@ -247,7 +287,7 @@ def notify_postpayment_removed(user, tournament) -> None:
     send_to_user_by_user(user, text, event_key="tournament.unpaid_removed")
 
 
-def _player_contact_lines(player) -> list[str]:
+def _player_contact_lines(player: Player) -> list[str]:
     """Строки контактов игрока для уведомления (HTML; читаемы и после strip_tags в email).
 
     Включает мессенджеры (Telegram, WhatsApp, MAX) и телефон. Показываются только
@@ -284,7 +324,7 @@ def _player_contact_lines(player) -> list[str]:
     return lines
 
 
-def _opponent_contacts_block(opponents: list) -> str:
+def _opponent_contacts_block(opponents: list[Player]) -> str:
     """Блок контактов соперника(ов) для уведомления о матче (HTML).
 
     Args:
@@ -316,7 +356,7 @@ def _opponent_contacts_block(opponents: list) -> str:
     return "\n".join(parts)
 
 
-def _match_info_text(match, opponents: list | None = None) -> str:
+def _match_info_text(match: Match, opponents: list[Player] | None = None) -> str:
     """Текст с информацией о матче для уведомления (без ссылки на сайт).
 
     Args:
@@ -327,8 +367,8 @@ def _match_info_text(match, opponents: list | None = None) -> str:
     Returns:
         str: HTML-текст уведомления о новом матче.
     """
-    side1 = match.get_player1_display()
-    side2 = match.get_player2_display()
+    side1 = html.escape(match.get_player1_display())
+    side2 = html.escape(match.get_player2_display())
     deadline_str = (
         match.deadline.strftime("%d.%m.%Y %H:%M") if match.deadline else "не указан"
     )
@@ -338,13 +378,15 @@ def _match_info_text(match, opponents: list | None = None) -> str:
         tournament_info = "Спарринг (личная встреча)"
         round_info = "—"
     else:
-        tournament_info = match.tournament.name if match.tournament else "—"
+        tournament_info = (
+            html.escape(match.tournament.name) if match.tournament else "—"
+        )
         if (
             match.tournament
             and getattr(match.tournament, "format", None) == "weekend_day"
         ):
             tournament_info = f"{tournament_info} (группы + плей-офф)"
-        round_info = match.round_name or "—"
+        round_info = html.escape(match.round_name or "—")
 
     contacts_block = ""
     if opponents:
@@ -361,7 +403,7 @@ def _match_info_text(match, opponents: list | None = None) -> str:
     )
 
 
-def notify_bracket_formed(tournament, subtitle: str | None = None) -> None:
+def notify_bracket_formed(tournament: Tournament, subtitle: str | None = None) -> None:
     """
     Уведомление всем участникам турнира о сформированной сетке (в бот и в ЛК).
     Вызывать после формирования сетки (bracket_generated=True).
@@ -387,7 +429,9 @@ def notify_bracket_formed(tournament, subtitle: str | None = None) -> None:
             )
         except Exception as e:
             logger.warning(
-                "notify_bracket_formed Notification for user %s: %s", user.pk, e
+                "Уведомление о сетке не сохранено: user_id={}, error={}",
+                user.pk,
+                type(e).__name__,
             )
 
     if not bot.is_configured():
@@ -415,7 +459,7 @@ def notify_bracket_formed(tournament, subtitle: str | None = None) -> None:
         )
 
 
-def notify_match_created(match) -> None:
+def notify_match_created(match: Match) -> None:
     """Уведомление участникам о создании матча: соперник, дедлайн и контакты соперника.
 
     Каждому участнику отправляется персональный текст с контактами именно его
@@ -454,13 +498,57 @@ def notify_match_created(match) -> None:
         )
 
 
-def notify_result_proposal(proposal) -> None:
-    """
-    Уведомление сопернику о предложенном результате с кнопками Подтвердить/Отклонить.
+def result_dispute_url(match: Match, *, score: str | None = None) -> str:
+    """Открыть существующую поддержку с номером матча, счётом и ссылкой на контекст."""
+    base = _get_site_base_url().rstrip("/")
+    match_url = f"{base}{reverse('match_detail', args=[match.pk])}"
+    query = urlencode(
+        {
+            "subject": f"Оспаривание результата матча №{match.pk}",
+            "message": (
+                f"Оспариваю результат матча №{match.pk}.\n"
+                f"Счёт: {score if score is not None else match.score_display}\n"
+                f"Матч: {match_url}\n"
+                "Причина оспаривания: "
+            ),
+        }
+    )
+    return f"{base}{reverse('support_feedback')}?{query}"
 
-    Логика с точки зрения ПОЛУЧАТЕЛЯ (соперника):
-    - WALKOVER_WIN (proposer заявляет победу) → получатель проигрывает → -40 очков, 6:0 6:0
-    - WALKOVER_LOSS (proposer признаёт поражение) → получатель выигрывает → без штрафа
+
+def _result_keyboard(match: Match, *, score: str | None = None) -> dict[str, Any]:
+    """Разделить просмотр матча и заметное оспаривание без изменения его результата."""
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "Открыть матч",
+                    "url": f"{_get_site_base_url().rstrip('/')}{reverse('match_detail', args=[match.pk])}",
+                }
+            ],
+            [
+                {
+                    "text": "⚠️ Оспорить результат",
+                    "url": result_dispute_url(match, score=score),
+                }
+            ],
+        ]
+    }
+
+
+def _match_context_text(match: Match) -> str:
+    """Экранировать название турнира и не требовать его наличия у спарринга."""
+    tournament = match.tournament
+    if tournament is not None:
+        return f"Турнир: {html.escape(tournament.name)}"
+    return "Спарринг (личная встреча)" if match.is_sparring() else "Матч"
+
+
+def notify_result_proposal(proposal: MatchResultProposal) -> None:
+    """Совместимое уведомление сопернику с его перспективой результата и оспариванием.
+
+    Новые сыгранные результаты уведомляют всех один раз из apply_proposal.
+    Этот вход сохранён для прежних производителей уведомлений о заявках.
     """
     if not bot.is_configured():
         return
@@ -473,7 +561,7 @@ def notify_result_proposal(proposal) -> None:
 
     if is_walkover_win:
         # Proposer заявляет неявку соперника → получатель проигрывает
-        result_text = "Неявка (соперник заявляет, что вы не вышли на матч)"
+        result_text = "Вы проиграли: соперник заявил вашу неявку"
         score = "без счёта"
         warning_text = (
             "\n\n⚠️ <b>Внимание!</b> Матч записан как несостоявшийся:\n"
@@ -484,7 +572,7 @@ def notify_result_proposal(proposal) -> None:
         )
     elif is_walkover_loss:
         # Proposer признаёт свою неявку → получатель выигрывает
-        result_text = "Неявка (соперник признаёт, что не вышел на матч)"
+        result_text = "Вы выиграли: соперник признал свою неявку"
         score = "без счёта"
         warning_text = (
             "\n\n✅ Соперник признаёт неявку.\n"
@@ -492,33 +580,32 @@ def notify_result_proposal(proposal) -> None:
             "• Вам засчитана победа без изменения рейтинга"
         )
     else:
-        result_text = proposal.get_result_display()
-        try:
-            score = (
-                " / ".join(
-                    f"{getattr(proposal, f'player1_set{i}')}:{getattr(proposal, f'player2_set{i}')}"
-                    for i in (1, 2, 3)
-                    if getattr(proposal, f"player1_set{i}") is not None
-                )
-                or "—"
-            )
-        except Exception:
-            score = "—"
+        result_text = "Вы проиграли" if result_val == "win" else "Вы выиграли"
+        score = _proposal_score_text(proposal)
         warning_text = ""
 
-    tournament_name = match.tournament.name if match.tournament else "спарринг"
+    applied = proposal.status == Match.ProposalStatus.ACCEPTED
+    if not applied:
+        warning_text = ""
     text = (
-        f"📩 <b>{proposer} внёс результат матча</b>\n\n"
-        f"Турнир: {tournament_name}\n"
+        f"📩 <b>{html.escape(str(proposer))} внёс результат матча</b>\n\n"
+        f"{_match_context_text(match)}\n"
+        f"Матч №{match.pk}: {html.escape(match.get_player1_display())} — {html.escape(match.get_player2_display())}\n"
         f"Результат: {result_text}\n"
         f"Счёт: {score}{warning_text}\n\n"
-        "✅ Матч завершён."
+        + ("✅ Результат применён сразу.\n" if applied else "")
+        + "Не согласны? Нажмите «Оспорить результат» и опишите причину."
     )
     for user in get_match_opponent_users(match, proposer):
-        send_to_user_by_user(user, text, event_key="match.result_proposed")
+        send_to_user_by_user(
+            user,
+            text,
+            reply_markup=_result_keyboard(match, score=score),
+            event_key="match.result_proposed",
+        )
 
 
-def _proposal_score_text(proposal) -> str:
+def _proposal_score_text(proposal: MatchResultProposal) -> str:
     """Формирует строку счёта из proposal."""
     sets = []
     for i in (1, 2, 3):
@@ -529,7 +616,7 @@ def _proposal_score_text(proposal) -> str:
     return " / ".join(sets) if sets else "—"
 
 
-def _proposal_opponent_name(proposal) -> str:
+def _proposal_opponent_name(proposal: MatchResultProposal) -> str:
     """Имя соперника (того, кто подтверждает/отклоняет)."""
     match = proposal.match
     proposer = proposal.proposer
@@ -552,7 +639,7 @@ def _proposal_opponent_name(proposal) -> str:
     return str(opponent) if opponent else "Соперник"
 
 
-def _proposal_result_text(proposal) -> str:
+def _proposal_result_text(proposal: MatchResultProposal) -> str:
     """Текстовое описание результата из proposal."""
     result_val = str(proposal.result) if proposal.result else ""
     if result_val == "walkover_loss":
@@ -569,7 +656,7 @@ def _proposal_result_text(proposal) -> str:
         return str(result_val or "—")
 
 
-def _player_side_index(match, player) -> int | None:
+def _player_side_index(match: Match, player: Player | None) -> int | None:
     """Определить сторону игрока в матче.
 
     Args:
@@ -592,7 +679,7 @@ def _player_side_index(match, player) -> int | None:
     return None
 
 
-def _no_show_penalty_text(match, player) -> str:
+def _no_show_penalty_text(match: Match, player: Player) -> str:
     """Текст о штрафе за неявку для конкретного участника.
 
     Args:
@@ -621,7 +708,7 @@ def _no_show_penalty_text(match, player) -> str:
     )
 
 
-def _get_penalty_text_for_player(match, player) -> str:
+def _get_penalty_text_for_player(match: Match, player: Player) -> str:
     """
     Получить текст о штрафе для конкретного игрока.
 
@@ -676,13 +763,11 @@ def _get_penalty_text_for_player(match, player) -> str:
             return "\n\n⚠️ <b>Штраф:</b> Из вашего рейтинга силы вычтено <b>40 очков</b> за тех. поражение."
 
 
-def notify_result_confirmed_to_participants(match) -> None:
-    """
-    Уведомление всем участникам матча в Telegram: результат подтверждён,
-    начислено/вычтено очков рейтинга, прогресс силы.
-    """
+def notify_result_confirmed_to_participants(match: Match) -> None:
+    """Уведомить всех о применённом результате, не приписывая сопернику подтверждение."""
     if not bot.is_configured():
         return
+    from apps.tournaments.proposal_service import result_summary_for_player
     from apps.tournaments.utils import get_match_participants
 
     participants = [
@@ -690,67 +775,36 @@ def notify_result_confirmed_to_participants(match) -> None:
         for p in get_match_participants(match)
         if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
     ]
-    is_friendly = match.is_friendly_sparring()
-    winner = match.winner
-    winner_team = match.winner_team
 
     for p in participants:
         user = getattr(p, "user", None)
         if not user:
             continue
-        is_winner = (
-            p == winner
-            or (winner_team and p in (winner_team.player1, winner_team.player2))
-            or (
-                match.is_doubles_sparring()
-                and winner
-                and p.pk in (match.player1_id, match.partner1_id)
-                and winner.pk in (match.player1_id, match.partner1_id)
-            )
-            or (
-                match.is_doubles_sparring()
-                and winner
-                and p.pk in (match.player2_id, match.partner2_id)
-                and winner.pk in (match.player2_id, match.partner2_id)
-            )
-        )
-        if is_friendly:
-            result_line = "Вы выиграли." if is_winner else "Вы проиграли."
-        else:
-            p.refresh_from_db()
-            changes = p.get_rating_changes()
-            fan = changes.get("fan", {})
-            delta = fan.get("delta") or 0
-            from apps.users.rating_utils import rating_to_ntrp_level
-
-            if delta != 0:
-                d_str = f"+{int(delta)}" if delta > 0 else str(int(delta))
-                rating_before = float(p.total_points) - float(delta)
-                ntrp_before = rating_to_ntrp_level(rating_before)
-                ntrp_after = rating_to_ntrp_level(float(p.total_points))
-                result_line = (
-                    f"Вы выиграли. Вам начислено {d_str} очков рейтинга. Сила: {ntrp_before:.2f} → {ntrp_after:.2f}."
-                    if is_winner
-                    else f"Вы проиграли. У вас вычтено {abs(int(delta))} очков рейтинга. Сила: {ntrp_before:.2f} → {ntrp_after:.2f}."
-                )
-            else:
-                result_line = "Вы выиграли." if is_winner else "Вы проиграли."
+        result_line = result_summary_for_player(match, p)
+        score = "без счёта" if match.is_no_show_walkover() else match.score_display
 
         text = (
-            "✅ <b>Результат матча подтверждён</b>\n\n"
-            f"Матч: {match.get_player1_display()} — {match.get_player2_display()}\n"
-            f"Счёт: {match.score_display() or '—'}\n\n"
-            f"{result_line}"
+            "✅ <b>Результат матча применён</b>\n\n"
+            f"{_match_context_text(match)}\n"
+            f"Матч №{match.pk}: {html.escape(match.get_player1_display())} — {html.escape(match.get_player2_display())}\n"
+            f"Счёт: {score}\n\n"
+            f"{result_line}\n\n"
+            "Не согласны? Нажмите «Оспорить результат» и опишите причину."
         )
-        send_to_user_by_user(user, text, event_key="match.result_confirmed")
+        send_to_user_by_user(
+            user,
+            text,
+            reply_markup=_result_keyboard(match, score=score),
+            event_key="match.result_confirmed",
+        )
     logger.info(
-        "notify_result_confirmed_to_participants: match=%s, participants=%s",
+        "Уведомление о результате сохранено: match_id={}, participants={}",
         match.pk,
         len(participants),
     )
 
 
-def notify_proposal_confirmed(proposal) -> None:
+def notify_proposal_confirmed(proposal: MatchResultProposal) -> None:
     """Уведомление инициатору о подтверждении результата."""
     if not bot.is_configured():
         logger.warning("notify_proposal_confirmed: bot not configured")
@@ -760,9 +814,8 @@ def notify_proposal_confirmed(proposal) -> None:
         logger.warning("notify_proposal_confirmed: proposer has no user")
         return
     match = proposal.match
-    opponent = _proposal_opponent_name(proposal)
     result = _proposal_result_text(proposal)
-    score = match.score_display() if match.winner else _proposal_score_text(proposal)
+    score = match.score_display if match.winner else _proposal_score_text(proposal)
     winner_name = str(match.winner) if match.winner else "—"
 
     # Получаем текст о штрафе для инициатора (proposer)
@@ -771,31 +824,36 @@ def notify_proposal_confirmed(proposal) -> None:
 
     # Определяем информацию о турнире/спарринге
     if match.tournament:
-        tournament_info = f"Турнир: {match.tournament.name}"
+        tournament_info = f"Турнир: {html.escape(match.tournament.name)}"
     elif match.is_sparring():
         tournament_info = "Спарринг (личная встреча)"
     else:
         tournament_info = "Матч"
 
     text = (
-        "✅ <b>Результат подтверждён</b>\n\n"
+        "✅ <b>Результат матча применён</b>\n\n"
         f"{tournament_info}\n"
-        f"Матч: {match.get_player1_display()} vs {match.get_player2_display()}\n"
+        f"Матч: {html.escape(match.get_player1_display())} vs {html.escape(match.get_player2_display())}\n"
         f"Результат: {result}\n"
         f"Счёт: {score}\n"
-        f"Победитель: {winner_name}{penalty_text}\n\n"
-        f"<b>{opponent}</b> подтвердил(а) результат."
+        f"Победитель: {html.escape(winner_name)}{penalty_text}\n\n"
+        "Не согласны? Нажмите «Оспорить результат»."
     )
-    ok = send_to_user_by_user(proposer_user, text, event_key="match.result_confirmed")
-    logger.info(
-        "notify_proposal_confirmed: proposer=%s, user=%s, sent=%s",
-        proposal.proposer,
+    ok = send_to_user_by_user(
         proposer_user,
+        text,
+        reply_markup=_result_keyboard(match, score=score),
+        event_key="match.result_confirmed",
+    )
+    logger.info(
+        "Применённый результат: proposer_id={}, user_id={}, queued_or_email_accepted={}",
+        proposal.proposer_id,
+        proposer_user.pk,
         ok,
     )
 
 
-def notify_proposal_rejected(proposal) -> None:
+def notify_proposal_rejected(proposal: MatchResultProposal) -> None:
     """Уведомление инициатору об отклонении результата."""
     if not bot.is_configured():
         logger.warning("notify_proposal_rejected: bot not configured")
@@ -828,14 +886,14 @@ def notify_proposal_rejected(proposal) -> None:
     )
     ok = send_to_user_by_user(proposer_user, text, event_key="match.proposal_updated")
     logger.info(
-        "notify_proposal_rejected: proposer=%s, user=%s, sent=%s",
-        proposal.proposer,
-        proposer_user,
+        "Отклонённый результат: proposer_id={}, user_id={}, queued_or_email_accepted={}",
+        proposal.proposer_id,
+        proposer_user.pk,
         ok,
     )
 
 
-def notify_match_deadline_reminder(match, days_left: int) -> None:
+def notify_match_deadline_reminder(match: Match, days_left: int) -> None:
     """
     Напоминание участникам матча о приближающемся дедлайне (за 2 или 1 день).
     days_left: 2 или 1. В сообщении кнопки «Внести результат», «Мои матчи», «Запросить продление».
@@ -844,26 +902,31 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
         return
     if not match.deadline:
         return
-    deadline_str = match.deadline.strftime("%d.%m.%Y %H:%M")
+    deadline_str = timezone.localtime(match.deadline).strftime("%d.%m.%Y %H:%M")
     side1 = match.get_player1_display()
     side2 = match.get_player2_display()
 
     # Определяем информацию о турнире/спарринге
     if match.tournament:
-        tournament_info = f"Турнир: {match.tournament.name}"
+        tournament_info = f"Турнир: {html.escape(match.tournament.name)}"
     elif match.is_sparring():
         tournament_info = "Спарринг (личная встреча)"
     else:
         tournament_info = "Матч"
 
+    deadline_rule = (
+        "Если турнирный матч не сыграют до дедлайна — RT 0:0. "
+        "Дальше проходит сторона с более высоким рейтингом; рейтинг не меняется.\n\n"
+        if match.tournament_id
+        else "Если не успеваете сыграть спарринг, продлите дедлайн в карточке матча или обратитесь к администратору.\n\n"
+    )
     text = (
         f"⏰ <b>Напоминание: до дедлайна матча {days_left} дн.</b>\n\n"
         f"{tournament_info}\n"
-        f"Этап: {match.round_name or '—'}\n"
-        f"{side1} — {side2}\n"
+        f"Этап: {html.escape(match.round_name or '—')}\n"
+        f"{html.escape(side1)} — {html.escape(side2)}\n"
         f"Дедлайн: {deadline_str}\n\n"
-        "Если матч не сыграют до дедлайна, обоим будет Walkover (неявка): "
-        "−40 очков рейтинга каждому.\n\n"
+        f"{deadline_rule}"
         "Матч не может состояться по вине соперника? Нажмите «Внести "
         "результат» и отметьте неявку — счёт вводить не нужно, −40 очков "
         "получит только неявившаяся сторона."
@@ -885,8 +948,6 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
             ],
         ],
     }
-    from django.urls import reverse
-
     from apps.tournaments.sparring_deadlines import can_extend_sparring_deadline
 
     for user in get_match_participant_users(match):
@@ -905,7 +966,7 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
                     [
                         {
                             "text": "Открыть матч и продлить дедлайн",
-                            "url": f"{_get_site_base_url()}{reverse('match_detail', args=[match.pk])}",
+                            "url": f"{_get_site_base_url().rstrip('/')}{reverse('match_detail', args=[match.pk])}",
                         }
                     ],
                 ],
@@ -914,11 +975,12 @@ def notify_match_deadline_reminder(match, days_left: int) -> None:
             user,
             personal_text,
             reply_markup=personal_markup,
+            skip_email=True,
             event_key="match.deadline_reminder",
         )
 
 
-def notify_extension_approved(extension_request) -> None:
+def notify_extension_approved(extension_request: DeadlineExtensionRequest) -> None:
     """Уведомление пользователю об одобрении запроса на продление дедлайна."""
     if not bot.is_configured():
         return
@@ -943,7 +1005,7 @@ def notify_extension_approved(extension_request) -> None:
     send_to_user_by_user(user, text, event_key="match.deadline_extended")
 
 
-def _format_new_tournament_message(tournament) -> str:
+def _format_new_tournament_message(tournament: Tournament) -> str:
     """Формирует подробный текст уведомления о новом турнире (HTML для Telegram)."""
     format_display = (
         "Группы + плей-офф"
@@ -974,7 +1036,7 @@ def _format_new_tournament_message(tournament) -> str:
             f"Тип: {tournament.get_tournament_type_display()}",
             f"Статус: {tournament.get_status_display()}",
             "",
-            f"📅 Начало: {tournament.start_date.strftime('%d.%m.%Y')}",
+            f"📅 Начало: {tournament.start_date.strftime('%d.%m.%Y') if tournament.start_date else 'не указано'}",
         ]
     )
     if tournament.end_date:
@@ -1016,44 +1078,40 @@ def _format_new_tournament_message(tournament) -> str:
     return "\n".join(parts)
 
 
-def _get_new_tournament_users(tournament) -> list:
+def _get_new_tournament_users(tournament: Tournament) -> QuerySet[User]:
     """Вернуть пользователей для ЛК и email о новом турнире.
 
     Args:
         tournament: Созданный турнир.
 
     Returns:
-        list: Список User. Клубный турнир — активные члены клуба.
+        QuerySet: Активные пользователи. Клубный турнир — активные члены клуба.
         Платформенный — игроки того же населённого пункта, что и турнир.
     """
     from apps.users.models import User
 
-    if getattr(tournament, "club_id", None):
+    if tournament.club_id is not None:
         from apps.clubs.models import ClubMember, ClubMemberStatus
 
-        user_ids = list(
-            ClubMember.objects.filter(
-                club_id=tournament.club_id,
-                status=ClubMemberStatus.ACTIVE,
-            ).values_list("user_id", flat=True)
-        )
-        if not user_ids:
-            return []
-        return list(User.objects.filter(pk__in=user_ids).order_by("pk"))
+        user_ids = ClubMember.objects.filter(
+            club_id=tournament.club_id,
+            status=ClubMemberStatus.ACTIVE,
+        ).values_list("user_id", flat=True)
+        return User.objects.filter(pk__in=user_ids, is_active=True).order_by("pk")
 
     from apps.sparring.city_notify import same_city_player_ids
 
     player_ids = same_city_player_ids(getattr(tournament, "city", "") or "")
     if not player_ids:
-        return []
-    return list(
+        return User.objects.none()
+    return (
         User.objects.filter(player__pk__in=player_ids, is_active=True)
         .distinct()
         .order_by("pk")
     )
 
 
-def _notify_new_tournament_lk_and_email(tournament) -> tuple[int, int]:
+def _notify_new_tournament_lk_and_email(tournament: Tournament) -> tuple[int, int]:
     """Создать ЛК-уведомления и отправить email о новом турнире.
 
     Args:
@@ -1082,17 +1140,23 @@ def _notify_new_tournament_lk_and_email(tournament) -> tuple[int, int]:
             lk_count += 1
         except Exception as exc:
             logger.warning(
-                "New tournament LK notify failed for user %s: %s", user.pk, exc
+                "Уведомление о турнире не сохранено: user_id={}, error={}",
+                user.pk,
+                type(exc).__name__,
             )
         try:
             if send_new_tournament_email(user, tournament):
                 email_count += 1
         except Exception as exc:
-            logger.warning("New tournament email failed for user %s: %s", user.pk, exc)
+            logger.warning(
+                "Письмо о турнире не отправлено: user_id={}, error={}",
+                user.pk,
+                type(exc).__name__,
+            )
     return lk_count, email_count
 
 
-def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
+def _get_new_tournament_recipients(tournament: Tournament) -> list[UserTelegramLink]:
     """Возвращает получателей Telegram-уведомления о новом турнире."""
     if getattr(tournament, "club_id", None):
         from apps.clubs.models import (
@@ -1149,75 +1213,22 @@ def _get_new_tournament_recipients(tournament) -> list[UserTelegramLink]:
 
 
 def _send_new_tournament_notification(tournament_pk: int) -> None:
-    """В фоне отправить ЛК, email и Telegram о новом турнире."""
-    with background_connection():
-        _deliver_new_tournament_notification(tournament_pk)
+    """Совместимый вход: подготовить один сохраняемый пакет, не отправляя в сеть."""
+    from .announcements import prepare_announcement, request_announcement
+
+    job = request_announcement(tournament_pk)
+    prepare_announcement(job.pk)
 
 
 def _deliver_new_tournament_notification(tournament_pk: int) -> None:
-    """Читает турнир и отправляет уведомления через настроенные каналы."""
-    try:
-        from apps.tournaments.models import Tournament
-
-        tournament = (
-            Tournament.objects.filter(pk=tournament_pk)
-            .prefetch_related("allowed_categories")
-            .first()
-        )
-        if not tournament:
-            logger.warning(
-                "New tournament notify: tournament pk=%s not found", tournament_pk
-            )
-            return
-
-        lk_count, email_count = _notify_new_tournament_lk_and_email(tournament)
-        logger.info(
-            "New tournament pk=%s: LK=%s email=%s",
-            tournament_pk,
-            lk_count,
-            email_count,
-        )
-
-        if not bot.is_configured():
-            logger.warning(
-                "New tournament notify: bot not configured, skip Telegram, pk=%s",
-                tournament_pk,
-            )
-            return
-        links = _get_new_tournament_recipients(tournament)
-        total = len(links)
-        if total == 0:
-            logger.info(
-                "New tournament pk=%s: no Telegram recipients",
-                tournament_pk,
-            )
-            return
-        message_text = _format_new_tournament_message(tournament)
-        sent = 0
-        for link in links:
-            try:
-                if bot.send_to_user(link.user_bot_chat_id, message_text):
-                    sent += 1
-            except Exception as e:
-                logger.warning(
-                    "New tournament notify to %s failed: %s", link.user_bot_chat_id, e
-                )
-        logger.info(
-            "New tournament pk=%s Telegram notified %s/%s users",
-            tournament_pk,
-            sent,
-            total,
-        )
-    except Exception as e:
-        logger.exception(
-            "_send_new_tournament_notification pk=%s failed: %s", tournament_pk, e
-        )
+    """Совместимый псевдоним подготовки; транспорт выполняет worker."""
+    _send_new_tournament_notification(tournament_pk)
 
 
-def notify_new_tournament(tournament) -> None:
+def notify_new_tournament(tournament: Tournament | None) -> None:
     """
     Уведомление всем пользователям с привязанным ботом о новом турнире.
-    Вызывается при создании турнира (post_save, created=True). Отправка в фоне.
+    Вызывается при создании турнира (post_save, created=True). Подготовка в cron.
     """
     pk = getattr(tournament, "pk", None)
     if not tournament or pk is None:
@@ -1226,7 +1237,7 @@ def notify_new_tournament(tournament) -> None:
     notify_new_tournament_by_pk(pk)
 
 
-def notify_tournament_start(tournament) -> None:
+def notify_tournament_start(tournament: Tournament) -> None:
     """
     Уведомление участникам турнира о начале турнира (в бот и в ЛК).
     Вызывать в день start_date турнира (например из cron утром).
@@ -1246,7 +1257,9 @@ def notify_tournament_start(tournament) -> None:
             )
         except Exception as e:
             logger.warning(
-                "notify_tournament_start Notification for user %s: %s", user.pk, e
+                "Уведомление о старте не сохранено: user_id={}, error={}",
+                user.pk,
+                type(e).__name__,
             )
 
     if not bot.is_configured():
@@ -1281,26 +1294,15 @@ def notify_tournament_start(tournament) -> None:
 
 
 def notify_new_tournament_by_pk(tournament_pk: int) -> None:
-    """
-    Запуск рассылки о новом турнире по pk. Вызывать после transaction.on_commit(),
-    чтобы турнир был уже закоммичен и виден в фоновом потоке.
+    """Сохранить задание подготовки ЛК, email и Telegram вместо daemon-потока."""
+    from .announcements import request_announcement
 
-    Рассылка включает ЛК-уведомления и email всем релевантным игрокам;
-    Telegram — при настроенном боте.
-    """
-    logger.info("New tournament pk=%s, starting background notify", tournament_pk)
-    thread = threading.Thread(
-        target=_send_new_tournament_notification,
-        args=(tournament_pk,),
-        daemon=True,
-        name=f"notify_tournament_{tournament_pk}",
-    )
-    thread.start()
+    request_announcement(tournament_pk)
 
 
 def notify_subscription_expiring(
-    user,
-    subscription,
+    user: User,
+    subscription: UserSubscription,
     days_left: int,
     *,
     has_autopay: bool = False,
@@ -1411,15 +1413,15 @@ def notify_subscription_expiring(
         user, text, reply_markup=reply_markup, event_key="subscription.expiring"
     )
     logger.info(
-        "notify_subscription_expiring: user=%s, tier=%s, days_left=%s, sent=%s",
-        user,
-        tier_name,
+        "Истечение подписки: user_id={}, tier_id={}, days_left={}, queued_or_email_accepted={}",
+        user.pk,
+        tier.pk,
         days_left,
         ok,
     )
 
 
-def notify_sparring_response(sparring_response) -> None:
+def notify_sparring_response(sparring_response: SparringResponse) -> None:
     """
     Уведомление автору заявки о новом отклике на спарринг.
 
@@ -1510,14 +1512,16 @@ def notify_sparring_response(sparring_response) -> None:
         author, text, reply_markup=reply_markup, event_key="sparring.response"
     )
     logger.info(
-        "notify_sparring_response: request=%s, respondent=%s, sent=%s",
+        "Отклик на спарринг: request_id={}, respondent_id={}, queued_or_email_accepted={}",
         request.pk,
         respondent.pk,
         ok,
     )
 
 
-def notify_sparring_response_accepted(sparring_response, match) -> None:
+def notify_sparring_response_accepted(
+    sparring_response: SparringResponse, match: Match
+) -> None:
     """Уведомление откликнувшемуся игроку: ваш отклик принят, матч создан (в бот)."""
     if not bot.is_configured():
         return
@@ -1547,32 +1551,37 @@ def notify_sparring_response_accepted(sparring_response, match) -> None:
         respondent_user, text, reply_markup=reply_markup, event_key="sparring.accepted"
     )
     logger.info(
-        "notify_sparring_response_accepted: response=%s, respondent=%s",
+        "Принятый отклик: response_id={}, respondent_id={}",
         sparring_response.pk,
         sparring_response.respondent_id,
     )
 
 
-def notify_doubles_join_accepted(join_request) -> None:
-    """Уведомление всем участникам отклика (парный 2×2): ваш отклик принят (в бот)."""
+def notify_doubles_join_accepted(join_request: DoublesJoinRequest) -> None:
+    """Сохранить Telegram для всех участников принятого отклика внутри сервисной транзакции."""
     if not bot.is_configured():
         return
-    text = (
-        "✅ <b>Ваш отклик на парный матч 2×2 принят!</b>\n\n"
-        "Ожидайте подтверждения матча автором заявки. После подтверждения матч появится в «Мои матчи»."
+    context = (
+        "командный спарринг"
+        if join_request.match_request.kind == "team"
+        else "парный матч 2×2"
     )
-    for m in join_request.members.select_related("player__user"):
+    text = (
+        f"✅ <b>Ваш отклик на {context} №{join_request.match_request_id} принят!</b>\n\n"
+        "Ожидайте формирования матчей автором заявки. Затем матчи появятся в «Мои матчи»."
+    )
+    for m in join_request.members.select_related("player__user").order_by("order"):
         if m.player and getattr(m.player, "user_id", None):
             send_to_user_by_user(
                 m.player.user, text, event_key="sparring.doubles_joined"
             )
     logger.info(
-        "notify_doubles_join_accepted: join_request=%s",
+        "Принятый парный отклик: join_request_id={}",
         join_request.pk,
     )
 
 
-def notify_team_sparring_ready(match_request) -> None:
+def notify_team_sparring_ready(match_request: DoublesMatchRequest) -> None:
     """
     Уведомление автору командного спарринга:
     команды сформированы (4 участника), можно сформировать матчи.
@@ -1611,14 +1620,14 @@ def notify_team_sparring_ready(match_request) -> None:
         author_user, text, reply_markup=reply_markup, event_key="sparring.team_ready"
     )
     logger.info(
-        "notify_team_sparring_ready: request=%s, user=%s, sent=%s",
+        "Командный спарринг готов: request_id={}, user_id={}, queued_or_email_accepted={}",
         match_request.pk,
         getattr(author_user, "pk", None),
         ok,
     )
 
 
-def _sparring_inviter_card_lines(inviter) -> list[str]:
+def _sparring_inviter_card_lines(inviter: Player) -> list[str]:
     """Строки HTML-описания пригласившего для Telegram."""
     lines: list[str] = [
         f"<b>{html.escape(str(inviter))}</b>",
@@ -1636,9 +1645,9 @@ def _sparring_inviter_card_lines(inviter) -> list[str]:
 
 
 def _notify_by_email_and_telegram(
-    user,
+    user: User | None,
     text: str,
-    reply_markup: dict | None = None,
+    reply_markup: dict[str, Any] | None = None,
     *,
     event_key: str = "platform.user_message",
 ) -> bool:
@@ -1653,7 +1662,7 @@ def _notify_by_email_and_telegram(
         reply_markup: Клавиатура Telegram.
 
     Returns:
-        True, если доставлено хотя бы в один канал.
+        True, если Telegram поставлен в очередь либо email принят транспортом.
     """
     if bot.is_configured():
         return send_to_user_by_user(
@@ -1662,7 +1671,7 @@ def _notify_by_email_and_telegram(
     return _send_notification_email_to_user(user=user, text=text, event_key=event_key)
 
 
-def notify_sparring_invitation_created(invitation) -> None:
+def notify_sparring_invitation_created(invitation: SparringInvitation) -> None:
     """
     Уведомление приглашённому: приглашение на спарринг (ЛК, почта и Telegram).
     """
@@ -1689,9 +1698,9 @@ def notify_sparring_invitation_created(invitation) -> None:
         )
     except Exception as e:
         logger.warning(
-            "notify_sparring_invitation_created LK failed user=%s: %s",
+            "Приглашение не сохранено в ЛК: user_id={}, error={}",
             getattr(invitee_user, "pk", None),
-            e,
+            type(e).__name__,
         )
 
     site_base = _get_site_base_url().rstrip("/")
@@ -1724,14 +1733,16 @@ def notify_sparring_invitation_created(invitation) -> None:
         invitee_user, text, reply_markup=reply_markup, event_key="sparring.invited"
     )
     logger.info(
-        "notify_sparring_invitation_created: invitation=%s invitee=%s sent=%s",
+        "Приглашение: invitation_id={}, invitee_id={}, queued_or_email_accepted={}",
         invitation.pk,
         getattr(invitee_user, "pk", None),
         ok,
     )
 
 
-def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
+def notify_sparring_invitation_accepted_inviter(
+    invitation: SparringInvitation, match: Match
+) -> None:
     """
     Уведомление пригласившему: приглашение принято, матч создан (ЛК, почта и Telegram).
     """
@@ -1746,19 +1757,12 @@ def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
     msg_lk = f"{invitee} принял(а) ваше приглашение на спарринг. Матч создан. Дедлайн: {deadline_str}."
     if len(msg_lk) > 255:
         msg_lk = msg_lk[:252] + "..."
-    try:
-        create_notification(
-            user=inviter_user,
-            message=msg_lk,
-            url=match_url,
-            event_key="sparring.invitation_accepted",
-        )
-    except Exception as e:
-        logger.warning(
-            "notify_sparring_invitation_accepted_inviter LK failed user=%s: %s",
-            getattr(inviter_user, "pk", None),
-            e,
-        )
+    create_notification(
+        user=inviter_user,
+        message=msg_lk,
+        url=match_url,
+        event_key="sparring.invitation_accepted",
+    )
 
     absolute_match_url = f"{_get_site_base_url().rstrip('/')}{match_url}"
     text = (
@@ -1787,7 +1791,7 @@ def notify_sparring_invitation_accepted_inviter(invitation, match) -> None:
         event_key="sparring.invitation_accepted",
     )
     logger.info(
-        "notify_sparring_invitation_accepted_inviter: invitation=%s inviter=%s sent=%s",
+        "Принятое приглашение: invitation_id={}, inviter_id={}, queued_or_email_accepted={}",
         invitation.pk,
         getattr(inviter_user, "pk", None),
         ok,

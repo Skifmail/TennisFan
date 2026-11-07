@@ -1,9 +1,14 @@
-"""
-Sparring app utilities.
-"""
+"""Sparring app utilities."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from apps.users.models import User
 
 
-def user_has_sparring_access(user) -> bool:
+def user_has_sparring_access(user: User) -> bool:
     """
     Вернуть True, если текущий тариф пользователя разрешает спарринги.
 

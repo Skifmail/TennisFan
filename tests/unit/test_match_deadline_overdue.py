@@ -57,7 +57,11 @@ class NotifyOverdueDeadlineTestCase(TestCase):
         )
 
     def test_overdue_assigns_auto_rt_to_higher_rated_without_penalty(self) -> None:
-        ok, msg = notify_admins_match_deadline_overdue(self.match)
+        with self.captureOnCommitCallbacks(execute=True):
+            ok, msg = notify_admins_match_deadline_overdue(self.match)
+            self.assertFalse(
+                any("просрочен дедлайн" in item.subject.lower() for item in mail.outbox)
+            )
 
         self.assertTrue(ok, msg)
         self.match.refresh_from_db()

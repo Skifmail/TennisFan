@@ -145,7 +145,7 @@ def _send_club_telegram(user: Any, text: str) -> bool:
         True при успешной отправке.
     """
     try:
-        ok = send_to_user_by_user(user, text, skip_email=center_enabled())
+        ok = send_to_user_by_user(user, text, skip_email=True)
         if ok:
             logger.info(
                 "club_telegram_sent | user_id=%s",

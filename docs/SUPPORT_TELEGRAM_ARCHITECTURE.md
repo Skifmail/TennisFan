@@ -1,140 +1,90 @@
-# Архитектура системы обратной связи через Telegram
+# Архитектура поддержки и оспаривания результатов
+
+Актуально на 6 ноября 2026. Название файла сохранено для существующих ссылок,
+но двустороннего Telegram-диалога поддержки в приложении **нет**.
 
 ## Общая схема
 
-```
-[Пользователь на сайте]                    [Администратор в Telegram]
-        |                                            |
-        | 1. Форма (тема, сообщение)                  |
-        v                                            |
-   Django: SupportMessage                            |
-        | 2. sendMessage(ADMIN_CHAT_ID)  ----------> Сообщение бота с #id
-        |    сохраняем admin_telegram_message_id     |
-        |                                            | 3. Reply на сообщение
-        | 4. Webhook: reply_to_message               |
-        v    ищем SupportMessage по message_id       |
-   Django: SupportMessage (is_from_admin=True)       |
-        | 5. sendMessage(USER_CHAT_ID)  <---------- Ответ пользователю в Telegram
-        v
-[Пользователь в Telegram получает ответ]
+1. Пользователь отправляет форму `/support/` или сообщение виджета сайта.
+2. `support_service.py` сохраняет `SupportThread` и `SupportMessage` в БД.
+3. `support_notifications.py` создаёт ЛК/push-уведомления активным сотрудникам
+   и при настройке почты отправляет письмо на `ADMIN_NOTIFICATIONS_EMAIL`.
+4. Сотрудник читает диалог в `/platform/support/` и отвечает через сайт.
+5. Ответ сохраняется как `SupportMessage(is_from_admin=True)`, становится
+   доступен в виджете пользователя; почтовый ответ отправляется асинхронно.
 
-Дальше: пользователь пишет боту в Telegram -> сохраняем, пересылаем админу.
-Админ отвечает reply -> ответ уходит пользователю. Двусторонний диалог.
-```
+Telegram-бот используется для игр, уведомлений и ссылки на форму оспаривания,
+а не для пересылки ответов поддержки. Подключать Telegram для обращения не нужно.
 
-## Связь пользователь ↔ Telegram
+## Модель диалога
 
-- **Telegram не позволяет боту писать пользователю первым.** Поэтому пользователь должен хотя бы раз инициировать контакт.
-- После отправки формы на сайте пользователь видит ссылку вида `https://t.me/BotUsername?start=TOKEN`.
-- Переход по ссылке и отправка боту команды `/start` (с параметром `TOKEN`) привязывает `telegram_chat_id` к аккаунту на сайте (модель `UserTelegramLink`).
-- Токен одноразовый, хранится в БД, действителен 24 часа.
+- `SupportThread` связывает диалог с аккаунтом либо гостевой сессией и email,
+  хранит дату последнего сообщения и счётчики непрочитанного.
+- `SupportMessage` хранит тему, текст, автора, признак ответа администратора,
+  время создания и редактирования.
+- `SupportAttachment` хранит приватные вложения; их выдача идёт через проверяемый
+  маршрут `/support/attachments/<pk>/`, а не публичную ссылку Telegram.
+- `BugReport` добавляет контекст страницы к сообщению об ошибке.
 
-## Модели данных
+`UserTelegramLink` не определяет доступ к диалогам. Его `user_bot_chat_id`
+относится только к пользовательскому боту. Оставшиеся legacy-поля Telegram
+в моделях не означают работающий маршрут или механизм ответа.
 
-### UserTelegramLink
+## Маршруты
 
-| Поле | Описание |
-|------|----------|
-| user | OneToOne → User (пользователь сайта) |
-| telegram_chat_id | BigInteger, nullable, unique — chat_id в Telegram |
-| binding_token | Токен для ссылки привязки (t.me/bot?start=TOKEN) |
-| token_created_at | Время создания токена (срок жизни 24 ч) |
+Пользователь:
 
-### SupportMessage
+- `GET /support/` — авторизованная форма. `subject` и `message` из query string
+  используются как начальные значения, но обращение ещё не создаётся.
+- `POST /support/` — валидация формы и сохранение сообщения.
+- `POST /api/feedback/submit/` — сообщение виджета, в том числе от гостя;
+  JSON или multipart с вложениями.
+- `GET /api/feedback/threads/` и `GET /api/feedback/unread-count/` — чтение
+  своего диалога и непрочитанных ответов.
+- `POST /api/feedback/message/update/` — изменение своего сообщения
+  в разрешённое окно.
 
-| Поле | Описание |
-|------|----------|
-| user | FK → User |
-| subject | Тема (опционально, с формы с сайта) |
-| text | Текст сообщения |
-| is_from_admin | True — ответ админа, False — сообщение пользователя |
-| created_at | Время создания |
-| admin_telegram_message_id | ID сообщения в Telegram (наше сообщение админу), для связи reply админа с записью |
+Сотрудник:
 
-**Связь reply админа с пользователем:** при отправке сообщения админу вызывается Telegram API `sendMessage`, в ответ приходит `message_id`. Мы сохраняем его в `SupportMessage.admin_telegram_message_id`. Когда админ нажимает «Ответить» в Telegram, в webhook приходит `message.reply_to_message.message_id` — по нему находим `SupportMessage`, получаем `user`, по `UserTelegramLink` — `telegram_chat_id` пользователя и отправляем ему ответ.
+- `GET /platform/support/` и `GET /platform/support/<thread_id>/` — список
+  и выбранный диалог.
+- `POST /api/support/admin/reply/` — ответ.
+- `POST /api/support/admin/message/update/` и
+  `POST /api/support/admin/message/delete/` — операции над ответами.
+- `GET /api/support/admin/unread-count/` — счётчик.
 
-## Эндпоинты
+Список действующих путей: `apps/core/urls.py`. Модуля
+`apps/core/telegram_support.py`, `/telegram/support-webhook/` и команды
+`clear_telegram_support_bindings` нет. Старые инструкции `setWebhook` для
+поддержки не применяются; `set_telegram_webhooks` настраивает только реальные роли.
 
-| URL | Метод | Описание |
-|-----|--------|----------|
-| `/support/` | GET | Форма обратной связи (тема, сообщение) |
-| `/support/` | POST | Создание SupportMessage, отправка админу, редирект на страницу успеха (при необходимости со ссылкой привязки) |
-| `/api/feedback/submit/` | POST (JSON) | То же для виджета: создание SupportMessage, ответ JSON с `telegram_binding_url` при необходимости |
-| `/api/feedback/threads/` | GET | Список сообщений пользователя (SupportMessage) для виджета |
-| `/telegram/support-webhook/` | POST | Webhook бота поддержки (TELEGRAM_SUPPORT_BOT_TOKEN) |
+## Оспаривание результата
 
-## Обработка webhook
+Бот и сайт применяют результат сразу. В сообщении участнику есть отдельная
+кнопка **«⚠️ Оспорить результат»**. `result_dispute_url()` формирует ссылку
+на `/support/` с темой и сообщением: номер матча, счёт, URL матча и место
+для причины. Параметры кодируются через `urlencode`.
 
-1. **Проверка секрета** (если задан `TELEGRAM_WEBHOOK_SECRET`): заголовок `X-Telegram-Bot-Api-Secret-Token` должен совпадать.
-2. **Ответ админа:** `message.reply_to_message` есть, `chat.id == TELEGRAM_ADMIN_CHAT_ID`. Ищем `SupportMessage` по `admin_telegram_message_id = reply_to_message.message_id`, получаем пользователя, отправляем ему ответ в Telegram, создаём `SupportMessage(is_from_admin=True)`.
-3. **/start с токеном:** личный чат, текст `/start TOKEN`. Ищем `UserTelegramLink` по `binding_token=TOKEN`, записываем `telegram_chat_id`, очищаем токен, отправляем подтверждение.
-4. **Обычное сообщение от пользователя:** личный чат, не reply. Ищем `UserTelegramLink` по `telegram_chat_id`. Если найден — создаём `SupportMessage`, отправляем админу, сохраняем `admin_telegram_message_id`. Если не найден — просим сначала привязать аккаунт по ссылке с сайта.
+Пользователь проверяет контекст и отправляет обращение. Сотрудник разбирает
+его через обычный диалог и при необходимости отдельно исправляет результат
+своими игровыми инструментами. Создание обращения само по себе не отменяет
+матч, рейтинг и списание. Контекст в тексте формы — подсказка, не доверенное
+подтверждение права на изменение матча.
 
-## Безопасность
+## Настройки и безопасность
 
-- **Whitelist админа:** ответы обрабатываются только если `message.chat.id == TELEGRAM_ADMIN_CHAT_ID` (ответ приходит из чата админа с ботом).
-- **Защита webhook:** опционально `TELEGRAM_SUPPORT_WEBHOOK_SECRET`; при setWebhook задаётся `secret_token`, Telegram присылает его в заголовке — проверяем в view, 403 при несовпадении.
-- Все сообщения хранятся в БД (Django ORM), Telegram не используется как хранилище.
+- Доступ сотрудника требует входа и `is_staff`/`is_superuser`; изменения
+  проходят существующую CSRF-защиту сайта.
+- Авторизованный пользователь определяется сессией сайта. Для гостя виджет
+  использует подписанную сессию и проверяет контактный email.
+- `ADMIN_NOTIFICATIONS_EMAIL`, `DEFAULT_FROM_EMAIL`, настройки email-backend
+  и `SUPPORT_EMAIL_TIMEOUT_SECONDS` относятся к почте поддержки.
+- `TELEGRAM_SUPPORT_*` не включает удалённого бота. Секрет
+  `TELEGRAM_USER_BOT_WEBHOOK_SECRET` обязателен только для действующего
+  `/telegram/user-bot-webhook/`; он не заменяет авторизацию на сайте.
+- Почта поддержки сохраняет имеющийся асинхронный механизм ответа; этот выпуск
+  не переводит все фоновые письма сайта на Telegram-очередь. Источником истины
+  остаётся сохранённый диалог, а не факт получения письма.
 
-## Настройка
-
-Используется **отдельный бот только для поддержки** (не основной бот уведомлений).
-
-1. **Переменные окружения**
-   - **Обязательно:** `TELEGRAM_SUPPORT_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID`.
-   - **По желанию:** `TELEGRAM_SUPPORT_BOT_USERNAME` — если не задан, username берётся через getMe; `TELEGRAM_SUPPORT_WEBHOOK_SECRET` — если не задан, webhook не проверяет секрет (всё равно работает).
-
-2. **Webhook бота поддержки**
-   - URL: `https://ваш-домен/telegram/support-webhook/`
-   - Установка (подставьте токен **бота поддержки**):  
-     `https://api.telegram.org/bot<TELEGRAM_SUPPORT_BOT_TOKEN>/setWebhook?url=https://ваш-домен/telegram/support-webhook/`  
-     С секретом:  
-     `...&secret_token=<TELEGRAM_SUPPORT_WEBHOOK_SECRET>`
-
-3. **Очистка старых привязок** (после смены бота или удаления пробных):
-   ```bash
-   python manage.py clear_telegram_support_bindings
-   ```
-   С опцией `--dry-run` — только показать количество записей.
-
-4. **Миграции**
-   ```bash
-   python manage.py migrate core
-   ```
-
-## Пример кода отправки
-
-**Админу (при создании обращения с сайта или из Telegram):**
-
-```python
-from apps.core import telegram_support as tg_support
-
-text = tg_support.format_support_message_to_admin(
-    support_message_id=support_msg.pk,
-    user_display=user.get_full_name() or user.email,
-    user_email=user.email or "",
-    subject=subject,
-    text=message,
-    source="сайт",  # или "Telegram"
-)
-msg_id, ok = tg_support.send_to_admin(text)
-if ok and msg_id:
-    support_msg.admin_telegram_message_id = msg_id
-    support_msg.save(update_fields=["admin_telegram_message_id"])
-```
-
-**Пользователю (ответ поддержки):**
-
-```python
-from apps.core import telegram_support as tg_support
-
-# link = UserTelegramLink.objects.get(user=user)
-if link.telegram_chat_id:
-    tg_support.send_to_user(link.telegram_chat_id, "📩 Ответ поддержки:\n\n" + reply_text)
-```
-
-## Ограничения
-
-- Не используется polling — только webhook.
-- Писать пользователю в Telegram можно только после того, как он сам написал боту (или перешёл по ссылке и отправил /start).
-- Хранение данных — только в БД (PostgreSQL/Django), не в Telegram.
+См. [настройку бота](TELEGRAM_USER_BOT.md) и
+[план выпуска](telegram-bot-release-plan.md).

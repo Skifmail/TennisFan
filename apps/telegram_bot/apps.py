@@ -1,26 +1,21 @@
-import logging
+from typing import Any
 
 from django.apps import AppConfig
-from django.db import transaction
 from django.db.models.signals import post_save
+from loguru import logger
 
-logger = logging.getLogger(__name__)
 
-
-def _on_tournament_created(sender, instance, created, **kwargs):
-    """При создании турнира — ЛК, email и Telegram после коммита транзакции."""
-    if created:
-        pk = instance.pk
-        logger.info(
-            "Tournament created signal: pk=%s, name=%s",
-            pk,
-            getattr(instance, "name", ""),
-        )
-        # Запускаем уведомление после commit, иначе в фоновом потоке турнир ещё не виден (транзакция не закоммичена).
-        transaction.on_commit(lambda: _notify_after_commit(pk))
+def _on_tournament_created(
+    sender: Any, instance: Any, created: bool, **kwargs: Any
+) -> None:
+    """Сохранить подготовку вместе с новым турниром; сеть работает только в cron."""
+    if created and not kwargs.get("raw"):
+        _notify_after_commit(instance.pk)
+        logger.info("Сохранено задание уведомления о турнире: pk={}", instance.pk)
 
 
 def _notify_after_commit(tournament_pk: int) -> None:
+    """Совместимый вход для сохраняемой подготовки, без отправки в сеть."""
     from . import notifications
 
     notifications.notify_new_tournament_by_pk(tournament_pk)
@@ -31,7 +26,12 @@ class TelegramBotConfig(AppConfig):
     name = "apps.telegram_bot"
     verbose_name = "Телеграм"
 
-    def ready(self):
+    def ready(self) -> None:
+        """Подключить создание задания уведомления без фоновых потоков."""
         from apps.tournaments.models import Tournament
 
-        post_save.connect(_on_tournament_created, sender=Tournament)
+        post_save.connect(
+            _on_tournament_created,
+            sender=Tournament,
+            dispatch_uid="telegram_tournament_announcement",
+        )

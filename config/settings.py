@@ -445,28 +445,38 @@ SUPPORT_EMAIL_TIMEOUT_SECONDS = int(
 # TELEGRAM
 # ------------------------------------------------------------------------------
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 _telegram_admin_raw = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
 TELEGRAM_ADMIN_CHAT_ID = _telegram_admin_raw.strip()
 # Список chat_id для рассылки уведомлений и поддержки (через запятую в .env)
 TELEGRAM_ADMIN_CHAT_IDS = [
     cid.strip() for cid in _telegram_admin_raw.split(",") if cid.strip()
 ]
-TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "")
+TELEGRAM_USER_BOT_TOKEN = os.environ.get("TELEGRAM_USER_BOT_TOKEN", "").strip()
+# Без секрета входящий webhook всегда отказывает; команду настройки выполнять отдельно.
 TELEGRAM_USER_BOT_WEBHOOK_SECRET = os.environ.get(
     "TELEGRAM_USER_BOT_WEBHOOK_SECRET", ""
-)
+).strip()
 # Задайте @username бота без запроса getMe к API (удобно при блокировке api.telegram.org).
 TELEGRAM_USER_BOT_USERNAME = os.environ.get("TELEGRAM_USER_BOT_USERNAME", "").strip()
 TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID = os.environ.get(
     "TELEGRAM_PRIVATE_COMMUNITY_CHAT_ID", ""
-)
+).strip()
+# Два разных отрицательных ID обязательны для включения подписного доступа.
+TELEGRAM_PUBLIC_COMMUNITY_CHAT_ID = os.environ.get(
+    "TELEGRAM_PUBLIC_COMMUNITY_CHAT_ID", ""
+).strip()
+TELEGRAM_PRIVATE_CHAT_ACCESS_ENABLED: Final = os.environ.get(
+    "TELEGRAM_PRIVATE_CHAT_ACCESS_ENABLED", "False"
+).strip().lower() in ("1", "true", "yes", "on")
 # Публичная ссылка на открытое сообщество TennisFan в Telegram (при открытых группах)
 TELEGRAM_PUBLIC_COMMUNITY_URL = (
     os.environ.get("TELEGRAM_PUBLIC_COMMUNITY_URL", "https://t.me/TennisFanu").strip()
     or "https://t.me/TennisFanu"
 )
-TELEGRAM_BOT_SITE_BASE_URL = os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "")
+TELEGRAM_BOT_SITE_BASE_URL = (
+    os.environ.get("TELEGRAM_BOT_SITE_BASE_URL", "").strip().rstrip("/")
+)
 # Исходящий прокси только для Telegram Bot API (если api.telegram.org недоступен напрямую).
 TELEGRAM_API_PROXY_URL = os.environ.get("TELEGRAM_API_PROXY_URL", "").strip()
 # Глобально отключить исходящие запросы к Telegram Bot API (боты, уведомления, webhooks-команда).

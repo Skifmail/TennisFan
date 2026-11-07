@@ -7,11 +7,9 @@ import math
 from datetime import timedelta
 from typing import cast
 
-from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.sports import Sport
-from apps.notifications.services import create_notification
 from apps.users.models import Player
 
 from .models import (
@@ -773,6 +771,11 @@ def finalize_tournament(tournament: Tournament) -> tuple[bool, str]:
     Турнир завершён (финал сыгран). Начислить очки финалисту и победителю.
     Финал — матч без next_match (корень бинарного дерева).
     """
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return False, "Турнир использует ручные этапы."
+
     if not _is_fan(tournament):
         return False, "Не FAN."
     if tournament.status == "completed":
@@ -891,35 +894,10 @@ def _overdue_winner(match: Match) -> Player | None:
 
 
 def apply_overdue_walkover(match: Match, winner: Player) -> None:
-    """
-    Оформить тех. победу (дедлайн истёк): обновить матч, отклонить заявки, уведомить игроков.
-    Не вызывает advance_winner / finalize — это делает вызывающий код.
-    """
-    loser = match.player2 if winner == match.player1 else match.player1
-    if loser is None:
-        return
-    match.winner = winner
-    match.status = Match.MatchStatus.WALKOVER
-    match.completed_datetime = timezone.now()
-    match.save(update_fields=["winner", "status", "completed_datetime"])
+    """Совместимый вход авто-RT; победитель выбирается по свежему рейтингу под блокировкой."""
+    from .overdue import apply_deadline_auto_rt
 
-    match.result_proposals.filter(status=Match.ProposalStatus.PENDING).update(
-        status=Match.ProposalStatus.REJECTED
-    )
-    url = reverse("match_detail", args=[match.pk])
-    create_notification(
-        user=winner.user,
-        message="Дедлайн матча истёк. Вам присуждена тех. победа.",
-        url=url,
-        event_key="match.overdue_result",
-    )
-    create_notification(
-        user=loser.user,
-        message="Дедлайн матча истёк. Вам засчитано тех. поражение.",
-        url=url,
-        event_key="match.overdue_result",
-    )
-    logger.info("Overdue walkover: match %s → winner %s", match.pk, winner)
+    apply_deadline_auto_rt(match)
 
 
 def process_overdue_match(match: Match) -> tuple[bool, str]:
@@ -932,4 +910,5 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
         return False, "Не FAN."
     from .overdue import notify_admins_match_deadline_overdue
 
-    return notify_admins_match_deadline_overdue(match)
+    result: tuple[bool, str] = notify_admins_match_deadline_overdue(match)
+    return result

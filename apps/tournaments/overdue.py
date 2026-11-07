@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
-import logging
-from typing import cast
+from datetime import datetime
+from functools import partial
 
 from django.db import transaction
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
+from loguru import logger
 
 from apps.notifications.services import create_notification
 from apps.users.models import Player, User
 
+from .match_locking import lock_match, lock_match_participants
 from .models import Match, SeasonPoints, Tournament, TournamentStatus, TournamentTeam
 from .rating import WALKOVER_NO_SHOW_PENALTY
 
-logger = logging.getLogger(__name__)
+
+def _lock_current_match(match: Match) -> None:
+    """Перечитать матч под общей блокировкой до проверки статуса, дедлайна и рейтинга."""
+    if lock_match(match.pk) is None:
+        raise ValueError("Матч не найден.")
+    match.refresh_from_db()
+    lock_match_participants(match)
 
 
 def get_overdue_notification_recipients(match: Match) -> list[User]:
@@ -60,17 +68,21 @@ def get_overdue_notification_recipients(match: Match) -> list[User]:
 
 def _manage_url(match: Match) -> str:
     """Ссылка на управление турниром с якорем на матч."""
-    if match.tournament_id:
-        return (
-            cast(str, reverse("tournament_manage", args=[match.tournament.slug]))
-            + f"#match-{match.pk}"
+    tournament = match.tournament
+    url: str
+    if tournament is not None:
+        url = (
+            reverse("tournament_manage", args=[tournament.slug]) + f"#match-{match.pk}"
         )
-    return cast(str, reverse("match_detail", args=[match.pk]))
+    else:
+        url = reverse("match_detail", args=[match.pk])
+    return url
 
 
 def _build_overdue_lk_message(match: Match) -> str:
     """Короткий текст уведомления в личный кабинет (лимит 255 символов)."""
-    tournament_name = match.tournament.name if match.tournament_id else "турнир"
+    tournament = match.tournament
+    tournament_name = tournament.name if tournament is not None else "турнир"
     winner_name = match.get_player1_display()
     if match.winner_id == match.player2_id or (
         match.winner_team_id and match.winner_team_id == match.team2_id
@@ -127,8 +139,12 @@ def pick_higher_rated_winner(
         return player_a, None
     from apps.users.sport_rating import rating_points
 
-    points_a = rating_points(player_a, match.sport)
-    points_b = rating_points(player_b, match.sport)
+    points_a = rating_points(player_a, match.sport) + (
+        rating_points(match.partner1, match.sport) if match.partner1_id else 0.0
+    )
+    points_b = rating_points(player_b, match.sport) + (
+        rating_points(match.partner2, match.sport) if match.partner2_id else 0.0
+    )
     if points_a != points_b:
         winner = player_a if points_a > points_b else player_b
         return winner, None
@@ -136,17 +152,17 @@ def pick_higher_rated_winner(
     return winner, None
 
 
+@transaction.atomic
 def apply_deadline_auto_rt(match: Match, *, notify: bool = True) -> None:
     """Закрыть просроченный матч как RT 0:0: побеждает более высокий рейтинг.
 
     Рейтинг силы не меняется. Счёт записывается нулями, бейдж Rt.
     """
-    if match.status in (
-        Match.MatchStatus.COMPLETED,
-        Match.MatchStatus.WALKOVER,
-        Match.MatchStatus.CANCELLED,
-    ):
+    _lock_current_match(match)
+    if match.status not in (Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS):
         raise ValueError("Матч уже завершён.")
+    if not match.deadline or match.deadline > timezone.now():
+        raise ValueError("Дедлайн не истёк.")
     winner, winner_team = pick_higher_rated_winner(match)
     if winner is None:
         raise ValueError("Нельзя определить победителя по рейтингу.")
@@ -175,7 +191,7 @@ def apply_deadline_auto_rt(match: Match, *, notify: bool = True) -> None:
     if notify:
         _notify_players_deadline_auto_rt(match, winner=winner, winner_team=winner_team)
     logger.info(
-        "Deadline auto RT: match %s → winner %s",
+        "Deadline auto RT: match {} → winner {}",
         match.pk,
         winner.pk,
     )
@@ -193,39 +209,38 @@ def _notify_players_deadline_auto_rt(
     url = reverse("match_detail", args=[match.pk])
     win_msg = "Дедлайн матча истёк. Вам присуждена тех. победа (RT 0:0)."
     lose_msg = "Дедлайн матча истёк. Вам засчитано тех. поражение (RT 0:0)."
-    recipients: list[tuple[Player | None, str]] = []
-    if winner_team is not None and match.team1 and match.team2:
-        loser_team = match.team2 if winner_team.pk == match.team1_id else match.team1
-        for player in (winner_team.player1, winner_team.player2):
-            recipients.append((player, win_msg))
-        for player in (loser_team.player1, loser_team.player2):
-            recipients.append((player, lose_msg))
-    else:
-        loser = match.player2 if winner.pk == match.player1_id else match.player1
-        recipients.append((winner, win_msg))
-        recipients.append((loser, lose_msg))
-    for player, message in recipients:
+    from .utils import get_match_participants, get_match_player_side
+
+    winner_side = get_match_player_side(match, winner)
+    for player in sorted(get_match_participants(match), key=lambda player: player.pk):
         if player is None or getattr(player, "is_bye", False):
             continue
-        try:
-            create_notification(
-                user=player.user,
-                message=message,
-                url=url,
-                event_key="match.overdue_result",
-            )
-        except Exception:
-            logger.exception(
-                "deadline auto RT notify player %s match %s failed",
-                getattr(player, "pk", None),
-                match.pk,
-            )
+        create_notification(
+            user=player.user,
+            message=(
+                win_msg
+                if get_match_player_side(match, player) == winner_side
+                else lose_msg
+            ),
+            url=url,
+            event_key="match.overdue_result",
+        )
+
+    from apps.telegram_bot.notifications import notify_result_confirmed_to_participants
+
+    notify_result_confirmed_to_participants(match)
 
 
-def revert_deadline_auto_rt(match: Match) -> None:
+@transaction.atomic
+def revert_deadline_auto_rt(
+    match: Match, *, new_deadline: datetime | None = None
+) -> None:
     """Откатить автоматический RT: матч снова запланирован, слот сетки очищен."""
+    _lock_current_match(match)
     if not match.is_deadline_auto_rt():
         raise ValueError("Это не автоматический RT по дедлайну.")
+    if new_deadline is not None:
+        match.deadline = new_deadline
     old_winner_id = match.winner_id
     old_winner_team_id = match.winner_team_id
     match.status = Match.MatchStatus.SCHEDULED
@@ -250,17 +265,23 @@ def revert_deadline_auto_rt(match: Match) -> None:
     if match.tournament_id:
         tournament = Tournament.objects.get(pk=match.tournament_id)
         _reopen_tournament_after_auto_rt_revert(tournament)
-    logger.info("Reverted deadline auto RT: match %s", match.pk)
+    logger.info("Reverted deadline auto RT: match {}", match.pk)
 
 
-def revert_no_show_walkover(match: Match) -> None:
+@transaction.atomic
+def revert_no_show_walkover(
+    match: Match, *, new_deadline: datetime | None = None
+) -> None:
     """Откатить клубный Walkover (неявку): матч снова запланирован.
 
     Штраф рейтинга и matches_played / matches_won возвращаются.
     Продление дедлайна после неявки снова открывает матч.
     """
+    _lock_current_match(match)
     if not match.is_no_show_walkover():
         raise ValueError("Это не Walkover (неявка).")
+    if new_deadline is not None:
+        match.deadline = new_deadline
     old_winner_id = match.winner_id
     old_winner_team_id = match.winner_team_id
     _revert_old_walkover_effects(match)
@@ -286,15 +307,17 @@ def revert_no_show_walkover(match: Match) -> None:
     if match.tournament_id:
         tournament = Tournament.objects.get(pk=match.tournament_id)
         _reopen_tournament_after_auto_rt_revert(tournament)
-    logger.info("Reverted no-show walkover: match %s", match.pk)
+    logger.info("Reverted no-show walkover: match {}", match.pk)
 
 
+@transaction.atomic
 def _reopen_tournament_after_auto_rt_revert(tournament: Tournament) -> None:
     """Вернуть турнир в ACTIVE и откатить очки за места после авто-RT.
 
     Авто-RT на последнем матче финализирует круговик. Продление дедлайна
     снова открывает матч — турнир не может оставаться завершённым.
     """
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
     if tournament.status != TournamentStatus.COMPLETED:
         return
     from .season_utils import get_current_season
@@ -307,7 +330,11 @@ def _reopen_tournament_after_auto_rt_revert(tournament: Tournament) -> None:
         awarded = int(result.fan_points or 0)
         if awarded <= 0 or not result.player_id:
             continue
-        season_points = SeasonPoints.objects.filter(player_id=result.player_id).first()
+        season_points = (
+            SeasonPoints.objects.select_for_update()
+            .filter(player_id=result.player_id)
+            .first()
+        )
         if (
             season_points is None
             or season_points.season_name != current_season.name
@@ -323,11 +350,12 @@ def _reopen_tournament_after_auto_rt_revert(tournament: Tournament) -> None:
     tournament.completion_notified_at = None
     tournament.save(update_fields=["status", "completion_notified_at"])
     logger.info(
-        "Reopened tournament %s after deadline auto RT revert",
+        "Reopened tournament {} after deadline auto RT revert",
         tournament.pk,
     )
 
 
+@transaction.atomic
 def notify_admins_match_deadline_overdue(match: Match) -> tuple[bool, str]:
     """При просрочке: RT 0:0, побеждает более высокий рейтинг, уведомление админам.
 
@@ -337,11 +365,8 @@ def notify_admins_match_deadline_overdue(match: Match) -> tuple[bool, str]:
     Returns:
         Пара (успех, сообщение для cron/логов).
     """
-    if match.status in (
-        Match.MatchStatus.COMPLETED,
-        Match.MatchStatus.WALKOVER,
-        Match.MatchStatus.CANCELLED,
-    ):
+    _lock_current_match(match)
+    if match.status not in (Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS):
         return False, "Матч уже завершён."
     if not match.deadline or match.deadline > timezone.now():
         return False, "Дедлайн не истёк."
@@ -357,7 +382,7 @@ def notify_admins_match_deadline_overdue(match: Match) -> tuple[bool, str]:
     recipients = get_overdue_notification_recipients(match)
     if not recipients:
         logger.warning(
-            "Overdue match %s: нет получателей уведомления (staff/club admins).",
+            "Overdue match {}: нет получателей уведомления (staff/club admins).",
             match.pk,
         )
         match.deadline_overdue_notified_at = timezone.now()
@@ -366,29 +391,34 @@ def notify_admins_match_deadline_overdue(match: Match) -> tuple[bool, str]:
 
     url = _manage_url(match)
     message = _build_overdue_lk_message(match)
-    emailed = 0
+    email_scheduled = 0
     from apps.core.email_service import send_match_deadline_overdue_admin_email
 
     for user in recipients:
         create_notification(
             user=user, message=message, url=url, event_key="match.overdue_admin"
         )
-        if send_match_deadline_overdue_admin_email(user, match, manage_url=url):
-            emailed += 1
+        if user.email and "@" in user.email:
+            transaction.on_commit(
+                partial(
+                    send_match_deadline_overdue_admin_email, user, match, manage_url=url
+                )
+            )
+            email_scheduled += 1
 
     match.deadline_overdue_notified_at = timezone.now()
     match.save(update_fields=["deadline_overdue_notified_at"])
     logger.info(
-        "Overdue match %s: уведомлены %s админов, писем %s",
+        "Overdue match {}: уведомлены {} админов, писем запланировано {}",
         match.pk,
         len(recipients),
-        emailed,
+        email_scheduled,
     )
     return (
         True,
         (
             f"Матч {match.pk}: администраторы уведомлены о просрочке "
-            f"(ЛК: {len(recipients)}, email: {emailed})."
+            f"(ЛК: {len(recipients)}, email запланировано: {email_scheduled})."
         ),
     )
 
@@ -441,6 +471,7 @@ def resolve_no_show_penalty(penalty: float | None) -> float:
     return abs(float(penalty))
 
 
+@transaction.atomic
 def apply_no_show_walkover(
     match: Match,
     *,
@@ -460,12 +491,13 @@ def apply_no_show_walkover(
     обе стороны получают свой штраф. Ноль штрафа означает, что рейтинг
     не меняется. ``replace=True`` позволяет править уже проставленный WO.
     """
+    _lock_current_match(match)
     is_edit = replace and (match.is_no_show_walkover() or match.is_deadline_auto_rt())
-    if match.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
-        if not is_edit:
-            raise ValueError("Матч уже завершён.")
-        if match.is_walkover_loss():
-            raise ValueError("Retired нельзя заменить этим Walkover (неявкой).")
+    if (
+        match.status not in (Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS)
+        and not is_edit
+    ):
+        raise ValueError("Матч уже завершён, отменён или ещё не готов к игре.")
 
     is_doubles = bool(match.team1_id and match.team2_id)
     if side1_no_show is None or side2_no_show is None:
@@ -520,19 +552,12 @@ def apply_no_show_walkover(
             old_winner_team_id=old_winner_team_id,
         )
 
-    if notify and not is_edit:
+    if notify:
         from .proposal_service import notify_participants_match_result_confirmed
 
-        try:
-            notify_participants_match_result_confirmed(match, walkover=True)
-        except Exception:
-            logger.exception(
-                "notify_participants_match_result_confirmed after no-show "
-                "walkover match %s failed",
-                match.pk,
-            )
+        notify_participants_match_result_confirmed(match, walkover=True)
     logger.info(
-        "No-show walkover: match %s, winner %s, penalties %.0f/%.0f",
+        "No-show walkover: match {}, winner {}, penalties {:.0f}/{:.0f}",
         match.pk,
         match.winner_id,
         resolved_side1,
@@ -556,9 +581,12 @@ def _sides_from_loser(
         return loser_team.pk == match.team1_id, loser_team.pk == match.team2_id
     if loser is None:
         raise ValueError("Укажите игрока с Walkover (неявкой).")
-    if loser.pk not in (match.player1_id, match.player2_id):
+    from .utils import get_match_player_side
+
+    side = get_match_player_side(match, loser)
+    if side is None:
         raise ValueError("Игрок не участвует в этом матче.")
-    return loser.pk == match.player1_id, loser.pk == match.player2_id
+    return side == 1, side == 2
 
 
 def _assign_walkover_winner(
@@ -590,12 +618,12 @@ def _sync_bracket_after_walkover_edit(
     old_winner_team_id: int | None,
 ) -> None:
     """Обновить слот следующего матча после правки Walkover (неявки)."""
-    parent = match.next_match
+    parent = lock_match(match.next_match_id) if match.next_match_id else None
     if parent is None:
         return
     if parent.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER):
         logger.warning(
-            "Walkover edit match %s: next match %s already finished, skip slot sync",
+            "Walkover edit match {}: next match {} already finished, skip slot sync",
             match.pk,
             parent.pk,
         )
@@ -654,20 +682,18 @@ def _players_matching_name(query: str) -> list[Player]:
 
 def _reload_match(match_id: int) -> Match:
     """Перечитать матч со связанными игроками."""
-    return cast(
-        Match,
-        Match.objects.select_related(
-            "player1__user",
-            "player2__user",
-            "winner",
-            "tournament",
-            "team1__player1",
-            "team1__player2",
-            "team2__player1",
-            "team2__player2",
-            "winner_team",
-        ).get(pk=match_id),
-    )
+    match: Match = Match.objects.select_related(
+        "player1__user",
+        "player2__user",
+        "winner",
+        "tournament",
+        "team1__player1",
+        "team1__player2",
+        "team2__player1",
+        "team2__player2",
+        "winner_team",
+    ).get(pk=match_id)
+    return match
 
 
 def find_match_for_walkover_replace(
@@ -692,7 +718,7 @@ def find_match_for_walkover_replace(
         ValueError: Если матч не найден или найдено несколько.
     """
     if match_id:
-        match = (
+        match: Match | None = (
             Match.objects.filter(pk=match_id)
             .select_related(
                 "player1__user",
@@ -704,7 +730,7 @@ def find_match_for_walkover_replace(
         )
         if match is None:
             raise ValueError(f"Матч не найден: id={match_id}")
-        return cast(Match, match)
+        return match
 
     player_q = player_query.strip()
     opponent_q = opponent_query.strip()
@@ -734,13 +760,13 @@ def find_match_for_walkover_replace(
             Q(tournament__name__icontains=tournament_q)
             | Q(tournament__slug__icontains=tournament_q)
         )
-    matches = list(qs.order_by("-pk"))
+    matches: list[Match] = list(qs.order_by("-pk"))
     if not matches:
         raise ValueError(f"Walkover-матч не найден: {player_q} vs {opponent_q}.")
     if len(matches) > 1:
         ids = ", ".join(str(m.pk) for m in matches)
         raise ValueError(f"Найдено несколько матчей ({ids}). Укажите --match-id.")
-    return cast(Match, matches[0])
+    return matches[0]
 
 
 def resolve_walkover_loser(
@@ -766,17 +792,19 @@ def resolve_walkover_loser(
         raise ValueError("Для парного матча укажите --match-id и правьте вручную.")
     if not match.player1_id or not match.player2_id:
         raise ValueError("У матча нет обоих игроков.")
+    first: Player | None = match.player1
+    second: Player | None = match.player2
 
     if keep_winner:
         if not match.winner_id:
             raise ValueError("У матча нет победителя, укажите --loser.")
         if match.winner_id == match.player1_id:
-            if match.player2 is None:
+            if second is None:
                 raise ValueError("У матча нет второго игрока.")
-            return cast(Player, match.player2)
-        if match.player1 is None:
+            return second
+        if first is None:
             raise ValueError("У матча нет первого игрока.")
-        return cast(Player, match.player1)
+        return first
 
     query = loser_query.strip()
     if not query:
@@ -784,11 +812,11 @@ def resolve_walkover_loser(
 
     candidates = [
         player
-        for player in (match.player1, match.player2)
+        for player in (first, second)
         if player is not None and _player_matches_query(player, query)
     ]
     if len(candidates) == 1:
-        return cast(Player, candidates[0])
+        return candidates[0]
     if not candidates:
         raise ValueError(f"Игрок «{query}» не участвует в этом матче.")
     raise ValueError(f"Фрагмент «{query}» подходит обоим игрокам, уточните.")
@@ -820,43 +848,35 @@ def _new_deltas_for_loser(match: Match, loser: Player) -> tuple[float, float]:
 
 def _revert_old_walkover_effects(match: Match) -> None:
     """Откатить FAN-дельты и matches_played / matches_won текущего walkover."""
+    from apps.core.sports import Sport
     from apps.tournaments.signals import _revert_player_rating
-    from apps.tournaments.withdraw import _revert_player_stats_for_walkover
+    from apps.users.sport_rating import get_sport_profile
+
+    from .utils import get_match_participants, get_match_player_side
+
+    if match.rating_status != Match.RatingCalcStatus.CALCULATED:
+        return
 
     d1 = float(match.rating_delta_player1 or 0.0)
     d2 = float(match.rating_delta_player2 or 0.0)
-    if match.team1_id and match.team2_id:
-        if match.team1:
-            for player in (match.team1.player1, match.team1.player2):
-                _revert_player_rating(player, d1)
-                _revert_player_stats_for_walkover(
-                    match,
-                    player=player,
-                    was_winner=match.winner_team_id == match.team1_id,
-                )
-        if match.team2:
-            for player in (match.team2.player1, match.team2.player2):
-                _revert_player_rating(player, d2)
-                _revert_player_stats_for_walkover(
-                    match,
-                    player=player,
-                    was_winner=match.winner_team_id == match.team2_id,
-                )
-        return
-    _revert_player_rating(match.player1, d1)
-    _revert_player_rating(match.player2, d2)
-    if match.player1:
-        _revert_player_stats_for_walkover(
-            match,
-            player=match.player1,
-            was_winner=match.winner_id == match.player1_id,
+    winner_side = get_match_player_side(match, match.winner) if match.winner else None
+    for player in sorted(get_match_participants(match), key=lambda player: player.pk):
+        if player.is_bye:
+            continue
+        side = get_match_player_side(match, player)
+        _revert_player_rating(player, d1 if side == 1 else d2, match.sport)
+        stats = (
+            get_sport_profile(player, Sport.PADEL)
+            if match.sport == Sport.PADEL
+            else player
         )
-    if match.player2:
-        _revert_player_stats_for_walkover(
-            match,
-            player=match.player2,
-            was_winner=match.winner_id == match.player2_id,
-        )
+        if stats is None:
+            continue
+        stats.refresh_from_db(fields=["matches_played", "matches_won"])
+        stats.matches_played = max(0, stats.matches_played - 1)
+        if side == winner_side:
+            stats.matches_won = max(0, stats.matches_won - 1)
+        stats.save(update_fields=["matches_played", "matches_won"])
 
 
 def _reset_walkover_to_scheduled(match: Match) -> None:
@@ -874,6 +894,7 @@ def _reset_walkover_to_scheduled(match: Match) -> None:
     )
 
 
+@transaction.atomic
 def replace_no_show_walkover(
     match: Match,
     *,
@@ -899,7 +920,7 @@ def replace_no_show_walkover(
     Raises:
         ValueError: Если матч нельзя заменить таким Walkover.
     """
-    match = _reload_match(match.pk)
+    _lock_current_match(match)
     if loser.pk not in (match.player1_id, match.player2_id):
         raise ValueError("Игрок не участвует в этом матче.")
 
@@ -925,7 +946,8 @@ def replace_no_show_walkover(
     new_delta1, new_delta2 = _new_deltas_for_loser(match, loser)
     p1_name = match.get_player1_display()
     p2_name = match.get_player2_display()
-    tournament_name = match.tournament.name if match.tournament_id else "—"
+    tournament = match.tournament
+    tournament_name = tournament.name if tournament is not None else "—"
     winner_name = match.winner.get_display_name() if match.winner else "—"
     new_winner = match.player2 if loser.pk == match.player1_id else match.player1
     new_winner_name = new_winner.get_display_name() if new_winner else "—"
@@ -950,7 +972,7 @@ def replace_no_show_walkover(
         ),
         (f"ожидаемый рейтинг: {p1_name}={p1_after:.1f} {p2_name}={p2_after:.1f}"),
     ]
-    if match.tournament_id and match.tournament.status == "completed":
+    if tournament is not None and tournament.status == TournamentStatus.COMPLETED:
         lines.append("внимание: турнир уже завершён; таблица мест не пересчитывается.")
         if match.winner_id and new_winner and match.winner_id != new_winner.pk:
             lines.append("внимание: победитель изменится — проверьте места вручную.")

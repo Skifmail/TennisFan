@@ -40,11 +40,15 @@ class SparringInvitationNotificationTests(TestCase):
 
     def test_invitee_gets_lk_and_email_without_telegram_bot(self) -> None:
         """Приглашённому создаётся уведомление в ЛК и письмо со ссылкой."""
-        with patch(
-            "apps.telegram_bot.notifications.bot.is_configured",
-            return_value=False,
+        with (
+            patch(
+                "apps.telegram_bot.notifications.bot.is_configured",
+                return_value=False,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             notify_sparring_invitation_created(self.invitation)
+            self.assertEqual(len(mail.outbox), 0)
 
         notice = Notification.objects.get(user=self.invitee.user)
         self.assertIn("пригласил вас на спарринг", notice.message)
@@ -60,9 +64,12 @@ class SparringInvitationNotificationTests(TestCase):
         """После принятия пригласивший получает письмо и уведомление со ссылкой на матч."""
         match = create_match_from_invitation(self.invitation)
         mail.outbox.clear()
-        with patch(
-            "apps.telegram_bot.notifications.bot.is_configured",
-            return_value=False,
+        with (
+            patch(
+                "apps.telegram_bot.notifications.bot.is_configured",
+                return_value=False,
+            ),
+            self.captureOnCommitCallbacks(execute=True),
         ):
             notify_sparring_invitation_accepted_inviter(self.invitation, match)
 

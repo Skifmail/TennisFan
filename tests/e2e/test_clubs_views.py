@@ -817,22 +817,29 @@ class ClubTournamentManagementViewsTestCase(TestCase):
         )
 
         new_date = (date.today() + timedelta(days=14)).isoformat()
-        response = self.client.post(
-            reverse(
-                "tournament_manage_match_deadline",
-                kwargs={"slug": tournament.slug, "pk": match.pk},
-            ),
-            {"deadline": new_date},
-            secure=True,
-            follow=True,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse(
+                    "tournament_manage_match_deadline",
+                    kwargs={"slug": tournament.slug, "pk": match.pk},
+                ),
+                {"deadline": new_date},
+                secure=True,
+                follow=True,
+            )
+            self.assertFalse(
+                OutboundEmail.objects.filter(
+                    subject__icontains="изменён дедлайн"
+                ).exists()
+            )
         self.assertEqual(response.status_code, 200)
         match.refresh_from_db()
         self.assertEqual(
             timezone.localtime(match.deadline).date(), date.fromisoformat(new_date)
         )
         self.assertContains(response, "Дедлайн матча обновлён")
-        self.assertContains(response, "Уведомления отправлены участникам")
+        self.assertContains(response, "Уведомления сохранены для участников")
+        self.assertContains(response, "email запланировано: 2")
         deadline_notifs_p1 = Notification.objects.filter(
             user=p1.user, message__startswith="Дедлайн матча"
         )

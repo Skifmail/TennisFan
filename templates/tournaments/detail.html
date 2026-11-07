@@ -749,6 +749,17 @@
     </div>
     {% endif %}
 
+    {% if has_stages %}
+    <h2 class="section-title mb-3">Круговой отбор и олимпийские сетки</h2>
+    {% include 'tournaments/_manual_stages.html' %}
+    {% if tournament.status == 'completed' %}
+    <section class="card mb-4"><div class="card-body"><h2>Итоговые места</h2>
+        <div class="table-responsive"><table class="table"><thead><tr><th scope="col">Место</th><th scope="col">Игрок</th><th scope="col">Очки</th></tr></thead><tbody>
+            {% for result in tournament.fan_results.all %}<tr><td>{{ result.place }}</td><td>{{ result.player.get_display_name }}</td><td>{{ result.fan_points }}</td></tr>{% endfor %}
+        </tbody></table></div>
+    </div></section>
+    {% endif %}
+    {% else %}
     {% if is_round_robin and matrix_rows and rr_standings %}
     <h2 class="section-title mb-3">Матрица результатов</h2>
     <div class="card mb-4 round-robin-table-wrapper">
@@ -1029,6 +1040,7 @@
         <p class="text-secondary">Матчи ещё не запланированы.</p>
         {% endfor %}
     </div>
+    {% endif %}
     {% endif %}
 </div>
 {% endblock %}

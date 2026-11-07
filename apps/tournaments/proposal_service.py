@@ -7,20 +7,27 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.notifications.services import create_notification
 from apps.subscriptions.sparring_billing import charge_fancoin_for_completed_match
 
-from .models import Match, MatchResultProposal
+from .match_locking import lock_match, lock_match_participants
+from .models import Match, MatchResultProposal, TournamentTeam
+from .score_validation import ProposalValidationError as ProposalValidationError
+from .score_validation import validate_match_score
+from .utils import (
+    find_blocking_earlier_tournament_match,
+    format_tournament_match_order_block_message,
+    get_match_opponent_users,
+    get_match_participants,
+    get_match_player_side,
+)
 
 if TYPE_CHECKING:
     from apps.users.models import Player
-
-
-class ProposalValidationError(ValueError):
-    """Несогласованный или неполный счёт в заявке на результат матча."""
 
 
 NO_SHOW_HINT = (
@@ -119,11 +126,7 @@ def _proposer_is_side1(match: Match, proposer: Player) -> bool:
     Returns:
         True, если инициатор относится к player1/team1.
     """
-    if match.team1_id and match.team2_id:
-        return bool(proposer in (match.team1.player1, match.team1.player2))
-    if match.is_doubles_sparring():
-        return bool(proposer in (match.player1, match.partner1))
-    return bool(proposer == match.player1)
+    return get_match_player_side(match, proposer) == 1
 
 
 def derive_proposer_result_from_score(
@@ -168,6 +171,14 @@ def derive_proposer_result_from_score(
         player2_set3,
     ):
         raise ProposalValidationError(NO_SHOW_HINT)
+    validate_match_score(
+        match,
+        (
+            (player1_set1, player2_set1),
+            (player1_set2, player2_set2),
+            (player1_set3, player2_set3),
+        ),
+    )
     sets_p1, sets_p2 = count_sets_won_from_score(
         player1_set1,
         player2_set1,
@@ -216,13 +227,17 @@ def validate_proposal_score_consistency(proposal: MatchResultProposal) -> None:
     Raises:
         ProposalValidationError: Если победитель не соответствует счёту.
     """
+    match = proposal.match
+    if proposal.result not in Match.ResultChoice.values:
+        raise ProposalValidationError("Выберите допустимый результат матча.")
+    if get_match_player_side(match, proposal.proposer) is None:
+        raise ProposalValidationError("Инициатор больше не участвует в этом матче.")
     if proposal.result in (
         Match.ResultChoice.WALKOVER_WIN,
         Match.ResultChoice.WALKOVER_LOSS,
     ):
         return
 
-    match = proposal.match
     sets_p1, sets_p2 = count_sets_won_from_score(
         proposal.player1_set1,
         proposal.player2_set1,
@@ -244,6 +259,14 @@ def validate_proposal_score_consistency(proposal: MatchResultProposal) -> None:
         proposal.player2_set3,
     ):
         raise ProposalValidationError(NO_SHOW_HINT)
+    validate_match_score(
+        match,
+        (
+            (proposal.player1_set1, proposal.player2_set1),
+            (proposal.player1_set2, proposal.player2_set2),
+            (proposal.player1_set3, proposal.player2_set3),
+        ),
+    )
     if sets_p1 == sets_p2:
         raise ProposalValidationError(
             "По введённому счёту нельзя определить победителя.",
@@ -277,7 +300,11 @@ def validate_proposal_score_consistency(proposal: MatchResultProposal) -> None:
         )
 
 
-def _compute_result(proposal: MatchResultProposal):
+def _compute_result(
+    proposal: MatchResultProposal,
+) -> tuple[
+    Player | None, Player | None, bool, TournamentTeam | None, TournamentTeam | None
+]:
     """Определить победителя, проигравшего и walkover по заявке. Поддержка одиночных и парных."""
     match = proposal.match
     proposer = proposal.proposer
@@ -310,12 +337,11 @@ def _compute_result(proposal: MatchResultProposal):
         )
 
     if is_doubles:
-        proposer_team = (
-            match.team1
-            if proposer in (match.team1.player1, match.team1.player2)
-            else match.team2
-        )
-        opponent_team = match.team2 if proposer_team == match.team1 else match.team1
+        team1, team2 = match.team1, match.team2
+        if team1 is None or team2 is None:
+            raise ProposalValidationError("Состав сторон матча не завершён.")
+        proposer_team = team1 if proposer in (team1.player1, team1.player2) else team2
+        opponent_team = team2 if proposer_team == team1 else team1
         won = result in (
             Match.ResultChoice.WIN,
             Match.ResultChoice.WALKOVER_WIN,
@@ -357,117 +383,67 @@ def _compute_result(proposal: MatchResultProposal):
     return winner, loser, walkover, winner_team, loser_team
 
 
+def result_summary_for_player(match: Match, player: Player) -> str:
+    """Описать исход со стороны получателя и дельту именно этого матча."""
+    side = get_match_player_side(match, player)
+    winner_side = get_match_player_side(match, match.winner) if match.winner else None
+    is_winner = side is not None and side == winner_side
+    if match.is_deadline_auto_rt():
+        return "Дедлайн истёк: RT 0:0. Рейтинг не меняется."
+    if match.is_no_show_walkover():
+        no_show_sides = match.get_no_show_sides()
+        missed = side is not None and no_show_sides[side - 1]
+        if match.is_mutual_no_show_walkover():
+            outcome = "Матч не состоялся: неявка обеих сторон."
+        elif is_winner:
+            outcome = "Вы выиграли: соперник не явился."
+        else:
+            outcome = "Вы проиграли: вам засчитана неявка."
+        return outcome + (
+            " Штраф за неявку: −40 очков рейтинга."
+            if missed
+            else " Рейтинг не меняется."
+        )
+
+    outcome = "Вы выиграли." if is_winner else "Вы проиграли."
+    if match.is_friendly_sparring():
+        return outcome + " Рейтинг не меняется."
+    if match.rating_status == Match.RatingCalcStatus.CALCULATED:
+        delta = match.rating_delta_player1 if side == 1 else match.rating_delta_player2
+        return outcome + f" Изменение рейтинга за этот матч: {delta:+.0f} очков."
+    if match.rating_status == Match.RatingCalcStatus.PENDING:
+        return outcome + " Рейтинг ожидает расчёта."
+    return outcome
+
+
 def notify_participants_match_result_confirmed(
     match: Match, *, walkover: bool = False
 ) -> None:
-    """
-    Отправить уведомления участникам матча о подтверждённом результате (ЛК + Telegram).
-    Вызывается из apply_proposal и из страницы управления турниром (админ ввёл результат).
-    """
-    import logging
-
-    logger = logging.getLogger(__name__)
-    winner = match.winner
-    winner_team = getattr(match, "winner_team", None)
+    """Сохранить одно уведомление результата на участника; Telegram отправляет очередь."""
     url = reverse("match_detail", args=[match.pk])
-
-    from .utils import get_match_participants
 
     participants = [
         p
         for p in get_match_participants(match)
         if p and not getattr(p, "is_bye", False) and getattr(p, "user_id", None)
     ]
-    is_friendly = match.is_friendly_sparring()
-
     for p in participants:
-        try:
-            is_winner = (
-                p == winner
-                or (winner_team and p in (winner_team.player1, winner_team.player2))
-                or (
-                    match.is_doubles_sparring()
-                    and winner in (match.player1, match.partner1)
-                    and p in (match.player1, match.partner1)
-                )
-                or (
-                    match.is_doubles_sparring()
-                    and winner in (match.player2, match.partner2)
-                    and p in (match.player2, match.partner2)
-                )
-            )
-            if walkover and match.is_mutual_no_show_walkover():
-                msg = (
-                    "Матч не состоялся: Walkover (неявка) обоим участникам, "
-                    "−40 очков рейтинга каждому."
-                )
-            elif walkover and match.is_no_show_walkover():
-                msg = (
-                    "Матч не состоялся: соперник не явился. Вам засчитана победа."
-                    if is_winner
-                    else (
-                        "Матч не состоялся: вам засчитана неявка, "
-                        "−40 очков рейтинга."
-                    )
-                )
-            elif walkover:
-                msg = (
-                    "Результат матча подтверждён: тех. победа (соперник снялся)."
-                    if is_winner
-                    else "Результат матча подтверждён: тех. поражение."
-                )
-            else:
-                base = (
-                    "Результат матча подтверждён: вы выиграли."
-                    if is_winner
-                    else "Результат матча подтверждён: поражение."
-                )
-                if not is_friendly:
-                    p.refresh_from_db()
-                    changes = p.get_rating_changes()
-                    fan = changes.get("fan", {})
-                    delta = fan.get("delta") or 0
-                    if delta != 0:
-                        from apps.users.rating_utils import rating_to_ntrp_level
-
-                        d_str = f"+{int(delta)}" if delta > 0 else str(int(delta))
-                        base += (
-                            f" Вам начислено {d_str} очков рейтинга."
-                            if delta > 0
-                            else f" У вас вычтено {abs(int(delta))} очков рейтинга."
-                        )
-                        rating_before = float(p.total_points) - float(delta)
-                        ntrp_before = rating_to_ntrp_level(rating_before)
-                        ntrp_after = rating_to_ntrp_level(float(p.total_points))
-                        base += f" Сила: {ntrp_before:.2f} → {ntrp_after:.2f}."
-                msg = base
-            if len(msg) > 255:
-                msg = msg[:252] + "..."
-            create_notification(
-                user=p.user, message=msg, url=url, event_key="match.result_confirmed"
-            )
-        except Exception as e:
-            logger.warning(
-                "notify_participants_match_result_confirmed for player %s: %s",
-                getattr(p, "pk", None),
-                e,
-            )
-
-    try:
-        from apps.telegram_bot.notifications import (
-            notify_result_confirmed_to_participants,
+        msg = (
+            f"Результат матча применён. Матч №{match.pk}. "
+            f"{result_summary_for_player(match, p)}"
+        )
+        if len(msg) > 255:
+            msg = msg[:252] + "..."
+        create_notification(
+            user=p.user, message=msg, url=url, event_key="match.result_confirmed"
         )
 
-        notify_result_confirmed_to_participants(match)
-    except Exception as e:
-        logger.warning("notify_result_confirmed_to_participants failed: %s", e)
+    from apps.player_ratings.notifications import notify_players_to_rate_match
+    from apps.telegram_bot.notifications import notify_result_confirmed_to_participants
 
-    try:
-        from apps.player_ratings.notifications import notify_players_to_rate_match
-
-        notify_players_to_rate_match(match)
-    except Exception as e:
-        logger.warning("notify_players_to_rate_match failed: %s", e)
+    # Сохранение обязательных уведомлений — часть результата, а не внешний best effort.
+    notify_result_confirmed_to_participants(match)
+    notify_players_to_rate_match(match)
 
 
 def no_show_sides_from_proposal(proposal: MatchResultProposal) -> tuple[bool, bool]:
@@ -536,33 +512,199 @@ def _apply_played_result(proposal: MatchResultProposal) -> None:
     match.save()
 
 
-def apply_proposal(proposal: MatchResultProposal) -> None:
-    """
-    Применить подтверждённую заявку к матчу.
-    Обновляет матч (winner, winner_team, score, status), отклоняет остальные заявки, отправляет уведомления.
+@transaction.atomic
+def apply_proposal(proposal: MatchResultProposal) -> bool:
+    """Однократно применить свежую заявку под блокировкой матча.
 
-    Тех. победа и тех. поражение означают, что матч не состоялся: он получает
-    статус Walkover без счёта, а штраф −40 достаётся только неявившейся стороне.
+    Результат, рейтинг, списание, ЛК и очередь Telegram фиксируются вместе.
+    Повтор уже применённой заявки возвращает False, даже если матч снова открыт.
+    Принятый админкой статус без applied_at допускает первое применение.
     """
-    validate_proposal_score_consistency(proposal)
-    match = proposal.match
-    is_no_show = proposal.result in (
+    if not proposal.pk:
+        raise ProposalValidationError("Сначала сохраните заявку на результат.")
+    match = lock_match(proposal.match_id)
+    if match is None:
+        raise ProposalValidationError("Матч не найден.")
+    fresh = MatchResultProposal.objects.select_for_update().get(
+        pk=proposal.pk, match_id=match.pk
+    )
+    fresh.match = match
+    if fresh.applied_at is not None:
+        proposal.status = fresh.status
+        proposal.applied_at = fresh.applied_at
+        proposal.match = match
+        return False
+    if fresh.status not in (
+        Match.ProposalStatus.PENDING,
+        Match.ProposalStatus.ACCEPTED,
+    ):
+        raise ProposalValidationError("Эта заявка уже отклонена.")
+    if match.status not in (Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS):
+        raise ProposalValidationError(
+            "Матч уже завершён, отменён или ещё не готов к игре."
+        )
+
+    # Единый порядок блокировок защищает рейтинг игроков и состав пар.
+    lock_match_participants(match)
+    participants = get_match_participants(match)
+    if len(participants) < 2 or match.is_bye_match():
+        raise ProposalValidationError("В матче должны быть две полноценные стороны.")
+    if bool(match.team1_id) != bool(match.team2_id) or bool(match.partner1_id) != bool(
+        match.partner2_id
+    ):
+        raise ProposalValidationError("Состав сторон матча не завершён.")
+    validate_proposal_score_consistency(fresh)
+    is_no_show = fresh.result in (
         Match.ResultChoice.WALKOVER_LOSS,
         Match.ResultChoice.WALKOVER_WIN,
     )
-
     if is_no_show:
-        _apply_no_show_from_proposal(proposal)
+        _apply_no_show_from_proposal(fresh)
     else:
-        _apply_played_result(proposal)
-
+        _apply_played_result(fresh)
     charge_fancoin_for_completed_match(match)
-
-    match.result_proposals.exclude(pk=proposal.pk).update(
-        status=Match.ProposalStatus.REJECTED
-    )
-    proposal.status = Match.ProposalStatus.ACCEPTED
-    proposal.save(update_fields=["status"])
-
+    match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exclude(
+        pk=fresh.pk
+    ).update(status=Match.ProposalStatus.REJECTED)
+    fresh.status = Match.ProposalStatus.ACCEPTED
+    fresh.applied_at = timezone.now()
+    if (confirmer := getattr(proposal, "_confirmed_by_user", None)) is not None:
+        fresh._confirmed_by_user = confirmer
+    fresh.save(update_fields=["status", "applied_at"])
+    proposal.status = fresh.status
+    proposal.applied_at = fresh.applied_at
+    proposal.match = match
     match.refresh_from_db()
     notify_participants_match_result_confirmed(match, walkover=is_no_show)
+    return True
+
+
+@transaction.atomic
+def submit_match_result(
+    match_id: int,
+    proposer: Player,
+    *,
+    result: str,
+    player1_set1: int | None = None,
+    player2_set1: int | None = None,
+    player1_set2: int | None = None,
+    player2_set2: int | None = None,
+    player1_set3: int | None = None,
+    player2_set3: int | None = None,
+    score_from_proposer: bool = False,
+) -> MatchResultProposal:
+    """Создать заявку и сразу применить результат в одной транзакции.
+
+    Полномочия, порядок матчей и ориентация счёта проверяются по свежему матчу.
+    Отказ не оставляет заявку, событие активности или частично применённый счёт.
+    """
+    from .withdraw import is_player_withdrawn
+
+    match = lock_match(match_id)
+    if match is None:
+        raise ProposalValidationError("Матч не найден.")
+    side = get_match_player_side(match, proposer)
+    if side is None:
+        raise ProposalValidationError("Вы больше не участвуете в этом матче.")
+    if match.status not in (Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS):
+        raise ProposalValidationError(
+            "Матч уже завершён, отменён или ещё не готов к игре."
+        )
+    if match.result_proposals.filter(status=Match.ProposalStatus.PENDING).exists():
+        raise ProposalValidationError("По этому матчу уже внесён результат.")
+    tournament = match.tournament
+    if tournament is not None and is_player_withdrawn(tournament, proposer):
+        raise ProposalValidationError(
+            "Вы сняты с турнира и не можете вносить результаты матчей."
+        )
+    if blocking := find_blocking_earlier_tournament_match(match, proposer):
+        raise ProposalValidationError(
+            format_tournament_match_order_block_message(blocking, proposer)
+        )
+    if result not in Match.ResultChoice.values:
+        raise ProposalValidationError("Выберите допустимый результат матча.")
+    if score_from_proposer and side == 2:
+        player1_set1, player2_set1 = player2_set1, player1_set1
+        player1_set2, player2_set2 = player2_set2, player1_set2
+        player1_set3, player2_set3 = player2_set3, player1_set3
+    score_fields = {
+        "player1_set1": player1_set1,
+        "player2_set1": player2_set1,
+        "player1_set2": player1_set2,
+        "player2_set2": player2_set2,
+        "player1_set3": player1_set3,
+        "player2_set3": player2_set3,
+    }
+    if result not in (
+        Match.ResultChoice.WALKOVER_WIN,
+        Match.ResultChoice.WALKOVER_LOSS,
+    ):
+        result = derive_proposer_result_from_score(match, proposer, **score_fields)
+    proposal = MatchResultProposal(
+        match=match, proposer=proposer, result=result, **score_fields
+    )
+    validate_proposal_score_consistency(proposal)
+    proposal.save()
+    apply_proposal(proposal)
+    return proposal
+
+
+@transaction.atomic
+def resolve_result_proposal(
+    proposal_id: int, player: Player, *, accept: bool
+) -> MatchResultProposal:
+    """Обработать старую заявку только свежим соперником, сохранив историю отклонения."""
+    from apps.core.activity import log_activity
+    from apps.core.models import PlatformActivityEvent
+    from apps.telegram_bot.notifications import notify_proposal_rejected
+
+    match_id = (
+        MatchResultProposal.objects.filter(pk=proposal_id)
+        .values_list("match_id", flat=True)
+        .first()
+    )
+    if match_id is None:
+        raise ProposalValidationError("Предложение не найдено.")
+    match = lock_match(match_id)
+    if match is None:
+        raise ProposalValidationError("Матч не найден.")
+    proposal: MatchResultProposal = MatchResultProposal.objects.select_for_update().get(
+        pk=proposal_id
+    )
+    proposal.match = match
+    if (
+        proposal.applied_at is not None
+        or proposal.status != Match.ProposalStatus.PENDING
+    ):
+        raise ProposalValidationError("Этот результат уже обработан.")
+    if match.status not in (Match.MatchStatus.SCHEDULED, Match.MatchStatus.IN_PROGRESS):
+        raise ProposalValidationError(
+            "Матч уже завершён, отменён или ещё не готов к игре."
+        )
+    if get_match_player_side(match, player) is None:
+        raise ProposalValidationError("Вы больше не участвуете в этом матче.")
+    if player.user not in get_match_opponent_users(match, proposal.proposer):
+        raise ProposalValidationError(
+            "Подтвердить или отклонить результат может только соперник."
+        )
+    if accept:
+        proposal._confirmed_by_user = player.user
+        apply_proposal(proposal)
+    else:
+        proposal.status = Match.ProposalStatus.REJECTED
+        proposal.save(update_fields=["status"])
+        log_activity(
+            event_type=PlatformActivityEvent.EventType.MATCH_RESULT_REJECTED,
+            actor=player.user,
+            description=f"Отклонил результат матча: {match}",
+            target_url=reverse("match_detail", args=[match.pk]),
+            dedupe_key=f"proposal_rejected:{proposal.pk}",
+        )
+        create_notification(
+            user=proposal.proposer.user,
+            message=f"{player} отклонил результат матча. Введите свой результат.",
+            url=reverse("my_matches"),
+            event_key="match.proposal_updated",
+        )
+        notify_proposal_rejected(proposal)
+    return proposal

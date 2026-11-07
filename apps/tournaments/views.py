@@ -137,8 +137,9 @@ from .postpayment import (
 )
 from .proposal_service import (
     ProposalValidationError,
-    apply_proposal,
     derive_proposer_result_from_score,
+    resolve_result_proposal,
+    submit_match_result,
 )
 from .round_robin import (
     _is_round_robin,
@@ -1346,6 +1347,10 @@ def tournament_detail(request, slug):
         "withdrawn_team_ids": withdrawn_team_ids,
         **_get_participant_photo_context(request, tournament),
     }
+    from .manual_stages import has_manual_stages, stage_context
+
+    if has_manual_stages(tournament):
+        context.update(stage_context(tournament))
     context.update(_get_club_panel_context_for_tournament(request, tournament))
     from django.conf import settings as dj_settings
 
@@ -1560,9 +1565,22 @@ def tournament_photo_prompt_dismiss(request, slug):
     return redirect(_get_safe_next_url(request, fallback))
 
 
-def _tournament_manage_get_any_tournament(request, slug):
-    """Get tournament by slug and check access for common manage actions."""
-    t = get_object_or_404(Tournament, slug=slug)
+def _tournament_manage_get_any_tournament(
+    request: HttpRequest, slug: str
+) -> Tournament | None:
+    """Получить турнир и проверить право на общие действия управления.
+
+    Args:
+        request: Запрос организатора.
+        slug: Публичный идентификатор турнира.
+
+    Returns:
+        Турнир при наличии прав, иначе None.
+
+    Raises:
+        Http404: Если турнир с указанным идентификатором не найден.
+    """
+    t: Tournament = get_object_or_404(Tournament, slug=slug)
     if not _can_manage_tournament(request, t):
         messages.error(request, "Нет доступа к управлению этим турниром.")
         return None
@@ -1656,6 +1674,9 @@ def tournament_manage(request, slug):
 
         return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
 
+    from .manual_stages import has_manual_stages
+
+    manual_stage_mode = has_manual_stages(tournament)
     is_tvd = _is_tvd(tournament)
     is_doubles = tournament.is_doubles()
     teams = []
@@ -1880,6 +1901,7 @@ def tournament_manage(request, slug):
 
     context = {
         "tournament": tournament,
+        "manual_stage_mode": manual_stage_mode,
         "is_doubles_tvd": is_doubles,
         "teams": teams,
         "full_teams_count": full_teams_count,
@@ -2174,6 +2196,10 @@ def tournament_manage_pairs(request, slug):
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return redirect("tournament_manage_stages", slug=slug)
     if not supports_manual_pairing(tournament):
         messages.error(
             request,
@@ -3333,11 +3359,16 @@ def _parse_walkover_side_penalty(request, side: int) -> float:
 
 
 @login_required
-def tournament_manage_match_result(request, slug, pk):
-    """POST: внести результат матча (score1/score2, winner_id/winner_team_id). Опционально walkover=1 — тех. результат (неявка/просрочка)."""
+@transaction.atomic
+def tournament_manage_match_result(
+    request: HttpRequest, slug: str, pk: int
+) -> HttpResponse:
+    """Сохранить свежий ручной результат, рейтинг и обязательные уведомления вместе."""
     from django.utils import timezone
 
+    from .match_locking import lock_match, lock_match_participants
     from .proposal_service import notify_participants_match_result_confirmed
+    from .score_validation import ProposalValidationError, validate_match_score
 
     fallback_url = _get_safe_next_url(
         request, reverse("tournament_manage", kwargs={"slug": slug})
@@ -3349,12 +3380,51 @@ def tournament_manage_match_result(request, slug, pk):
     if tournament is None:
         return redirect("tournament_list")
     match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    from .manual_stages import result_is_locked
+
+    if result_is_locked(match):
+        messages.warning(
+            request, "Результат зафиксирован: на его основе уже создан следующий этап."
+        )
+        return redirect(fallback_url)
+    current = lock_match(match.pk)
+    if current is None or current.tournament_id != tournament.pk:
+        messages.warning(request, "Матч не найден или его контекст изменился.")
+        return redirect(fallback_url)
+    match = current
+    tournament.refresh_from_db(fields=["status"])
     if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
         messages.warning(
             request,
             "В отмененном или завершенном турнире изменение результатов недоступно.",
         )
         return redirect(fallback_url)
+    if match.status not in (
+        Match.MatchStatus.SCHEDULED,
+        Match.MatchStatus.IN_PROGRESS,
+        Match.MatchStatus.COMPLETED,
+        Match.MatchStatus.WALKOVER,
+    ):
+        messages.warning(request, "Матч отменён или ещё не готов к игре.")
+        return redirect(fallback_url)
+    lock_match_participants(match)
+    if match.is_bye_match() or bool(match.team1_id) != bool(match.team2_id):
+        messages.warning(request, "В матче должны быть две полноценные стороны.")
+        return redirect(fallback_url)
+    result_fields = (
+        "winner_id",
+        "winner_team_id",
+        "status",
+        "walkover_no_show_side1",
+        "walkover_no_show_side2",
+        "player1_set1",
+        "player2_set1",
+        "player1_set2",
+        "player2_set2",
+        "player1_set3",
+        "player2_set3",
+    )
+    previous_result = tuple(getattr(match, field) for field in result_fields)
     is_walkover = request.POST.get("walkover") in ("1", "on", "true", "yes")
     score1 = _parse_int_post(request, "score1")
     score2 = _parse_int_post(request, "score2")
@@ -3369,28 +3439,28 @@ def tournament_manage_match_result(request, slug, pk):
         if not winner_team_id or winner_team_id not in (match.team1_id, match.team2_id):
             messages.warning(request, "Укажите победившую команду.")
             return redirect(fallback_url)
-        winner_team = get_object_or_404(
-            TournamentTeam, pk=winner_team_id, tournament=tournament
-        )
+        winner_team = match.team1 if winner_team_id == match.team1_id else match.team2
+        if winner_team is None:
+            messages.warning(request, "В матче должны быть две полноценные стороны.")
+            return redirect(fallback_url)
         match.winner_team = winner_team
         match.winner = winner_team.player1
     else:
-        if not winner_id and match.player1_id and match.player2_id:
+        if not match.player1_id or not match.player2_id:
+            messages.warning(request, "В матче должны быть две полноценные стороны.")
+            return redirect(fallback_url)
+        if not winner_id:
             messages.warning(request, "Укажите победителя.")
             return redirect(fallback_url)
-        winner = None
-        if winner_id:
-            winner = get_object_or_404(Player, pk=winner_id)
-            if winner.id != match.player1_id and winner.id != match.player2_id:
-                messages.warning(
-                    request, "Победитель должен быть одним из игроков матча."
-                )
-                return redirect(fallback_url)
-        match.winner = winner
+        if winner_id not in (match.player1_id, match.player2_id):
+            messages.warning(request, "Победитель должен быть одним из игроков матча.")
+            return redirect(fallback_url)
+        match.winner = match.player1 if winner_id == match.player1_id else match.player2
+        match.winner_team = None
+    match.walkover_no_show_side1 = False
+    match.walkover_no_show_side2 = False
     if is_walkover:
         match.status = Match.MatchStatus.WALKOVER
-        match.completed_datetime = timezone.now()
-        match.rating_status = Match.RatingCalcStatus.PENDING
         if match.winner_id == match.player1_id or (
             is_doubles_match and match.winner_team_id == match.team1_id
         ):
@@ -3403,28 +3473,18 @@ def tournament_manage_match_result(request, slug, pk):
             match.player2_set1 = 6
             match.player1_set2 = 0
             match.player2_set2 = 6
-        match.save()
-        try:
-            notify_participants_match_result_confirmed(match, walkover=True)
-        except Exception as e:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "notify_participants_match_result_confirmed after admin walkover: %s", e
-            )
-        messages.success(
-            request, "Технический результат (RT) сохранён. Таблица и сетка обновлены."
-        )
+        match.player1_set3 = None
+        match.player2_set3 = None
     else:
-        if score1 is not None and score2 is not None:
-            match.player1_set1 = score1
-            match.player2_set1 = score2
-        if set2_p1 is not None and set2_p2 is not None:
-            match.player1_set2 = set2_p1
-            match.player2_set2 = set2_p2
-        if set3_p1 is not None and set3_p2 is not None:
-            match.player1_set3 = set3_p1
-            match.player2_set3 = set3_p2
+        scores = ((score1, score2), (set2_p1, set2_p2), (set3_p1, set3_p2))
+        try:
+            validate_match_score(match, scores)
+        except ProposalValidationError as exc:
+            messages.error(request, str(exc))
+            return redirect(fallback_url)
+        for index, (first, second) in enumerate(scores, start=1):
+            setattr(match, f"player1_set{index}", first)
+            setattr(match, f"player2_set{index}", second)
         # Проверка согласованности: победитель должен выиграть больше сетов по введённому счёту
         winner_entity_id = (
             match.winner_id
@@ -3472,29 +3532,35 @@ def tournament_manage_match_result(request, slug, pk):
             )
             return redirect(fallback_url)
         match.status = Match.MatchStatus.COMPLETED
-        match.completed_datetime = timezone.now()
-        match.rating_status = Match.RatingCalcStatus.PENDING
-        match.save()
-        try:
-            notify_participants_match_result_confirmed(match, walkover=False)
-        except Exception as e:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "notify_participants_match_result_confirmed after admin result: %s", e
-            )
-        messages.success(
-            request, "Результат сохранён. Участникам отправлены уведомления."
+    if previous_result == tuple(getattr(match, field) for field in result_fields):
+        messages.info(
+            request, "Результат не изменился — повторные уведомления не создавались."
         )
+        return redirect(fallback_url)
+    match.completed_datetime = timezone.now()
+    match.rating_status = Match.RatingCalcStatus.PENDING
+    match.save()
+    match.result_proposals.filter(status=Match.ProposalStatus.PENDING).update(
+        status=Match.ProposalStatus.REJECTED
+    )
+    notify_participants_match_result_confirmed(match, walkover=is_walkover)
+    messages.success(
+        request, "Результат сохранён. Уведомления участникам сохранены в очереди."
+    )
     return redirect(fallback_url)
 
 
 @login_required
-def tournament_manage_match_deadline(request, slug, pk):
+@transaction.atomic
+def tournament_manage_match_deadline(
+    request: HttpRequest, slug: str, pk: int
+) -> HttpResponse:
     """POST: вручную изменить дедлайн незавершённого матча на странице управления."""
     from datetime import datetime, time
 
     from django.utils import timezone
+
+    from .match_locking import lock_match, lock_match_participants
 
     if request.method != "POST":
         return redirect("tournament_manage", slug=slug)
@@ -3502,6 +3568,18 @@ def tournament_manage_match_deadline(request, slug, pk):
     if tournament is None:
         return redirect("tournament_list")
     match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    from .manual_stages import result_is_locked
+
+    if result_is_locked(match):
+        messages.warning(request, "Результат зафиксирован следующим этапом турнира.")
+        return redirect("tournament_manage_stages", slug=slug)
+
+    current = lock_match(match.pk)
+    if current is None or current.tournament_id != tournament.pk:
+        messages.warning(request, "Матч не найден или его контекст изменился.")
+        return redirect("tournament_manage", slug=slug)
+    match = current
+    tournament.refresh_from_db(fields=["status"])
     if tournament.status == TournamentStatus.CANCELLED:
         messages.warning(
             request,
@@ -3524,6 +3602,14 @@ def tournament_manage_match_deadline(request, slug, pk):
                 "Нельзя изменить дедлайн у завершённого матча.",
             )
             return redirect("tournament_manage", slug=slug)
+    elif match.status not in (
+        Match.MatchStatus.SCHEDULED,
+        Match.MatchStatus.IN_PROGRESS,
+    ):
+        messages.warning(
+            request, "Изменение дедлайна отменённого или неготового матча недоступно."
+        )
+        return redirect("tournament_manage", slug=slug)
 
     raw = (request.POST.get("deadline") or "").strip()
     if not raw:
@@ -3551,17 +3637,18 @@ def tournament_manage_match_deadline(request, slug, pk):
     if match.is_deadline_auto_rt():
         from .overdue import revert_deadline_auto_rt
 
-        revert_deadline_auto_rt(match)
+        revert_deadline_auto_rt(match, new_deadline=match.deadline)
     elif match.is_no_show_walkover():
         from .overdue import revert_no_show_walkover
 
-        revert_no_show_walkover(match)
+        revert_no_show_walkover(match, new_deadline=match.deadline)
     else:
+        lock_match_participants(match)
         match.save(update_fields=["deadline", "deadline_overdue_notified_at"])
 
     from .utils import notify_participants_match_deadline_changed
 
-    notified, emailed = notify_participants_match_deadline_changed(
+    notified, email_scheduled = notify_participants_match_deadline_changed(
         match,
         old_deadline=old_deadline,
         new_deadline=match.deadline,
@@ -3570,8 +3657,8 @@ def tournament_manage_match_deadline(request, slug, pk):
         request,
         (
             f"Дедлайн матча обновлён: до {deadline_date.strftime('%d.%m.%Y')}. "
-            f"Уведомления отправлены участникам "
-            f"(личный кабинет: {notified}, email: {emailed})."
+            f"Уведомления сохранены для участников "
+            f"(личный кабинет: {notified}, email запланировано: {email_scheduled})."
         ),
     )
     return redirect("tournament_manage", slug=slug)
@@ -3588,6 +3675,12 @@ def tournament_manage_match_walkover(request, slug, pk):
     if tournament is None:
         return redirect("tournament_list")
     match = get_object_or_404(Match, tournament=tournament, pk=pk)
+    from .manual_stages import result_is_locked
+
+    if result_is_locked(match):
+        messages.warning(request, "Результат зафиксирован следующим этапом турнира.")
+        return redirect("tournament_manage_stages", slug=slug)
+
     is_edit = match.is_no_show_walkover() or match.is_deadline_auto_rt()
     if tournament.status == TournamentStatus.CANCELLED:
         messages.warning(
@@ -3759,6 +3852,10 @@ def tournament_tables_detail(request, slug):
         ),
         slug=slug,
     )
+    from .manual_stages import has_manual_stages
+
+    if has_manual_stages(tournament):
+        return redirect("tournament_detail", slug=slug)
     is_fan = _is_fan(tournament)
     is_olympic = _is_olympic(tournament)
     is_tvd = _is_tvd(tournament)
@@ -4336,7 +4433,7 @@ def my_sparring_matches(request):
 
 @login_required
 def propose_result(request, pk):
-    """Propose result for a match by participant."""
+    """Сразу применить результат участника с единственным уведомлением всем сторонам."""
     fallback_url = reverse("my_matches")
 
     match = get_object_or_404(
@@ -4425,42 +4522,21 @@ def propose_result(request, pk):
             messages.error(request, str(exc))
             return redirect(_get_safe_next_url(request, fallback_url))
 
-    proposal = MatchResultProposal.objects.create(
-        match=match,
-        proposer=player,
-        result=result,
-        **score_fields,
-    )
-
-    # Сразу применяем результат без ожидания подтверждения вторым игроком
     try:
-        apply_proposal(proposal)
+        submit_match_result(
+            match.pk,
+            player,
+            result=result,
+            player1_set1=score_fields["player1_set1"],
+            player1_set2=score_fields["player1_set2"],
+            player1_set3=score_fields["player1_set3"],
+            player2_set1=score_fields["player2_set1"],
+            player2_set2=score_fields["player2_set2"],
+            player2_set3=score_fields["player2_set3"],
+        )
     except ProposalValidationError as exc:
-        proposal.delete()
         messages.error(request, str(exc))
         return redirect(_get_safe_next_url(request, fallback_url))
-
-    for opponent_user in get_match_opponent_users(match, player):
-        if match.tournament:
-            match_context = f"в турнире {match.tournament.name}"
-        elif match.is_sparring():
-            match_context = "спаррингового матча"
-        else:
-            match_context = "матча"
-
-        create_notification(
-            user=opponent_user,
-            message=f"{player} внёс результат {match_context}. Матч завершён.",
-            url=reverse("match_detail", args=[match.pk]),
-            event_key="match.result_proposed",
-        )
-
-    try:
-        from apps.telegram_bot import notifications as tg
-
-        tg.notify_result_proposal(proposal)
-    except Exception:
-        pass
 
     messages.success(request, "Результат сохранён. Матч завершён.")
     return redirect(_get_safe_next_url(request, fallback_url))
@@ -4468,7 +4544,7 @@ def propose_result(request, pk):
 
 @login_required
 def confirm_proposal(request, pk):
-    """Opponent confirms or rejects proposal."""
+    """Обработать старую заявку соперником с повторной проверкой под блокировкой."""
     fallback_url = reverse("my_matches")
 
     proposal = get_object_or_404(
@@ -4514,42 +4590,17 @@ def confirm_proposal(request, pk):
         return redirect(_get_safe_next_url(request, fallback_url))
 
     action = request.POST.get("action")
+    if action not in ("accept", "reject"):
+        messages.error(request, "Выберите подтверждение или отклонение результата.")
+        return redirect(_get_safe_next_url(request, fallback_url))
+    try:
+        resolve_result_proposal(proposal.pk, player, accept=action == "accept")
+    except ProposalValidationError as exc:
+        messages.info(request, str(exc))
+        return redirect(_get_safe_next_url(request, fallback_url))
     if action == "accept":
-        # Передаём в сигнал ленты активности, кто именно подтвердил результат.
-        proposal._confirmed_by_user = request.user
-        apply_proposal(proposal)
-        # FAN-логика (advance, consolation, finalize) вызывается из post_save сигнала Match
-        # Уведомления в ЛК и Telegram (с рейтингом и силой) создаются внутри apply_proposal для обоих участников
-        messages.success(request, "Результат подтверждён.")
+        messages.success(request, "Результат применён.")
     else:
-        # Telegram-уведомление инициатору (до удаления proposal)
-        try:
-            from apps.telegram_bot.notifications import notify_proposal_rejected
-
-            notify_proposal_rejected(proposal)
-        except Exception:
-            pass  # Telegram-уведомление не критично
-        # Фиксируем отклонение результата в ленте активности до удаления заявки.
-        try:
-            from apps.core.activity import log_activity
-            from apps.core.models import PlatformActivityEvent
-
-            log_activity(
-                event_type=PlatformActivityEvent.EventType.MATCH_RESULT_REJECTED,
-                actor=request.user,
-                description=f"Отклонил результат матча: {match}",
-                target_url=reverse("match_detail", args=[match.pk]),
-                dedupe_key=f"proposal_rejected:{proposal.pk}",
-            )
-        except Exception:
-            pass  # запись в ленту не должна мешать основному сценарию
-        proposal.delete()
-        create_notification(
-            user=proposal.proposer.user,
-            message=f"{player} отклонил результат матча. Введите свой результат.",
-            url=reverse("my_matches"),
-            event_key="match.proposal_updated",
-        )
         messages.info(request, "Результат отклонён. Введите свой результат матча.")
 
     return redirect(_get_safe_next_url(request, fallback_url))

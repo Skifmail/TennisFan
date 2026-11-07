@@ -1,15 +1,15 @@
 """Однократное самостоятельное продление спарринговых матчей."""
 
 from datetime import timedelta
-from typing import cast
+from html import escape
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from loguru import logger
 
 from apps.notifications.services import create_notification
 from apps.users.models import Player
 
+from .match_locking import lock_match, lock_match_participants
 from .models import Match, SparringDeadlineExtension
 from .utils import get_match_participants
 
@@ -29,36 +29,56 @@ def can_extend_sparring_deadline(match: Match, player: Player | None) -> bool:
 
 
 def _notify_extension(extension_id: int) -> None:
-    """Сообщить участникам о новом дедлайне после фиксации транзакции."""
+    """Сохранить обязательные уведомления вместе с продлением, без внешней отправки."""
     from django.urls import reverse
     from django.utils import timezone
+
+    from apps.telegram_bot.notifications import _get_site_base_url, send_to_user_by_user
 
     extension = SparringDeadlineExtension.objects.select_related("match", "player").get(
         pk=extension_id
     )
-    for participant in get_match_participants(extension.match):
-        try:
-            create_notification(
-                user=participant.user,
-                message=(
-                    f"{extension.player} продлил дедлайн спарринга на неделю: "
-                    f"до {timezone.localtime(extension.new_deadline):%d.%m.%Y}."
-                ),
-                url=reverse("match_detail", kwargs={"pk": extension.match.pk}),
-                event_key="match.deadline_changed",
-            )
-        except Exception:
-            logger.exception(
-                "Не удалось уведомить игрока {} о продлении {}",
-                participant.pk,
-                extension.pk,
-            )
+    path = reverse("match_detail", kwargs={"pk": extension.match.pk})
+    message = (
+        f"{extension.player} продлил дедлайн спарринга на неделю: "
+        f"до {timezone.localtime(extension.new_deadline):%d.%m.%Y}."
+    )
+    for participant in sorted(
+        get_match_participants(extension.match), key=lambda player: player.pk
+    ):
+        if participant.is_bye:
+            continue
+        create_notification(
+            user=participant.user,
+            message=message[:255],
+            url=path,
+            event_key="match.deadline_extended",
+        )
+        send_to_user_by_user(
+            participant.user,
+            f"🔄 <b>Дедлайн спарринга продлён</b>\n\n{escape(message)}",
+            reply_markup={
+                "inline_keyboard": [
+                    [
+                        {
+                            "text": "Открыть матч",
+                            "url": _get_site_base_url().rstrip("/") + path,
+                        }
+                    ]
+                ]
+            },
+            skip_email=True,
+            event_key="match.deadline_extended",
+        )
 
 
 @transaction.atomic
 def extend_sparring_deadline(match_id: int, player: Player | None) -> Match:
     """Добавить семь дней с блокировкой матча и защитой от повторного запроса."""
-    match = cast(Match, Match.objects.select_for_update().get(pk=match_id))
+    match = lock_match(match_id)
+    if match is None:
+        raise ValidationError("Матч не найден.")
+    lock_match_participants(match)
     if not can_extend_sparring_deadline(match, player):
         raise ValidationError(
             "Продление недоступно: только участник активного спарринга может продлить дедлайн один раз."
@@ -75,13 +95,22 @@ def extend_sparring_deadline(match_id: int, player: Player | None) -> Match:
         old_deadline=old_deadline,
         new_deadline=match.deadline,
     )
-    transaction.on_commit(lambda: _notify_extension(extension.pk))
+    _notify_extension(extension.pk)
     return match
 
 
 def prepare_admin_sparring_save(match: Match, changed_fields: set[str]) -> None:
     """Откатить прежний результат перед изменением матча администратором."""
-    old = Match.objects.select_for_update().get(pk=match.pk)
+    old = lock_match(match.pk, additional_request_id=match.sparring_team_request_id)
+    if old is None:
+        raise ValidationError("Матч не найден.")
+    # Форма могла быть прочитана до чужого результата. Меняем только явно
+    # отредактированные поля, остальные берём из уже заблокированной строки.
+    for field in match._meta.concrete_fields:
+        if not field.primary_key and not {field.name, field.attname}.intersection(
+            changed_fields
+        ):
+            setattr(match, field.attname, getattr(old, field.attname))
     if "deadline" in changed_fields:
         match.deadline_overdue_notified_at = None
     result_fields = {
@@ -103,6 +132,7 @@ def prepare_admin_sparring_save(match: Match, changed_fields: set[str]) -> None:
     }
     if not changed_fields.intersection(result_fields):
         return
+    lock_match_participants(old, match)
     if old.rating_status == Match.RatingCalcStatus.CALCULATED:
         from apps.core.sports import Sport
         from apps.users.sport_rating import ensure_sport_profile

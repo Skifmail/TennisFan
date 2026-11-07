@@ -44,7 +44,6 @@ from apps.core.decorators import require_filled_profile, require_verified_player
 from apps.core.home_city_counters import SPARRINGS_SEEN_COOKIE, mark_list_seen
 from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
-from apps.notifications.services import create_notification
 from apps.sparring.feed import FEED_PAGE_SIZE, rank_sparring_feed
 from apps.sparring.formats import SPARRING_FORMAT_OPTIONS, parse_sparring_formats
 from apps.users.models import Player
@@ -72,7 +71,6 @@ from .forms import (
     sparring_form_error_messages,
 )
 from .models import (
-    DoublesJoinRequest,
     DoublesJoinRequestStatus,
     DoublesMatchKind,
     DoublesMatchRequest,
@@ -96,21 +94,21 @@ from .player_search import search_players_for_sparring_invite
 from .services import (
     accept_sparring_invitation,
     cancel_sparring_invitation,
+    cancel_sparring_request,
+    confirm_sparring_response,
+    delete_sparring_request,
     reject_sparring_invitation,
+    respond_to_sparring,
 )
 from .utils import user_has_sparring_access
 
 # Импорт для Telegram уведомлений
 try:
     from apps.telegram_bot.notifications import (
-        notify_sparring_invitation_accepted_inviter,
         notify_sparring_invitation_created,
-        notify_sparring_response,
     )
 except ImportError:
-    notify_sparring_response = None  # type: ignore[assignment]
     notify_sparring_invitation_created = None  # type: ignore[assignment]
-    notify_sparring_invitation_accepted_inviter = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -582,11 +580,15 @@ def sparring_edit(request, pk):
 @require_POST
 @login_required
 def sparring_delete(request, pk):
-    """Delete own sparring request."""
+    """Удалить свою заявку, если по ней ещё не создан матч."""
     sparring = get_object_or_404(SparringRequest, pk=pk)
     if sparring.player.user_id != request.user.id:
         raise Http404
-    sparring.delete()
+    try:
+        delete_sparring_request(sparring.pk, request.user.pk)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("sparring_my_requests")
     messages.success(request, "Заявка удалена.")
     return redirect("sparring_my_requests")
 
@@ -594,12 +596,15 @@ def sparring_delete(request, pk):
 @require_POST
 @login_required
 def sparring_cancel(request, pk):
-    """Cancel (close) own sparring request."""
+    """Закрыть свою свежую заявку без изменения созданного матча."""
     sparring = get_object_or_404(SparringRequest, pk=pk)
     if sparring.player.user_id != request.user.id:
         raise Http404
-    sparring.status = SparringRequest.Status.CLOSED
-    sparring.save()
+    try:
+        cancel_sparring_request(sparring.pk, request.user.pk)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("sparring_my_requests")
     messages.success(request, "Заявка отменена.")
     return redirect("sparring_my_requests")
 
@@ -683,48 +688,7 @@ def sparring_confirm_response(request, response_id):
         return redirect("sparring_my_requests")
 
     try:
-        from apps.sparring.services import create_match_from_response
-
-        match = create_match_from_response(response)
-
-        # Обновляем статус отклика
-        response.status = SparringResponse.ResponseStatus.ACCEPTED
-        response.save(update_fields=["status"])
-
-        # Закрываем заявку
-        response.sparring_request.status = SparringRequest.Status.CLOSED
-        response.sparring_request.save(update_fields=["status"])
-
-        # Уведомление в ЛК для откликнувшегося игрока
-        try:
-            deadline_str = (
-                match.deadline.strftime("%d.%m.%Y")
-                if match.deadline
-                else "Не установлен"
-            )
-            create_notification(
-                user=response.respondent.user,
-                message=f"Ваш отклик на заявку на спарринг принят! Матч создан. Дедлайн: {deadline_str}.",
-                url=reverse("match_detail", args=[match.pk]),
-                event_key="sparring.accepted",
-            )
-        except Exception as e:
-            logger.warning(
-                "Failed to create notification for sparring response acceptance: %s", e
-            )
-
-        # Уведомление в Telegram откликнувшемуся
-        try:
-            from apps.telegram_bot.notifications import (
-                notify_sparring_response_accepted,
-            )
-
-            notify_sparring_response_accepted(response, match)
-        except Exception as e:
-            logger.warning(
-                "Failed to send Telegram notification for sparring response acceptance: %s",
-                e,
-            )
+        match = confirm_sparring_response(response.pk, request.user.pk)
 
         messages.success(
             request,
@@ -857,14 +821,10 @@ def sparring_respond(request, pk):
         return redirect("sparring_list")
 
     try:
-        obj, created = SparringResponse.objects.update_or_create(
-            sparring_request=sparring,
-            respondent=respondent,
-            defaults={
-                "contact_method": method,
-                "status": SparringResponse.ResponseStatus.PENDING,
-            },
+        obj, created = respond_to_sparring(
+            sparring.pk, respondent, contact_method=method
         )
+        sparring = obj.sparring_request
         logger.info(
             "sparring_respond: response %s %s (sparring=%s, respondent=%s)",
             "created" if created else "updated",
@@ -872,36 +832,23 @@ def sparring_respond(request, pk):
             sparring.pk,
             respondent.pk,
         )
-    except Exception as e:
-        logger.error("Failed to create/update sparring response: %s", e, exc_info=True)
+    except ValueError as exc:
+        if request.method == "POST":
+            return JsonResponse({"success": False, "error": str(exc)}, status=409)
+        messages.error(request, str(exc))
+        return redirect("sparring_list")
+    except Exception as exc:
+        logger.error("Failed to save sparring response: %s", type(exc).__name__)
         if request.method == "POST":
             return JsonResponse(
-                {"success": False, "error": f"Ошибка при сохранении отклика: {str(e)}"},
+                {
+                    "success": False,
+                    "error": "Не удалось сохранить отклик. Попробуйте позже.",
+                },
                 status=500,
             )
         messages.error(request, "Ошибка при сохранении отклика. Попробуйте позже.")
         return redirect("sparring_list")
-
-    if created:
-        # Создаем уведомление в личном кабинете для автора заявки
-        try:
-            create_notification(
-                user=sparring.player.user,
-                message=f"{respondent} откликнулся на вашу заявку на спарринг.",
-                url=reverse("sparring_my_requests"),
-                event_key="sparring.response",
-            )
-        except Exception as e:
-            logger.warning("Failed to create notification for sparring response: %s", e)
-
-        # Отправляем Telegram уведомление
-        if notify_sparring_response is not None:
-            try:
-                notify_sparring_response(obj)
-            except Exception as e:
-                logger.warning(
-                    "Failed to send Telegram notification for sparring response: %s", e
-                )
 
     if request.method == "POST":
         try:
@@ -970,16 +917,24 @@ def doubles_detail(request, pk):
 
     can_confirm = (
         is_author
+        and not req.confirmed_at
+        and not req.match_id
         and req.status == DoublesMatchRequestStatus.READY
         and author_team
         and opponent_team
         and author_team.members.count() == 2
         and opponent_team.members.count() == 2
     )
-    can_edit_teams = is_author and req.status in (
-        DoublesMatchRequestStatus.OPEN,
-        DoublesMatchRequestStatus.FORMING,
-        DoublesMatchRequestStatus.READY,
+    can_edit_teams = (
+        is_author
+        and not req.confirmed_at
+        and not req.match_id
+        and req.status
+        in (
+            DoublesMatchRequestStatus.OPEN,
+            DoublesMatchRequestStatus.FORMING,
+            DoublesMatchRequestStatus.READY,
+        )
     )
     exclude_for_partner = set()
     if author_team:
@@ -1091,34 +1046,6 @@ def doubles_accept_join(request, pk, join_request_id):
             join_request_id=join_request_id,
             accepted_by=player,
         )
-        jr = DoublesJoinRequest.objects.prefetch_related("members__player__user").get(
-            pk=join_request_id, match_request_id=pk
-        )
-        detail_url = reverse("doubles_detail", args=[pk])
-        msg = "Ваш отклик на парный матч 2×2 принят. Ожидайте подтверждения матча автором заявки."
-        if len(msg) > 255:
-            msg = msg[:252] + "..."
-        for m in jr.members.all():
-            if m.player and getattr(m.player, "user_id", None):
-                try:
-                    create_notification(
-                        user=m.player.user,
-                        message=msg,
-                        url=detail_url,
-                        event_key="sparring.doubles_joined",
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "doubles_accept_join Notification for user %s: %s",
-                        m.player.user_id,
-                        e,
-                    )
-        try:
-            from apps.telegram_bot.notifications import notify_doubles_join_accepted
-
-            notify_doubles_join_accepted(jr)
-        except Exception as e:
-            logger.warning("notify_doubles_join_accepted failed: %s", e)
         messages.success(request, "Отклик принят.")
     except (PermissionError, ValueError) as e:
         messages.error(request, str(e))
@@ -1140,7 +1067,7 @@ def doubles_reject_join(request, pk, join_request_id):
             rejected_by=player,
         )
         messages.info(request, "Отклик отклонён.")
-    except PermissionError as e:
+    except (PermissionError, ValueError) as e:
         messages.error(request, str(e))
     return redirect("doubles_detail", pk=pk)
 
@@ -1290,7 +1217,7 @@ def doubles_delete_request(request, pk):
     try:
         delete_match_request(match_request_id=pk, deleted_by=player)
         messages.success(request, "Заявка удалена.")
-    except PermissionError as exc:
+    except (PermissionError, ValueError) as exc:
         messages.error(request, str(exc))
     return redirect(f"{reverse('sparring_my_requests')}?type={list_type}")
 
@@ -1444,15 +1371,6 @@ def sparring_invitation_accept(request, pk):
     except ValueError as e:
         messages.error(request, str(e))
         return redirect("sparring_my_invitations")
-
-    inv = get_object_or_404(
-        SparringInvitation.objects.select_related("inviter__user"), pk=pk
-    )
-    if notify_sparring_invitation_accepted_inviter is not None:
-        try:
-            notify_sparring_invitation_accepted_inviter(inv, match)
-        except Exception as e:
-            logger.warning("notify_sparring_invitation_accepted_inviter failed: %s", e)
 
     messages.success(request, "Приглашение принято, матч создан.")
     return redirect("match_detail", pk=match.pk)

@@ -80,7 +80,7 @@ def _expire_interrupted_email(now: datetime) -> int:
 
 
 @transaction.atomic
-def _claim() -> Delivery | None:
+def _claim(*, announcement_only: bool = False) -> Delivery | None:
     """Захватывает одно задание, не останавливаясь на прерванном письме.
 
     Returns:
@@ -88,15 +88,16 @@ def _claim() -> Delivery | None:
     """
     now = timezone.now()
     while True:
-        item = (
-            Delivery.objects.select_for_update(skip_locked=True)
-            .filter(
-                Q(status="queued") | Q(status="processing"),
-                available_at__lte=now,
-            )
-            .order_by("available_at", "pk")
-            .first()
+        candidates = Delivery.objects.select_for_update(skip_locked=True).filter(
+            Q(status="queued") | Q(status="processing"),
+            channel__in=["push", "email"],
+            available_at__lte=now,
         )
+        if announcement_only:
+            candidates = candidates.filter(
+                channel="email", tournament_announcement__isnull=False
+            )
+        item = candidates.order_by("available_at", "pk").first()
         if item is None:
             return None
         # SMTP не поддерживает идемпотентность: после падения процесса не повторяем вслепую.
@@ -146,16 +147,25 @@ def _process(item: Delivery) -> None:
     Raises:
         NotificationValidationError: Событие отсутствует в реестре или политике.
     """
-    policy = event_policy(item.event_key)
-    push, email = preferences(item.user_id)
+    if item.channel not in {"push", "email"}:
+        _finish(item, "failed", "unsupported_channel")
+        return
     user_active = item.user.is_active
     campaign_active = item.broadcast is None or item.broadcast.status != "cancelled"
-    allowed_push, allowed_email, _ = channels_for(
-        (policy.push_enabled, policy.email_enabled, policy.inbox_enabled),
-        push=push,
-        email=email,
-    )
-    allowed = allowed_push if item.channel == "push" else allowed_email
+    if center_enabled():
+        policy = event_policy(item.event_key)
+        push, email = preferences(item.user_id)
+        allowed_push, allowed_email, _ = channels_for(
+            (policy.push_enabled, policy.email_enabled, policy.inbox_enabled),
+            push=push,
+            email=email,
+        )
+        allowed = allowed_push if item.channel == "push" else allowed_email
+    else:
+        # Новые турнирные письма прежде работали независимо от rollout push/email.
+        allowed = (
+            item.channel == "email" and item.tournament_announcement_id is not None
+        )
     if (
         not user_active
         or not allowed
@@ -211,6 +221,20 @@ def _process(item: Delivery) -> None:
                         count=revoked,
                     )
             raise
+    elif (announcement := item.tournament_announcement) is not None:
+        from apps.core.email_service import send_new_tournament_email
+        from apps.telegram_bot.announcements import tournament_recipient_allowed
+
+        tournament = announcement.tournament
+        if not tournament_recipient_allowed(tournament, item.user_id):
+            _finish(item, "skipped", "tournament_audience_changed")
+            return
+        if not send_new_tournament_email(
+            item.user, tournament, raise_on_failure=True, timeout_seconds=SMTP_TIMEOUT
+        ):
+            _finish(item, "failed", "smtp_not_accepted")
+            return
+        provider_id = "smtp-accepted"
     else:
         message = EventEmail(
             event_key=item.event_key,
@@ -236,11 +260,19 @@ def process_deliveries(*, limit: int = 100) -> int:
     Returns:
         Число рассмотренных заданий; accepted означает только принятие транспортом.
     """
-    if not center_enabled():
+    announcement_only = not center_enabled()
+    if (
+        announcement_only
+        and not Delivery.objects.filter(
+            channel="email",
+            tournament_announcement__isnull=False,
+            status__in=["queued", "processing"],
+        ).exists()
+    ):
         return 0
     for campaign_id in Broadcast.objects.filter(status="queued").values_list(
         "pk", flat=True
-    )[:limit]:
+    )[: 0 if announcement_only else limit]:
         try:
             expand_broadcast(campaign_id)
         except NotificationValidationError:
@@ -252,7 +284,7 @@ def process_deliveries(*, limit: int = 100) -> int:
     _expire_interrupted_email(timezone.now())
     handled = 0
     for _ in range(limit):
-        item = _claim()
+        item = _claim(announcement_only=announcement_only)
         if item is None:
             break
         handled += 1

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.conf import settings
 from django.core.validators import MaxLengthValidator
@@ -13,6 +13,9 @@ from django.db import models
 from apps.users.models import Notification, User
 
 from .domain.rules import BODY_LIMIT, TITLE_LIMIT
+
+if TYPE_CHECKING:
+    from apps.telegram_bot.models import TelegramBroadcast, TournamentAnnouncement
 
 
 class EventPolicy(models.Model):
@@ -267,7 +270,8 @@ class Delivery(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE
     )
     channel: models.CharField[str, str] = models.CharField(
-        max_length=8, choices=[("push", "Push"), ("email", "Email")]
+        max_length=8,
+        choices=[("push", "Push"), ("email", "Email"), ("telegram", "Telegram")],
     )
     title: models.CharField[str, str] = models.CharField(max_length=TITLE_LIMIT)
     body: models.TextField[str, str] = models.TextField(max_length=BODY_LIMIT)
@@ -279,6 +283,29 @@ class Delivery(models.Model):
     notification_id: int | None
     notification: models.ForeignKey[Notification | None, Notification | None] = (
         models.ForeignKey("users.Notification", null=True, on_delete=models.SET_NULL)
+    )
+    telegram_payload: models.JSONField[dict[str, Any] | None, dict[str, Any] | None] = (
+        models.JSONField(null=True, blank=True)
+    )
+    telegram_broadcast_id: int | None
+    telegram_broadcast: models.ForeignKey[
+        TelegramBroadcast | None, TelegramBroadcast | None
+    ] = models.ForeignKey(
+        "telegram_bot.TelegramBroadcast",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="deliveries",
+    )
+    tournament_announcement_id: int | None
+    tournament_announcement: models.ForeignKey[
+        TournamentAnnouncement | None, TournamentAnnouncement | None
+    ] = models.ForeignKey(
+        "telegram_bot.TournamentAnnouncement",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="deliveries",
     )
     status: models.CharField[str, str] = models.CharField(
         "Статус", max_length=16, default="queued"
@@ -309,6 +336,14 @@ class Delivery(models.Model):
             models.UniqueConstraint(
                 fields=["broadcast", "user", "channel"],
                 name="unique_broadcast_user_channel",
+            ),
+            models.UniqueConstraint(
+                fields=["telegram_broadcast", "user", "channel"],
+                name="unique_tg_broadcast_recipient",
+            ),
+            models.UniqueConstraint(
+                fields=["tournament_announcement", "user", "channel"],
+                name="unique_tournament_announcement",
             ),
         ]
         indexes: ClassVar = [

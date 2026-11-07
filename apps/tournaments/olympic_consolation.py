@@ -509,4 +509,5 @@ def process_overdue_match(match: Match) -> tuple[bool, str]:
         return False, "Не олимпийский турнир."
     from .overdue import notify_admins_match_deadline_overdue
 
-    return notify_admins_match_deadline_overdue(match)
+    result: tuple[bool, str] = notify_admins_match_deadline_overdue(match)
+    return result

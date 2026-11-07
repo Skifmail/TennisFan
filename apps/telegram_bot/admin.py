@@ -2,74 +2,34 @@
 Админка раздела «Телеграм»: рассылки, привязки пользователей, запросы на продление дедлайна.
 """
 
-import logging
-import threading
-from datetime import timedelta
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypeAlias, cast
 
 from django.contrib import admin, messages
-from django.http import HttpResponseRedirect
+from django.db.models import QuerySet
+from django.forms import ModelForm
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.urls import reverse
-from django.utils import timezone
 
-from apps.core.models import UserTelegramLink
-from apps.tournaments.models import DeadlineExtensionRequest, Match
+from apps.tournaments.deadline_extensions import approve_deadline_extension
+from apps.tournaments.models import DeadlineExtensionRequest
+from apps.users.models import User
 
 from . import services as bot
+from .delivery import request_broadcast
 from .models import (
     DeadlineExtensionRequestProxy,
     TelegramBroadcast,
     UserTelegramLinkProxy,
 )
 
-logger = logging.getLogger(__name__)
-
-
-def _send_broadcast_in_background(broadcast_pk: int) -> None:
-    """
-    В фоновом потоке: отправить рассылку всем подписчикам и проставить sent_at.
-    Вызывается после сохранения рассылки в БД (объект уже с изображением в storage).
-    """
-    from django.db import connection
-
-    connection.close()  # поток использует свою копию соединения
-    try:
-        broadcast = TelegramBroadcast.objects.get(pk=broadcast_pk)
-        if broadcast.sent_at:
-            return
-        text = (broadcast.text or "").strip()
-        if not text:
-            return
-        links = UserTelegramLink.objects.filter(user_bot_chat_id__isnull=False).exclude(
-            user_bot_chat_id=0
-        )
-        total = links.count()
-        sent = 0
-        for link in links:
-            try:
-                if broadcast.image:
-                    photo_arg = getattr(broadcast.image, "url", None) or getattr(
-                        broadcast.image, "path", None
-                    )
-                    if photo_arg:
-                        _, ok = bot.send_photo(
-                            link.user_bot_chat_id,
-                            photo_arg,
-                            caption=text or None,
-                        )
-                    else:
-                        ok = False
-                else:
-                    ok = bot.send_to_user(link.user_bot_chat_id, text)
-                if ok:
-                    sent += 1
-            except Exception as e:
-                logger.warning("Broadcast to %s failed: %s", link.user_bot_chat_id, e)
-        broadcast.sent_at = timezone.now()
-        broadcast.save(update_fields=["sent_at"])
-        logger.info("Broadcast pk=%s sent: %s/%s", broadcast_pk, sent, total)
-    except Exception as e:
-        logger.exception("Background broadcast pk=%s failed: %s", broadcast_pk, e)
-
+if TYPE_CHECKING:
+    _BroadcastAdmin: TypeAlias = admin.ModelAdmin[TelegramBroadcast]
+    _LinkAdmin: TypeAlias = admin.ModelAdmin[UserTelegramLinkProxy]
+    _ExtensionAdmin: TypeAlias = admin.ModelAdmin[DeadlineExtensionRequestProxy]
+else:
+    _BroadcastAdmin = _LinkAdmin = _ExtensionAdmin = admin.ModelAdmin
 
 # ---------------------------------------------------------------------------
 # Рассылки в Telegram
@@ -77,13 +37,29 @@ def _send_broadcast_in_background(broadcast_pk: int) -> None:
 
 
 @admin.register(TelegramBroadcast)
-class TelegramBroadcastAdmin(admin.ModelAdmin):
+class TelegramBroadcastAdmin(_BroadcastAdmin):
     """Рассылка: текст и опционально фото — отправка всем пользователям бота при сохранении."""
 
-    list_display = ("text_short", "has_image", "sent_at", "created_at", "created_by")
-    list_filter = ("sent_at",)
+    list_display = (
+        "text_short",
+        "has_image",
+        "status",
+        "delivery_summary",
+        "sent_at",
+        "created_at",
+        "created_by",
+    )
+    list_filter = ("status",)
     search_fields = ("text",)
-    readonly_fields = ("sent_at", "created_at", "created_by")
+    readonly_fields = (
+        "status",
+        "delivery_summary",
+        "prepared_at",
+        "finished_at",
+        "sent_at",
+        "created_at",
+        "created_by",
+    )
 
     fieldsets = (
         (
@@ -98,7 +74,15 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
         (
             "Служебные",
             {
-                "fields": ("sent_at", "created_at", "created_by"),
+                "fields": (
+                    "status",
+                    "delivery_summary",
+                    "prepared_at",
+                    "finished_at",
+                    "sent_at",
+                    "created_at",
+                    "created_by",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -107,50 +91,74 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
     class Media:
         js = ("js/admin_broadcast.js",)
 
-    def text_short(self, obj):
+    @admin.display(description="Текст")
+    def text_short(self, obj: TelegramBroadcast) -> str:
+        """Показать короткий текст рассылки."""
         return (
             ((obj.text or "")[:60] + "…")
             if (obj.text and len(obj.text) > 60)
             else (obj.text or "—")
         )
 
-    text_short.short_description = "Текст"
-
-    def has_image(self, obj):
+    @admin.display(boolean=True, description="Фото")
+    def has_image(self, obj: TelegramBroadcast) -> bool:
+        """Показать наличие фото в хранилище."""
         return bool(obj.image)
 
-    has_image.boolean = True
-    has_image.short_description = "Фото"
+    @admin.display(description="Доставка")
+    def delivery_summary(self, obj: TelegramBroadcast) -> str:
+        """Не смешивать принятие Telegram с ошибками, пропусками и неопределённостью."""
+        if not obj.pk:
+            return "—"
+        from django.db.models import Count
 
-    def get_readonly_fields(self, request, obj=None):
-        if obj and obj.sent_at:
-            return list(super().get_readonly_fields(request, obj)) + ["text", "image"]
-        return super().get_readonly_fields(request, obj)
+        counts = dict(
+            obj.deliveries.values("status")
+            .annotate(total=Count("pk"))
+            .values_list("status", "total")
+        )
+        return (
+            f"Принято: {counts.get('accepted', 0)}/{sum(counts.values())}; "
+            f"ошибки: {counts.get('failed', 0)}; неизвестно: {counts.get('uncertain', 0)}; "
+            f"пропущено: {counts.get('skipped', 0)}"
+        )
 
-    def save_model(self, request, obj, form, change):
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: TelegramBroadcast | None = None
+    ) -> list[str] | tuple[str, ...]:
+        """Запретить редактировать содержимое уже поставленной рассылки."""
+        fields: list[str] | tuple[str, ...] = super().get_readonly_fields(request, obj)
+        if obj and obj.status != TelegramBroadcast.Status.DRAFT:
+            return list(fields) + ["text", "image"]
+        return fields
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: TelegramBroadcast,
+        form: ModelForm[TelegramBroadcast],
+        change: bool,
+    ) -> None:
+        """Сохранить подготовку рассылки без сетевых вызовов и daemon-потока."""
         if not change:
-            obj.created_by = request.user
-        need_send = not obj.sent_at and bool((obj.text or "").strip())
-        if need_send and not bot.is_configured():
-            messages.error(
-                request,
-                "Пользовательский бот не настроен (TELEGRAM_USER_BOT_TOKEN). Рассылка не отправлена.",
-            )
+            obj.created_by = cast(User, request.user)
         super().save_model(request, obj, form, change)
-        if need_send and bot.is_configured():
-            thread = threading.Thread(
-                target=_send_broadcast_in_background,
-                args=(obj.pk,),
-                daemon=True,
-                name=f"broadcast-{obj.pk}",
-            )
-            thread.start()
+        if request_broadcast(obj.pk):
+            obj.refresh_from_db()
             messages.success(
                 request,
-                "Рассылка создана. Отправка выполняется в фоне; обновите страницу через несколько секунд.",
+                "Рассылка сохранена в очереди. Доставку выполняет process_notifications; "
+                "статусы показывают приём Telegram, а не прочтение.",
             )
+            if not bot.is_configured():
+                messages.warning(
+                    request,
+                    "API бота отключён или токен не настроен. Задания сохранены, но отправка пока приостановлена.",
+                )
 
-    def response_post_save_add(self, request, obj):
+    def response_post_save_add(
+        self, request: HttpRequest, obj: TelegramBroadcast
+    ) -> HttpResponseRedirect:
         """
         Редирект сразу после создания — на страницу просмотра рассылки по pk.
         Иначе Django подставляет get_full_path().replace("/add/", "/<pk>/"); если в пути
@@ -166,7 +174,12 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
             return HttpResponseRedirect(path)
         return super().response_post_save_add(request, obj)
 
-    def response_add(self, request, obj, post_url_continue=None):
+    def response_add(
+        self,
+        request: HttpRequest,
+        obj: TelegramBroadcast,
+        post_url_continue: str | None = None,
+    ) -> HttpResponse:
         """Дублируем явный редирект по pk на случай другого пути вызова."""
         pk = getattr(obj, "pk", None)
         if pk is not None and isinstance(pk, int):
@@ -184,7 +197,7 @@ class TelegramBroadcastAdmin(admin.ModelAdmin):
 
 
 @admin.register(UserTelegramLinkProxy)
-class UserTelegramLinkProxyAdmin(admin.ModelAdmin):
+class UserTelegramLinkProxyAdmin(_LinkAdmin):
     """Привязки пользователей к Telegram (отображаются в разделе «Телеграм»)."""
 
     list_display = (
@@ -197,11 +210,10 @@ class UserTelegramLinkProxyAdmin(admin.ModelAdmin):
     search_fields = ("user__email",)
     readonly_fields = ("created_at", "updated_at", "token_created_at")
 
-    def has_binding_token(self, obj):
+    @admin.display(boolean=True, description="Токен привязки")
+    def has_binding_token(self, obj: UserTelegramLinkProxy) -> bool:
+        """Показать наличие одноразового токена, не раскрывая его содержимое."""
         return bool(obj.binding_token)
-
-    has_binding_token.boolean = True
-    has_binding_token.short_description = "Токен привязки"
 
 
 # ---------------------------------------------------------------------------
@@ -210,29 +222,15 @@ class UserTelegramLinkProxyAdmin(admin.ModelAdmin):
 
 
 @admin.action(description="Одобрить (+24 ч)")
-def approve_extension_action(modeladmin, request, queryset):
+def approve_extension_action(
+    modeladmin: admin.ModelAdmin[DeadlineExtensionRequestProxy],
+    request: HttpRequest,
+    queryset: QuerySet[DeadlineExtensionRequestProxy],
+) -> None:
     """Продлить дедлайн матча на 24 часа и отметить запрос как одобренный."""
-    now = timezone.now()
     count = 0
     for ext in queryset.filter(status=DeadlineExtensionRequest.Status.PENDING):
-        match = ext.match
-        if match.status != Match.MatchStatus.SCHEDULED:
-            continue
-        if match.deadline:
-            match.deadline = match.deadline + timedelta(hours=24)
-        else:
-            match.deadline = now + timedelta(hours=24)
-        match.save(update_fields=["deadline"])
-        ext.status = DeadlineExtensionRequest.Status.APPROVED
-        ext.processed_at = now
-        ext.save(update_fields=["status", "processed_at"])
-        try:
-            from apps.telegram_bot import notifications as tg
-
-            tg.notify_extension_approved(ext)
-        except Exception:
-            pass
-        count += 1
+        count += int(approve_deadline_extension(ext.pk))
     if count:
         messages.success(
             request, f"Одобрено запросов: {count}. Дедлайн продлён на 24 ч."
@@ -244,7 +242,7 @@ def approve_extension_action(modeladmin, request, queryset):
 
 
 @admin.register(DeadlineExtensionRequestProxy)
-class DeadlineExtensionRequestProxyAdmin(admin.ModelAdmin):
+class DeadlineExtensionRequestProxyAdmin(_ExtensionAdmin):
     """Запросы на продление дедлайна матча (из кнопки в Telegram-боте)."""
 
     list_display = ("match", "requested_by", "status", "created_at", "processed_at")

@@ -413,6 +413,13 @@
     </div>
     {% endif %}
 
+    {% if manual_stage_mode %}
+    <section class="card mb-4"><div class="card-body">
+        <h2 class="h4">Круговой отбор и две олимпийские сетки</h2>
+        <p>Составы отборов, результаты и обе сетки находятся на странице ручных этапов.</p>
+        <a class="btn btn-primary" href="{% url 'tournament_manage_stages' slug=tournament.slug %}">Открыть ручные этапы</a>
+    </div></section>
+    {% else %}
     <!-- Секция 4: Плей-офф — визуальная турнирная сетка -->
     {% if tvd_main_matches or tvd_consolation_matches %}
     <div class="card manage-card mb-4">
@@ -632,6 +639,8 @@
             {% endif %}
         </div>
     </div>
+    {% endif %}
+
     {% endif %}
 
     <!-- Секция 5: Итоги -->

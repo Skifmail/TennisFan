@@ -3,19 +3,23 @@
 Используются в views и в telegram_bot без циклических импортов.
 """
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from html import escape
 from typing import TYPE_CHECKING, cast
 
 from apps.notifications.services import create_notification
 
 if TYPE_CHECKING:
     from apps.clubs.models import Club
-    from apps.users.models import Player
+    from apps.users.models import Player, User
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import (
     Case,
     DateTimeField,
@@ -205,7 +209,7 @@ _UNFINISHED_MATCH_STATUSES = (
 )
 
 
-def _player_tournament_matches_q(player: "Player") -> Q:
+def _player_tournament_matches_q(player: Player) -> Q:
     """Фильтр матчей турнира, в которых участвует игрок."""
     return (
         Q(player1=player)
@@ -219,7 +223,7 @@ def _player_tournament_matches_q(player: "Player") -> Q:
 
 def find_blocking_earlier_tournament_match(
     match: Match,
-    player: "Player",
+    player: Player,
 ) -> Match | None:
     """Найти более ранний незавершённый матч того же турнира.
 
@@ -277,7 +281,7 @@ def find_blocking_earlier_tournament_match(
 
 def format_tournament_match_order_block_message(
     blocking_match: Match,
-    player: "Player",
+    player: Player,
 ) -> str:
     """Текст ошибки при нарушении порядка внесения результатов в турнире.
 
@@ -310,7 +314,7 @@ def format_tournament_match_order_block_message(
 
 def attach_tournament_result_order_flags(
     matches: Iterable[Match],
-    player: "Player",
+    player: Player,
 ) -> None:
     """Пометить матчи флагами блокировки ввода результата по порядку дат.
 
@@ -380,6 +384,35 @@ def get_tournament_participant_users(tournament: Tournament) -> list:
             ):
                 users.add(player.user)
     return list(users)
+
+
+def get_match_player_side(match: Match, player: Player) -> int | None:
+    """Определить сторону любого участника одиночного или парного матча."""
+    if match.team1_id and match.team2_id:
+        if match.team1 and player in (match.team1.player1, match.team1.player2):
+            return 1
+        if match.team2 and player in (match.team2.player1, match.team2.player2):
+            return 2
+    else:
+        if player.pk in (match.player1_id, match.partner1_id):
+            return 1
+        if player.pk in (match.player2_id, match.partner2_id):
+            return 2
+    return None
+
+
+def match_participant_filter(player: Player) -> Q:
+    """Фильтр матчей для всех участников, включая партнёров спарринга."""
+    return (
+        Q(player1=player)
+        | Q(player2=player)
+        | Q(partner1=player)
+        | Q(partner2=player)
+        | Q(team1__player1=player)
+        | Q(team1__player2=player)
+        | Q(team2__player1=player)
+        | Q(team2__player2=player)
+    )
 
 
 def get_match_participants(match: Match) -> set:
@@ -548,7 +581,7 @@ class PlayerTrophy:
 
 def get_players_trophies_map(
     player_ids: Iterable[int],
-    club: "Club | None" = None,
+    club: Club | None = None,
     sport: str | None = None,
 ) -> dict[int, list[PlayerTrophy]]:
     """Собирает кубки за призовые места (1–3) для набора игроков одним запросом.
@@ -619,8 +652,8 @@ def get_players_trophies_map(
 
 
 def get_player_trophies(
-    player: "Player",
-    club: "Club | None" = None,
+    player: Player,
+    club: Club | None = None,
     sport: str | None = None,
 ) -> list[PlayerTrophy]:
     """Собирает кубки игрока за призовые места (1–3) в завершённых турнирах.
@@ -639,13 +672,14 @@ def get_player_trophies(
     )
 
 
+@transaction.atomic
 def notify_participants_match_deadline_changed(
     match: Match,
     *,
-    old_deadline,
-    new_deadline,
+    old_deadline: datetime | None,
+    new_deadline: datetime | None,
 ) -> tuple[int, int]:
-    """Уведомить участников матча об изменении дедлайна (ЛК + email).
+    """Сохранить уведомления об изменении дедлайна; почту отправить только после коммита.
 
     Args:
         match (Match): Матч с обновлённым дедлайном.
@@ -653,11 +687,12 @@ def notify_participants_match_deadline_changed(
         new_deadline: Новый дедлайн (datetime | None).
 
     Returns:
-        tuple[int, int]: ``(число уведомлений в ЛК, число отправленных писем)``.
+        tuple[int, int]: ``(число уведомлений в ЛК, число запланированных писем)``.
     """
     from django.urls import reverse
 
     from apps.core.email_service import send_match_deadline_changed_email
+    from apps.telegram_bot.notifications import send_to_user_by_user
 
     tournament = match.tournament
     if tournament is None:
@@ -684,36 +719,39 @@ def notify_participants_match_deadline_changed(
         msg_lk = msg_lk[:252] + "..."
 
     notified = 0
-    emailed = 0
-    for user in dict.fromkeys(get_match_participant_users(match)):
-        try:
-            create_notification(
-                user=user,
-                message=msg_lk,
-                url=match_path,
-                event_key="match.deadline_changed",
-            )
-            notified += 1
-        except Exception:
-            logger.exception(
-                "Не удалось создать уведомление о дедлайне для user=%s match=%s",
-                getattr(user, "pk", None),
-                match.pk,
-            )
-        try:
-            if send_match_deadline_changed_email(
-                user,
-                tournament,
-                new_deadline_str=new_str,
-                old_deadline_str=old_str,
-                round_name=match.round_name or "",
-                match_url=match_url,
-            ):
-                emailed += 1
-        except Exception:
-            logger.exception(
-                "Не удалось отправить email о дедлайне user=%s match=%s",
-                getattr(user, "pk", None),
-                match.pk,
-            )
-    return notified, emailed
+    email_scheduled = 0
+    for user in sorted(
+        dict.fromkeys(get_match_participant_users(match)), key=lambda user: user.pk
+    ):
+        create_notification(
+            user=user,
+            message=msg_lk,
+            url=match_path,
+            event_key="match.deadline_changed",
+        )
+        notified += 1
+        send_to_user_by_user(
+            user,
+            f"🔄 <b>Дедлайн матча изменён</b>\n\n{escape(msg_lk)}",
+            reply_markup={
+                "inline_keyboard": [[{"text": "Открыть матч", "url": match_url}]]
+            },
+            skip_email=True,
+            event_key="match.deadline_changed",
+        )
+        if user.email and "@" in user.email:
+
+            def send_deadline_email(recipient: User = user) -> None:
+                """Отправить письмо после коммита выбранному участнику матча."""
+                send_match_deadline_changed_email(
+                    recipient,
+                    tournament,
+                    new_deadline_str=new_str,
+                    old_deadline_str=old_str,
+                    round_name=match.round_name or "",
+                    match_url=match_url,
+                )
+
+            transaction.on_commit(send_deadline_email)
+            email_scheduled += 1
+    return notified, email_scheduled

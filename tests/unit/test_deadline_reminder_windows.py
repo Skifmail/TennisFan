@@ -23,6 +23,7 @@ from apps.tournaments.management.commands.send_deadline_reminders import (
 from apps.tournaments.models import Match, SparringDeadlineExtension, TournamentStatus
 from apps.users.models import Notification
 from tests.support.factories import make_player, make_tournament
+from tests.support.notifications import seed_event_policies
 
 
 def _end_of_day_in(days: int) -> datetime:
@@ -131,6 +132,7 @@ class SparringExtensionReminderTextTestCase(TestCase):
     """Почта, ЛК и push объясняют продление только имеющему на него право игроку."""
 
     def setUp(self) -> None:
+        seed_event_policies()
         self.p1 = make_player(email_suffix="hint-p1")
         self.p2 = make_player(email_suffix="hint-p2")
         self.match = Match.objects.create(

@@ -59,6 +59,15 @@ EVENTS: Final[dict[str, EventDefinition]] = {
     "junior.updated": EventDefinition(
         "Детская лига: изменение", "Детская лига", "inbox"
     ),
+    "junior.guardian_pending": EventDefinition(
+        "Детская лига: представитель на проверке", "Детская лига", "inbox"
+    ),
+    "junior.sparring_response": EventDefinition(
+        "Детская лига: отклик на спарринг", "Детская лига", "inbox"
+    ),
+    "junior.sparring_accepted": EventDefinition(
+        "Детская лига: спарринг согласован", "Детская лига", "inbox"
+    ),
     "stringer.application_submitted": EventDefinition(
         "Новая заявка стрингера", "Стрингеры", "inbox"
     ),
@@ -277,6 +286,9 @@ EVENTS: Final[dict[str, EventDefinition]] = {
 PRODUCER_EVENTS: Final[dict[str, str]] = {
     "apps.juniors.notifications:notify_representative": "junior.updated",
     "apps.juniors.appeals:submit_appeal": "junior.updated",
+    "apps.juniors.notifications:notify_pending_guardian": "junior.guardian_pending",
+    "apps.juniors.sparring:_notify_response": "junior.sparring_response",
+    "apps.juniors.sparring:_notify_accepted": "junior.sparring_accepted",
     "apps.chat.direct:notify_direct_message": "chat.direct_message",
     "apps.content.stringer_services:notify_stringer_application": "stringer.application_submitted",
     "apps.notifications.auth_forms:send_mail": "account.password_reset",
@@ -403,6 +415,8 @@ INBOX_ONLY_EVENTS: Final = frozenset(
         "camp.application_submitted",
         "camp.application_updated",
         "junior.updated",
+        "junior.sparring_response",
+        "junior.sparring_accepted",
         "chat.reply",
         "club.join_approved",
         "club.join_rejected",

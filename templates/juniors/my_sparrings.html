@@ -1,0 +1,52 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Мои спарринги{% endblock %}
+{% block junior_content %}
+<header class="jl-heading">
+    <div>
+        <p class="jl-eyebrow">СЕМЕЙНЫЙ КАБИНЕТ</p>
+        <h1>Спарринги вашей семьи.</h1>
+        <p class="jl-muted">Заявки детей, полученные отклики и игры, на которые вы откликнулись сами.</p>
+    </div>
+    <div class="jl-actions">
+        {% if can_create %}<a class="jl-button" href="{% url 'juniors:sparring_new' %}">Разместить заявку</a>{% endif %}
+        <a class="jl-button jl-button-outline" href="{% url 'juniors:sparrings' %}">Все заявки</a>
+    </div>
+</header>
+{% if not can_create %}<aside class="jl-note">Чтобы размещать заявки, нужен проверенный представитель и подписка взрослого с доступом к спаррингам. Откликаться на чужие заявки можно при действующей подписке.</aside>{% endif %}
+
+<section class="jl-card">
+    <div class="jl-card-top"><h2>Заявки детей</h2><span class="jl-badge">{{ own_requests|length }}</span></div>
+    <div class="jl-grid jl-sparring-grid">
+    {% for request in own_requests %}<article class="jl-card jl-sparring-card">
+        <div class="jl-card-top"><span class="jl-badge">{{ request.get_status_display }}</span><span class="jl-muted">{{ request.city }}</span></div>
+        <h2><a href="{% url 'juniors:sparring' pk=request.pk %}">{{ request.child }}</a></h2>
+        <p>{{ request.created_at|date:'d E, H:i' }}<br><span class="jl-muted">{{ request.get_partner_kind_display }}</span></p>
+        <footer class="jl-tournament-footer"><p>{{ request.responses.count }} откл.</p><a class="jl-link" href="{% url 'juniors:sparring' pk=request.pk %}">Открыть →</a></footer>
+    </article>{% empty %}<p class="jl-muted">Заявок пока нет.</p>{% endfor %}
+    </div>
+</section>
+
+<section class="jl-card">
+    <div class="jl-card-top"><h2>Отклики на заявки детей</h2><span class="jl-badge">{{ received|length }}</span></div>
+    <div class="jl-grid jl-sparring-grid">
+    {% for response in received %}<article class="jl-card jl-sparring-card">
+        <div class="jl-card-top"><span class="jl-badge">{{ response.get_status_display }}</span><span class="jl-muted">{{ response.request.city }}</span></div>
+        <h2><a href="{% url 'juniors:sparring' pk=response.request_id %}">{{ response.respondent_label }}</a></h2>
+        <p>{{ response.respondent_age|default:'Возраст не указан' }}{% if response.respondent_age %} лет{% endif %}<br><span class="jl-muted">Заявка: {{ response.request.child }}</span></p>
+        <footer class="jl-tournament-footer"><p>{{ response.created_at|date:'d E, H:i' }}</p><a class="jl-link" href="{% url 'juniors:sparring' pk=response.request_id %}">К заявке →</a></footer>
+    </article>{% empty %}<p class="jl-muted">Откликов пока нет.</p>{% endfor %}
+    </div>
+</section>
+
+<section class="jl-card">
+    <div class="jl-card-top"><h2>Ваши отклики</h2><span class="jl-badge">{{ sent|length }}</span></div>
+    <div class="jl-grid jl-sparring-grid">
+    {% for response in sent %}<article class="jl-card jl-sparring-card">
+        <div class="jl-card-top"><span class="jl-badge">{{ response.get_status_display }}</span><span class="jl-muted">{{ response.request.city }}</span></div>
+        <h2><a href="{% url 'juniors:sparring' pk=response.request_id %}">{{ response.request.child.public_label }}</a></h2>
+        <p>{{ response.created_at|date:'d E, H:i' }}<br><span class="jl-muted">Заявка: {{ response.request.get_partner_kind_display }}</span></p>
+        <footer class="jl-tournament-footer"><p>{% if response.status == 'pending' %}Ожидает решения{% elif response.status == 'accepted' %}Игра согласована{% else %}Отклонён{% endif %}</p><a class="jl-link" href="{% url 'juniors:sparring' pk=response.request_id %}">К заявке →</a></footer>
+    </article>{% empty %}<p class="jl-muted">Вы ещё не откликались на заявки.</p>{% endfor %}
+    </div>
+</section>
+{% endblock %}

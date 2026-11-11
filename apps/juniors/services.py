@@ -10,7 +10,7 @@ from apps.users.models import User
 
 from .legal import ACCURACY_CONFIRMATION, REPRESENTATIVE_CONFIRMATION
 from .models import AuditEvent, ChildConsent, ChildProfile, GuardianLink, LegalRelease
-from .notifications import notify_representative
+from .notifications import notify_pending_guardian, notify_representative
 from .permissions import guardian_for, require_verifier
 
 
@@ -82,6 +82,7 @@ def create_child(*, actor: User, data: dict[str, Any], relation: str) -> ChildPr
         action="child.created",
         details={"declarations": declarations, "relation": relation},
     )
+    notify_pending_guardian(link)
     return cast(ChildProfile, child)
 
 

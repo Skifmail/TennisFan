@@ -1,0 +1,43 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Спарринги детей{% endblock %}
+{% block junior_content %}
+<header class="jl-heading">
+    <div>
+        <p class="jl-eyebrow">ТОВАРИЩЕСКИЕ ИГРЫ</p>
+        <h1>Найдите соперника для игры.</h1>
+        <p class="jl-muted">Дети могут играть с детьми и взрослыми. Возраст и пол — подсказка для подбора, а не ограничение допуска. Контакты открываются только после согласования.</p>
+    </div>
+    <div class="jl-actions">
+        {% if can_play %}<a class="jl-button" href="{% url 'juniors:sparring_new' %}">Разместить заявку</a>{% endif %}
+        <a class="jl-button jl-button-outline" href="{% url 'juniors:my_sparrings' %}">Мои спарринги</a>
+    </div>
+</header>
+<aside class="jl-note">Спарринги доступны по подписке взрослого: если тариф с доступом к спаррингам есть у представителя, ребёнок играет без отдельной оплаты.</aside>
+<form class="jl-filter jl-filter-panel" method="get" aria-label="Фильтры спаррингов">
+    <div class="jl-filter-fields">
+        <div class="jl-field"><label for="id_city">Город</label><input type="text" name="city" id="id_city" value="{{ city }}" placeholder="Например, Москва"></div>
+        <div class="jl-field"><label for="id_partner_kind">С кем играем</label>
+            <select name="partner_kind" id="id_partner_kind">
+                <option value="">Любой соперник</option>
+                {% for value, label in partner_kinds %}<option value="{{ value }}"{% if value == partner_kind %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="jl-filter-footer">
+        <div class="jl-filter-actions"><button class="jl-button" type="submit">Показать</button><a class="jl-button jl-button-outline" href="{% url 'juniors:sparrings' %}">Сбросить</a></div>
+    </div>
+</form>
+<div class="jl-grid jl-sparring-grid">
+{% for row in rows %}<article class="jl-card jl-sparring-card">
+    <div class="jl-card-top"><span class="jl-badge">{{ row.request.get_partner_kind_display }}</span><span class="jl-muted">{{ row.request.city }}</span></div>
+    <h2><a href="{% url 'juniors:sparring' pk=row.request.pk %}">{{ row.label }}</a></h2>
+    <p>{{ row.request.child_age }} лет · {{ row.request.get_gender_preference_display }}<br><span class="jl-muted">Возраст соперника: {{ row.age_preference }}</span></p>
+    {% if row.request.preferred_days or row.request.preferred_time %}<p class="jl-muted">{{ row.request.preferred_days }}{% if row.request.preferred_days and row.request.preferred_time %} · {% endif %}{{ row.request.preferred_time }}</p>{% endif %}
+    <footer class="jl-tournament-footer">
+        <p>{% if row.own %}Ваша заявка{% elif row.responded %}Вы уже откликнулись{% else %}Игра без рейтинга{% endif %}<br><span class="jl-muted">{{ row.request.created_at|date:'d E' }}</span></p>
+        <a class="jl-link" href="{% url 'juniors:sparring' pk=row.request.pk %}">Подробнее и откликнуться →</a>
+    </footer>
+</article>{% empty %}<section class="jl-empty"><h2>Открытых заявок пока нет</h2><p>Измените фильтры или разместите свою заявку — её увидят другие семьи и взрослые игроки по подписке.</p></section>{% endfor %}
+</div>
+{% if page.has_other_pages %}<nav class="jl-actions" aria-label="Страницы спаррингов">{% if page.has_previous %}<a class="jl-button jl-button-outline" href="?page={{ page.previous_page_number }}&amp;city={{ city|urlencode }}&amp;partner_kind={{ partner_kind }}">← Назад</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a class="jl-button jl-button-outline" href="?page={{ page.next_page_number }}&amp;city={{ city|urlencode }}&amp;partner_kind={{ partner_kind }}">Далее →</a>{% endif %}</nav>{% endif %}
+{% endblock %}

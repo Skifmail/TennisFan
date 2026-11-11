@@ -2,7 +2,13 @@
 
 from django.urls import path
 
-from . import match_views, organizer_views, payment_views, views
+from . import (
+    match_views,
+    organizer_views,
+    payment_views,
+    sparring_views,
+    views,
+)
 
 app_name = "juniors"
 urlpatterns = [
@@ -18,6 +24,35 @@ urlpatterns = [
     path("matches/", match_views.my_matches, name="my_matches"),
     path("matches/<int:pk>/", match_views.match_detail, name="match"),
     path("matches/<int:pk>/result/", organizer_views.result, name="result"),
+    path("sparrings/", sparring_views.sparrings, name="sparrings"),
+    path("sparrings/new/", sparring_views.sparring_new, name="sparring_new"),
+    path("sparrings/mine/", sparring_views.my_sparrings, name="my_sparrings"),
+    path("sparrings/<int:pk>/", sparring_views.sparring_detail, name="sparring"),
+    path(
+        "sparrings/<int:pk>/close/",
+        sparring_views.sparring_close,
+        name="sparring_close",
+    ),
+    path(
+        "sparrings/<int:pk>/respond/",
+        sparring_views.sparring_respond,
+        name="sparring_respond",
+    ),
+    path(
+        "sparrings/responses/<int:pk>/accept/",
+        sparring_views.sparring_accept,
+        name="sparring_accept",
+    ),
+    path(
+        "sparrings/responses/<int:pk>/reject/",
+        sparring_views.sparring_reject,
+        name="sparring_reject",
+    ),
+    path(
+        "sparrings/responses/<int:pk>/cancel/",
+        sparring_views.sparring_cancel,
+        name="sparring_cancel",
+    ),
     path("entries/<int:pk>/withdraw/", views.withdraw_entry, name="withdraw"),
     path("entries/<int:pk>/pay/", payment_views.pay, name="pay"),
     path("payments/", payment_views.payments, name="payments"),

@@ -1,0 +1,88 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Спарринг: {{ label }}{% endblock %}
+{% block junior_content %}
+<header class="jl-heading">
+    <div>
+        <p class="jl-eyebrow">ТОВАРИЩЕСКАЯ ИГРА · {{ sparring.get_status_display }}</p>
+        <h1>{{ label }}</h1>
+        <p class="jl-muted">{{ sparring.city }} · {{ sparring.child_age }} лет · {{ sparring.get_partner_kind_display }}</p>
+    </div>
+    <div class="jl-actions"><a class="jl-button jl-button-outline" href="{% url 'juniors:sparrings' %}">Все заявки</a></div>
+</header>
+
+<section class="jl-card">
+    <div class="jl-card-top"><span class="jl-badge">{{ sparring.get_gender_preference_display }}</span><span class="jl-muted">{{ sparring.created_at|date:'d E, H:i' }}</span></div>
+    <p>{{ sparring.description|linebreaksbr }}</p>
+    <div class="jl-grid">
+        <p><span class="jl-muted">Возраст соперника</span><br>{{ age_preference }}<br><small class="jl-muted">Пожелание, а не ограничение допуска.</small></p>
+        {% if sparring.preferred_days %}<p><span class="jl-muted">Дни</span><br>{{ sparring.preferred_days }}</p>{% endif %}
+        {% if sparring.preferred_time %}<p><span class="jl-muted">Время</span><br>{{ sparring.preferred_time }}</p>{% endif %}
+        {% if sparring.preferred_location %}<p><span class="jl-muted">Место</span><br>{{ sparring.preferred_location }}</p>{% endif %}
+    </div>
+    {% if not subscription_ok %}<aside class="jl-note">Подписка представителя с доступом к спаррингам не активна. Заявка останется видимой, но согласовать новую игру без продления тарифа нельзя.</aside>{% endif %}
+</section>
+
+{% if accepted %}
+<section class="jl-card">
+    <h2>Игра согласована</h2>
+    <p>Соперник: <strong>{{ accepted.respondent_label }}</strong>{% if accepted.respondent_age %}, {{ accepted.respondent_age }} лет{% endif %}. Контакты открыты только участникам игры.</p>
+    <div class="jl-grid">
+    {% for contact in contacts %}<article class="jl-card">
+        <h3>{{ contact.name }}</h3>
+        {% if contact.email %}<p>Email: <a href="mailto:{{ contact.email }}">{{ contact.email }}</a></p>{% endif %}
+        {% if contact.phone %}<p>Телефон: <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a></p>{% endif %}
+        {% if contact.telegram %}<p><a class="jl-link" href="{{ contact.telegram }}" rel="noopener" target="_blank">Написать в Telegram →</a></p>{% endif %}
+        {% if contact.whatsapp %}<p><a class="jl-link" href="{{ contact.whatsapp }}" rel="noopener" target="_blank">Написать в WhatsApp →</a></p>{% endif %}
+    </article>{% empty %}<p class="jl-muted">Контакты доступны представителю ребёнка и сопернику.</p>{% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if is_owner %}
+<section class="jl-card">
+    <div class="jl-card-top"><h2>Отклики</h2><span class="jl-badge">{{ responses|length }}</span></div>
+    {% if sparring.status == 'active' %}<p class="jl-muted">Примите один отклик — заявка закроется, остальные отклики получат отказ, а контакты откроются обеим сторонам.</p>{% endif %}
+    <div class="jl-grid">
+    {% for row in responses %}<article class="jl-card">
+        <div class="jl-card-top"><span class="jl-badge">{{ row.response.get_status_display }}</span><span class="jl-muted">{{ row.response.created_at|date:'d E, H:i' }}</span></div>
+        <h3>{{ row.response.respondent_label }}{% if row.response.respondent_age %}, {{ row.response.respondent_age }} лет{% endif %}</h3>
+        {% if row.response.message %}<p>{{ row.response.message|linebreaksbr }}</p>{% endif %}
+        {% if row.warning %}<aside class="jl-note">{{ row.warning }}</aside>{% endif %}
+        {% if sparring.status == 'active' and row.response.status == 'pending' %}
+        <div class="jl-actions">
+            <form method="post" action="{% url 'juniors:sparring_accept' pk=row.response.pk %}">{% csrf_token %}<button class="jl-button" type="submit">Принять и открыть контакты</button></form>
+            <form method="post" action="{% url 'juniors:sparring_reject' pk=row.response.pk %}">{% csrf_token %}<button class="jl-button jl-button-outline" type="submit">Отклонить</button></form>
+        </div>
+        {% endif %}
+    </article>{% empty %}<p class="jl-muted">Откликов пока нет. Заявку видят другие семьи и взрослые игроки по подписке.</p>{% endfor %}
+    </div>
+    {% if sparring.status == 'active' %}
+    <form method="post" action="{% url 'juniors:sparring_close' pk=sparring.pk %}" class="jl-actions">{% csrf_token %}<button class="jl-button jl-button-outline" type="submit">Закрыть заявку</button></form>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if own_response %}
+<section class="jl-card">
+    <div class="jl-card-top"><h2>Ваш отклик</h2><span class="jl-badge">{{ own_response.get_status_display }}</span></div>
+    {% if own_response.message %}<p>{{ own_response.message|linebreaksbr }}</p>{% endif %}
+    {% if own_response.status == 'pending' %}
+    <form method="post" action="{% url 'juniors:sparring_cancel' pk=own_response.pk %}" class="jl-actions">{% csrf_token %}<button class="jl-button jl-button-outline" type="submit">Отменить отклик</button></form>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if can_respond %}
+<section class="jl-card">
+    <h2>Откликнуться</h2>
+    <p class="jl-muted">{% if allow_adult and children %}Можно сыграть самому как взрослому игроку или заявить своего ребёнка.{% elif allow_adult %}Можно сыграть самому как взрослому игроку по своей подписке.{% else %}Заявите своего ребёнка: у представителя должна быть действующая подписка с доступом к спаррингам.{% endif %}</p>
+    <form method="post" action="{% url 'juniors:sparring_respond' pk=sparring.pk %}" class="jl-form" novalidate>{% csrf_token %}
+    {% if form.errors %}<div class="jl-error" role="alert">{{ form.non_field_errors }}<ul>{% for field in form %}{% if field.errors %}<li>{{ field.label }}: {{ field.errors|striptags }}</li>{% endif %}{% endfor %}</ul></div>{% endif %}
+    {% for field in form.visible_fields %}<div class="jl-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+    <div class="jl-actions"><button class="jl-button" type="submit">Отправить отклик</button></div>
+    </form>
+</section>
+{% elif not is_owner and sparring.status == 'active' and not own_response %}
+<aside class="jl-note">Чтобы откликнуться, нужна действующая подписка взрослого с доступом к спаррингам либо проверенный профиль своего ребёнка с такой подпиской.</aside>
+{% endif %}
+{% endblock %}

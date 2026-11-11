@@ -1,0 +1,21 @@
+{% extends 'juniors/base.html' %}
+{% block title %}Новая заявка на спарринг{% endblock %}
+{% block junior_content %}
+<header class="jl-heading">
+    <div>
+        <p class="jl-eyebrow">ТОВАРИЩЕСКАЯ ИГРА</p>
+        <h1>Заявка на спарринг.</h1>
+        <p class="jl-muted">Игра не влияет на рейтинг лиги. Возраст и пол соперника — пожелание: откликнуться сможет любой, а вы решите, подходит ли игра.</p>
+    </div>
+</header>
+<form method="post" class="jl-card jl-form jl-note" novalidate>{% csrf_token %}
+{% if form.errors %}<div class="jl-error" role="alert"><strong>Проверьте заполнение формы.</strong>{{ form.non_field_errors }}<ul>{% for field in form %}{% if field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ field.errors|striptags }}</a></li>{% endif %}{% endfor %}</ul></div>{% endif %}
+<div class="jl-form-grid">
+{% for field in form.visible_fields %}
+<div class="jl-field"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-label="обязательно">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>
+{% endfor %}
+</div>
+<aside class="jl-note">Контакты в тексте заявки не указывайте. Они откроются обеим сторонам только после того, как вы примете отклик.</aside>
+<div class="jl-actions"><button class="jl-button" type="submit">Опубликовать заявку</button><a href="{% url 'juniors:sparrings' %}">Отмена</a></div>
+</form>
+{% endblock %}

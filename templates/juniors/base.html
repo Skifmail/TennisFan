@@ -12,6 +12,7 @@
             <a class="jl-nav-link" href="{% url 'juniors:ratings' %}"{% if '/kids/ratings/' in request.path %} aria-current="page"{% endif %}>Рейтинги</a>
             <a class="jl-nav-link" href="{% url 'juniors:rules' %}"{% if '/kids/rules/' in request.path %} aria-current="page"{% endif %}>Правила и родителям</a>
             <a class="jl-nav-link" href="{% url 'juniors:family' %}"{% if '/kids/family/' in request.path %} aria-current="page"{% endif %}>Мои дети</a>
+            <a class="jl-nav-link" href="{% url 'juniors:sparrings' %}"{% if '/kids/sparrings/' in request.path %} aria-current="page"{% endif %}>Спарринги</a>
             {% if user.is_authenticated %}
             <a class="jl-nav-link" href="{% url 'juniors:my_matches' %}"{% if '/kids/matches/' in request.path %} aria-current="page"{% endif %}>Матчи детей</a>
             <a class="jl-nav-link" href="{% url 'juniors:payments' %}"{% if '/kids/payments/' in request.path %} aria-current="page"{% endif %}>Оплаты</a>

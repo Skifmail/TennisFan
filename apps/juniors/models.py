@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -12,6 +13,9 @@ from apps.notifications.models import EventPolicy
 
 from .photos import photo_upload_path, private_photo_storage
 from .rules import AgeRule, Ball, ScoreFormat, age_on
+
+if TYPE_CHECKING:
+    from apps.users.models import User
 
 
 class ChildProfile(models.Model):
@@ -801,6 +805,252 @@ class JuniorAppeal(models.Model):
                 name="unique_open_junior_appeal",
             )
         ]
+
+
+class JuniorSparringRequest(models.Model):
+    """Заявка ребёнка на товарищескую игру без влияния на рейтинг лиги."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Активна"
+        CLOSED = "closed", "Закрыта"
+
+    class PartnerKind(models.TextChoices):
+        CHILD = "child", "С ребёнком"
+        ADULT = "adult", "Со взрослым"
+        ANY = "any", "С ребёнком или взрослым"
+
+    class GenderPreference(models.TextChoices):
+        OPEN = "open", "Любой"
+        MALE = "male", "Мальчик или мужчина"
+        FEMALE = "female", "Девочка или женщина"
+
+    child = models.ForeignKey(
+        ChildProfile,
+        on_delete=models.PROTECT,
+        related_name="sparring_requests",
+        verbose_name="Ребёнок",
+    )
+    guardian = models.ForeignKey(
+        GuardianLink,
+        on_delete=models.PROTECT,
+        related_name="sparring_requests",
+        verbose_name="Кто разместил заявку",
+    )
+    city = models.CharField("Населённый пункт", max_length=100)
+    description = models.TextField(
+        "Описание",
+        max_length=1000,
+        help_text="Опишите опыт ребёнка и условия игры. Контакты указывать не нужно.",
+    )
+    partner_kind = models.CharField(
+        "Ищем соперника",
+        max_length=10,
+        choices=PartnerKind.choices,
+        default=PartnerKind.ANY,
+    )
+    gender_preference = models.CharField(
+        "Пол соперника",
+        max_length=10,
+        choices=GenderPreference.choices,
+        default=GenderPreference.OPEN,
+    )
+    desired_age_min = models.PositiveIntegerField(
+        "Желаемый возраст от",
+        null=True,
+        blank=True,
+        help_text="Пожелание для подбора, а не ограничение допуска.",
+    )
+    desired_age_max = models.PositiveIntegerField(
+        "Желаемый возраст до",
+        null=True,
+        blank=True,
+        help_text="Пожелание для подбора, а не ограничение допуска.",
+    )
+    preferred_days = models.CharField("Удобные дни", max_length=100, blank=True)
+    preferred_time = models.CharField("Удобное время", max_length=100, blank=True)
+    preferred_location = models.CharField(
+        "Предпочтительное место", max_length=200, blank=True
+    )
+    status = models.CharField(
+        "Статус", max_length=12, choices=Status.choices, default=Status.ACTIVE
+    )
+    created_at = models.DateTimeField("Создана", default=timezone.now, editable=False)
+    updated_at = models.DateTimeField("Обновлена", auto_now=True)
+
+    class Meta:
+        verbose_name = "Спарринг-заявка"
+        verbose_name_plural = "11. Спарринги"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(desired_age_min__isnull=True)
+                    | models.Q(desired_age_max__isnull=True)
+                    | models.Q(desired_age_min__lte=models.F("desired_age_max"))
+                ),
+                name="junior_sparring_age_range",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Спарринг: {self.child} в {self.city}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.partner_kind not in self.PartnerKind.values:
+            raise ValidationError("Выберите, с кем ищете соперника.")
+        if self.gender_preference not in self.GenderPreference.values:
+            raise ValidationError("Выберите пол соперника.")
+        if not self.city.strip():
+            raise ValidationError({"city": "Укажите населённый пункт."})
+        for field in ("desired_age_min", "desired_age_max"):
+            value = getattr(self, field)
+            if value is not None and not 3 <= value <= 99:
+                raise ValidationError(
+                    {field: "Возраст соперника указывается в пределах 3–99 лет."}
+                )
+        if (
+            self.desired_age_min is not None
+            and self.desired_age_max is not None
+            and self.desired_age_min > self.desired_age_max
+        ):
+            raise ValidationError(
+                {"desired_age_max": "Верхняя граница возраста ниже нижней."}
+            )
+
+    @property
+    def allows_child(self) -> bool:
+        """Допускает ли заявка отклик от другого ребёнка."""
+        return self.partner_kind in (self.PartnerKind.CHILD, self.PartnerKind.ANY)
+
+    @property
+    def allows_adult(self) -> bool:
+        """Допускает ли заявка отклик от взрослого игрока."""
+        return self.partner_kind in (self.PartnerKind.ADULT, self.PartnerKind.ANY)
+
+    @property
+    def child_age(self) -> int:
+        """Полный возраст ребёнка на сегодня без хранения копии даты рождения."""
+        return age_on(self.child.birth_date, timezone.localdate())
+
+    @property
+    def accepted_response(self) -> "JuniorSparringResponse | None":
+        """Возвращает согласованный отклик, если заявка уже закрыта игрой."""
+        return cast(
+            "JuniorSparringResponse | None",
+            self.responses.filter(
+                status=JuniorSparringResponse.Status.ACCEPTED
+            ).first(),
+        )
+
+
+class JuniorSparringResponse(models.Model):
+    """Отклик взрослого игрока или представителя другого ребёнка на заявку."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Ожидает ответа"
+        ACCEPTED = "accepted", "Согласован"
+        REJECTED = "rejected", "Отклонён"
+
+    request = models.ForeignKey(
+        JuniorSparringRequest,
+        on_delete=models.CASCADE,
+        related_name="responses",
+        verbose_name="Заявка",
+    )
+    player = models.ForeignKey(
+        "users.Player",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="junior_sparring_responses",
+        verbose_name="Взрослый игрок",
+    )
+    child = models.ForeignKey(
+        ChildProfile,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="sparring_responses",
+        verbose_name="Ребёнок",
+    )
+    guardian = models.ForeignKey(
+        GuardianLink,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="sparring_responses",
+        verbose_name="Представитель ребёнка",
+    )
+    message = models.TextField("Сообщение", max_length=500, blank=True)
+    status = models.CharField(
+        "Статус", max_length=12, choices=Status.choices, default=Status.PENDING
+    )
+    created_at = models.DateTimeField("Создан", default=timezone.now, editable=False)
+    updated_at = models.DateTimeField("Обновлён", auto_now=True)
+
+    class Meta:
+        verbose_name = "Отклик на спарринг"
+        verbose_name_plural = "11. Отклики на спарринг"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(player__isnull=False, child__isnull=True)
+                    | models.Q(player__isnull=True, child__isnull=False)
+                ),
+                name="junior_sparring_one_respondent",
+            ),
+            models.UniqueConstraint(
+                fields=["request", "player"],
+                condition=models.Q(player__isnull=False),
+                name="unique_junior_sparring_player",
+            ),
+            models.UniqueConstraint(
+                fields=["request", "child"],
+                condition=models.Q(child__isnull=False),
+                name="unique_junior_sparring_child",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.respondent_label} → {self.request}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.child_id is not None and self.guardian_id is None:
+            raise ValidationError(
+                {"guardian": "Для отклика от имени ребёнка укажите представителя."}
+            )
+
+    @property
+    def respondent_user(self) -> "User | None":
+        """Возвращает взрослый аккаунт, с которого отправлен отклик."""
+        if self.player_id is not None:
+            return cast("User", self.player.user)
+        if self.guardian_id is not None:
+            return cast("User", self.guardian.user)
+        return None
+
+    @property
+    def respondent_label(self) -> str:
+        """Показывает соперника без раскрытия фамилии чужого ребёнка."""
+        if self.player_id is not None:
+            return str(self.player.user.get_display_name())
+        if self.child_id is not None:
+            return str(self.child.public_label)
+        return "Участник"
+
+    @property
+    def respondent_age(self) -> int | None:
+        """Возвращает известный возраст соперника для подсказки о пожеланиях."""
+        if self.child_id is not None:
+            return age_on(self.child.birth_date, timezone.localdate())
+        if self.player_id is None:
+            return None
+        if self.player.birth_date is not None:
+            return age_on(self.player.birth_date, timezone.localdate())
+        return cast(int, self.player.age)
 
 
 class JuniorRankingSnapshot(models.Model):

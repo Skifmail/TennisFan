@@ -1,5 +1,6 @@
 """Понятные формы семейного кабинета без скрытых полей полномочий."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from django import forms
@@ -7,7 +8,13 @@ from django import forms
 from apps.users.forms import UserRegistrationForm
 
 from .legal import ACCURACY_CONFIRMATION, REPRESENTATIVE_CONFIRMATION
-from .models import ChildProfile, GuardianLink, JuniorTournament, LegalRelease
+from .models import (
+    ChildProfile,
+    GuardianLink,
+    JuniorSparringRequest,
+    JuniorTournament,
+    LegalRelease,
+)
 from .rules import Ball
 
 
@@ -349,3 +356,84 @@ class ManualDrawForm(forms.Form):
             raise forms.ValidationError("Каждого ребёнка выберите только один раз.")
         data["entry_order"] = ids
         return data
+
+
+class JuniorSparringForm(forms.ModelForm):
+    """Заявка представителя на товарищескую игру без влияния на рейтинг лиги."""
+
+    child = forms.ModelChoiceField(
+        label="Кто играет", queryset=ChildProfile.objects.none()
+    )
+
+    class Meta:
+        model = JuniorSparringRequest
+        fields = [
+            "child",
+            "city",
+            "description",
+            "partner_kind",
+            "gender_preference",
+            "desired_age_min",
+            "desired_age_max",
+            "preferred_days",
+            "preferred_time",
+            "preferred_location",
+        ]
+        widgets = {
+            "description": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": "Опыт ребёнка, мяч, формат игры. Контакты указывать не нужно.",
+                }
+            ),
+        }
+
+    def __init__(
+        self, *args: Any, children: Iterable[ChildProfile], **kwargs: Any
+    ) -> None:
+        """Ограничивает выбор детей проверенными профилями этого взрослого."""
+        super().__init__(*args, **kwargs)
+        self.fields["child"].queryset = ChildProfile.objects.filter(
+            pk__in=[child.pk for child in children]
+        ).order_by("first_name", "pk")
+        for field in ("desired_age_min", "desired_age_max"):
+            self.fields[field].widget.attrs.update({"min": 3, "max": 99})
+        self.fields["desired_age_min"].help_text = (
+            "Пожелание, а не ограничение допуска."
+        )
+        self.fields["desired_age_max"].help_text = (
+            "Пожелание, а не ограничение допуска."
+        )
+
+
+class JuniorSparringResponseForm(forms.Form):
+    """Отклик взрослого игрока или представителя другого ребёнка."""
+
+    child = forms.ModelChoiceField(
+        label="Кто играет", queryset=ChildProfile.objects.none(), required=False
+    )
+    message = forms.CharField(
+        label="Сообщение",
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(
+            attrs={"rows": 3, "placeholder": "Формат игры, удобное время, корт."}
+        ),
+    )
+
+    def __init__(
+        self,
+        *args: Any,
+        children: Iterable[ChildProfile],
+        allow_adult: bool,
+        **kwargs: Any,
+    ) -> None:
+        """Показывает взрослую опцию только там, где заявка её допускает."""
+        super().__init__(*args, **kwargs)
+        self.fields["child"].queryset = ChildProfile.objects.filter(
+            pk__in=[child.pk for child in children]
+        ).order_by("first_name", "pk")
+        self.fields["child"].required = not allow_adult
+        self.fields["child"].empty_label = (
+            "Играю сам(а) — взрослый игрок" if allow_adult else "Выберите ребёнка"
+        )

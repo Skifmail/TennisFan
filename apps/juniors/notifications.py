@@ -1,5 +1,14 @@
-"""Уведомления представителям через единый центр без дублирования push."""
+"""Уведомления представителям и проверяющим через единый центр без дублирования push."""
 
+from functools import partial
+
+from django.conf import settings
+from django.core.mail import get_connection
+from django.db import transaction
+from django.urls import reverse
+from loguru import logger
+
+from apps.notifications.infrastructure.email import EventEmail
 from apps.notifications.services import create_notification
 from apps.users.models import User
 
@@ -51,4 +60,41 @@ def notify_match(match: JuniorMatch, message: str) -> None:
         seen.add(link.user_id)
         notify_representative(
             link.user, link.child, message, url=f"/kids/matches/{match.pk}/"
+        )
+
+
+def _send_pending_guardian_email(address: str, message: str, url: str) -> None:
+    """Отправляет письмо после фиксации заявки, сохраняя её при сбое SMTP."""
+    try:
+        EventEmail(
+            subject="Детская лига: представитель на проверке",
+            body=f"{message}\n\n{settings.SITE_URL.rstrip('/')}{url}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[address],
+            event_key="junior.guardian_pending",
+            capture_event=False,
+            connection=get_connection(timeout=3),
+        ).send()
+    except Exception:
+        logger.exception("Не удалось отправить письмо о проверке представителя")
+
+
+def notify_pending_guardian(link: GuardianLink) -> None:
+    """Сообщает проверяющим о новой заявке через ЛК, push и общий почтовый адрес."""
+    child = link.child
+    url = reverse("admin:juniors_guardianlink_changelist")
+    message = (
+        f"На проверку: {child.first_name} {child.last_name} — {link.user.email}. "
+        "Подтвердите полномочия законного представителя."
+    )[:255]
+    for user in User.objects.filter(is_active=True, is_staff=True):
+        if not user.has_perm("juniors.verify_representative"):
+            continue
+        create_notification(
+            event_key="junior.guardian_pending", user=user, message=message, url=url
+        )
+    admin_email = settings.ADMIN_NOTIFICATIONS_EMAIL.strip()
+    if admin_email:
+        transaction.on_commit(
+            partial(_send_pending_guardian_email, admin_email, message, url)
         )

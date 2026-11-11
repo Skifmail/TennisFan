@@ -34,6 +34,8 @@ from .models import (
     JuniorRankingSnapshot,
     JuniorRefund,
     JuniorSeason,
+    JuniorSparringRequest,
+    JuniorSparringResponse,
     JuniorTournament,
     LegalRelease,
 )
@@ -590,6 +592,47 @@ class JuniorNotificationPolicyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(JuniorSparringRequest)
+class JuniorSparringRequestAdmin(AuditEventAdmin):
+    list_display: tuple[str, ...] = (
+        "created_at",
+        "child",
+        "guardian",
+        "city",
+        "partner_kind",
+        "status",
+    )
+    list_filter: ClassVar[tuple[str, ...]] = ("status", "partner_kind", "city")
+    search_fields = ("child__first_name", "child__last_name", "city")
+    readonly_fields = tuple(field.name for field in JuniorSparringRequest._meta.fields)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.has_perm("juniors.verify_representative"):
+            return qs
+        return qs.filter(guardian__user=request.user)
+
+
+@admin.register(JuniorSparringResponse)
+class JuniorSparringResponseAdmin(AuditEventAdmin):
+    list_display: tuple[str, ...] = (
+        "created_at",
+        "request",
+        "player",
+        "child",
+        "guardian",
+        "status",
+    )
+    list_filter: ClassVar[tuple[str, ...]] = ("status",)
+    readonly_fields = tuple(field.name for field in JuniorSparringResponse._meta.fields)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.has_perm("juniors.verify_representative"):
+            return qs
+        return qs.filter(request__guardian__user=request.user)
 
 
 @admin.register(JuniorRankingSnapshot)

@@ -55,7 +55,7 @@ def test_document_when_opened_should_be_public_and_versioned(
     """Все три текста доступны гостям и не являются заглушками."""
     response = client.get(f"/legal/{slug}/")
     assert response.status_code == 200
-    assert "Ермолаев Леонид" in response.content.decode()
+    assert "Ермолаев Леонид Анатольевич" in response.content.decode()
     assert len(LEGAL_DOCUMENT_PATHS[slug].read_text()) > 1000
 
 

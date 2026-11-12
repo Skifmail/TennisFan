@@ -5,9 +5,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ site_brand_copyright }}{% endblock %} - Всероссийская теннисная платформа для игроков всех уровней</title>
+    <title>{% block title %}{{ site_brand_copyright }}{% endblock %} - Международная теннисная платформа для игроков всех уровней</title>
     <meta name="description"
-        content="{% block meta_description %}{{ site_brand_copyright }} - платформа любительских теннисных турниров по всей России. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
+        content="{% block meta_description %}{{ site_brand_copyright }} - платформа любительских теннисных турниров по всему миру. Рейтинги игроков, спарринг-партнёры, тренировки.{% endblock %}">
     <meta property="og:site_name" content="{{ site_brand_copyright }}">
     {% block meta_og %}{% endblock %}
     {% if request.resolver_match and request.resolver_match.url_name == "home" and not request.resolver_match.namespace and not is_tennistop %}
@@ -357,7 +357,7 @@
                             <span class="footer-brand-title__secondary">{{ site_brand_en_base }}<span class="footer-brand-accent">{{ site_brand_en_accent }}</span></span>
                         </a>
                     </h3>
-                    <p class="footer-desc">Всероссийская теннисная платформа для игроков всех уровней</p>
+                    <p class="footer-desc">Международная теннисная платформа для игроков всех уровней</p>
                     {% if not user.is_authenticated %}
                       {% if not request.resolver_match or request.resolver_match.url_name != 'auth' and request.resolver_match.url_name != 'ntrp_test' %}
                     <a href="{% url 'ntrp_test' %}" class="btn btn-outline footer-btn-extra">Пройти тест уровня силы</a>

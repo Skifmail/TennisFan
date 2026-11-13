@@ -1,0 +1,10 @@
+<h3 class="sparring-card__contacts-title">Контакты автора</h3>
+{% if contacts %}
+<ul class="sparring-response__contacts" aria-label="Контакты автора заявки">
+    {% for link in contacts %}
+    <li>{% include 'sparring/_response_contact.html' with link=link only %}</li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="sparring-card__contacts-hint">Автор не указал внешние контакты. Напишите ему в чате на сайте.</p>
+{% endif %}

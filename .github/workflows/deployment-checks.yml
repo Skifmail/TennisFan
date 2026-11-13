@@ -112,6 +112,7 @@ jobs:
           PY
           done
           CHAT_E2E_URL=http://127.0.0.1:18765 CHAT_E2E_SECOND_URL=http://127.0.0.1:18766 CHAT_E2E_SESSION_FILE=/tmp/chat-ci-sessions.json venv/bin/pytest tests/e2e/chat tests/e2e/test_sparring_toolbar_browser.py tests/e2e/test_sparring_feed_browser.py tests/e2e/test_tournament_local_feed_browser.py --no-cov -q
+          CHAT_E2E_URL=http://127.0.0.1:18765 venv/bin/pytest tests/ -k 'sparring_response_cards_browser or sparring_author_contacts_browser' --no-cov -q
       - name: OneSignal subscription browser tests without external requests
         env:
           WEB_PUSH_BROWSER_TESTS: '1'
@@ -133,7 +134,9 @@ jobs:
       - name: Chat stylesheet and JavaScript checks
         run: |
           npm ci --ignore-scripts
-          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css static/admin/css/chat_room.css static/css/pages/notification-settings.css
+          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css static/css/pages/applications.css static/admin/css/chat_room.css static/css/pages/notification-settings.css
+          node --check static/js/main.js
+          node --check static/js/sparring-respond.js
           node --check static/js/chat_shell.js
           node --check static/js/chat_consent.js
           node --check static/js/city_chat.js

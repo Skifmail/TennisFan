@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 from apps.core.locality_proximity import LocalityProximityIndex
-from apps.sparring.models import DoublesMatchRequest, SparringRequest
+from apps.sparring.models import (
+    DoublesMatchRequest,
+    SparringContact,
+    SparringRequest,
+    SparringResponse,
+)
 
 FEED_PAGE_SIZE: Final = 10
 SparringFormat = Literal["singles", "doubles", "team"]
@@ -22,12 +27,34 @@ class SparringFeedEntry:
         sparring_type: Формат для выбора шаблона карточки.
         is_local: Совпадает ли населённый пункт с городом зрителя.
         distance_km: Расстояние до города зрителя либо отсутствие координат.
+        viewer_response: Собственный отклик зрителя на одиночную заявку, если есть.
     """
 
     request: SparringRequest | DoublesMatchRequest
     sparring_type: SparringFormat
     is_local: bool
     distance_km: float | None
+    viewer_response: SparringResponse | None = None
+
+    @property
+    def can_view_author_contacts(self) -> bool:
+        """Разрешить контакты только по собственному неотклонённому отклику."""
+        return (
+            isinstance(self.request, SparringRequest)
+            and self.viewer_response is not None
+            and self.viewer_response.status
+            in (
+                SparringResponse.ResponseStatus.PENDING,
+                SparringResponse.ResponseStatus.ACCEPTED,
+            )
+        )
+
+    @property
+    def author_contacts(self) -> list[SparringContact]:
+        """Вернуть контакты автора только для разрешённой карточки."""
+        if self.can_view_author_contacts and isinstance(self.request, SparringRequest):
+            return self.request.contact_links()
+        return []
 
 
 def rank_sparring_feed(
@@ -35,6 +62,7 @@ def rank_sparring_feed(
     singles: Iterable[SparringRequest],
     doubles: Iterable[DoublesMatchRequest],
     viewer_city: str,
+    viewer_id: int | None = None,
 ) -> list[SparringFeedEntry]:
     """Объединяет форматы: свой город, близкие города, дальние, неизвестные.
 
@@ -46,6 +74,8 @@ def rank_sparring_feed(
         singles: Отфильтрованные одиночные заявки.
         doubles: Отфильтрованные парные и командные заявки.
         viewer_city: Населённый пункт из профиля; пустой для гостя.
+        viewer_id: Профиль зрителя для проверки его собственного отклика.
+            Отклики одиночных заявок должны быть предварительно загружены.
 
     Returns:
         Общая упорядоченная лента для последующей пагинации.
@@ -57,8 +87,24 @@ def rank_sparring_feed(
         item: SparringRequest | DoublesMatchRequest, kind: SparringFormat
     ) -> None:
         proximity = index.get(item.city)
+        viewer_response = None
+        if (
+            isinstance(item, SparringRequest)
+            and viewer_id is not None
+            and item.player_id != viewer_id
+        ):
+            viewer_response = next(
+                (
+                    response
+                    for response in item.responses.all()
+                    if response.respondent_id == viewer_id
+                ),
+                None,
+            )
         entries.append(
-            SparringFeedEntry(item, kind, proximity.is_local, proximity.distance_km)
+            SparringFeedEntry(
+                item, kind, proximity.is_local, proximity.distance_km, viewer_response
+            )
         )
 
     for single in singles:

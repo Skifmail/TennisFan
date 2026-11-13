@@ -1,0 +1,247 @@
+{% load skill_tags %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Новый отклик на вашу заявку</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #f4f4f4;
+            padding: 40px 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #1a3a2a 0%, #0f2318 100%);
+            padding: 36px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            color: #a6824a;
+            font-size: 26px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 8px 0 0;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 15px;
+        }
+        .content {
+            padding: 36px 30px;
+        }
+        .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a3a2a;
+            margin: 0 0 18px;
+        }
+        .intro {
+            margin: 0 0 24px;
+            color: #555555;
+        }
+        .section-title {
+            margin: 0 0 12px;
+            color: #1a3a2a;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+        .card {
+            background-color: #f7faf8;
+            border: 1px solid #d9e5dd;
+            border-left: 4px solid #a6824a;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin: 0 0 24px;
+        }
+        .card .name {
+            display: block;
+            color: #1a3a2a;
+            font-size: 18px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .facts {
+            margin: 12px 0 0;
+            color: #555555;
+            font-size: 14px;
+        }
+        .facts span {
+            color: #8a8a8a;
+        }
+        .contacts {
+            margin: 0 0 24px;
+            padding: 0;
+            list-style: none;
+        }
+        .contacts li {
+            margin: 0 0 8px;
+        }
+        .contact {
+            display: block;
+            padding: 12px 16px;
+            background-color: #ffffff;
+            border: 1px solid #d9e5dd;
+            border-radius: 8px;
+            color: #1a3a2a;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .contact span {
+            color: #7a7a7a;
+            font-weight: 400;
+            font-size: 14px;
+        }
+        .contact-method {
+            margin: 0 0 12px;
+            color: #7a7a7a;
+            font-size: 14px;
+        }
+        .request {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin: 0 0 24px;
+        }
+        .request .title {
+            margin: 0 0 8px;
+            color: #1a3a2a;
+            font-weight: 700;
+        }
+        .request .description {
+            margin: 8px 0 0;
+            color: #555555;
+            font-size: 15px;
+        }
+        .cta-section {
+            text-align: center;
+            padding: 28px 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            margin: 0 0 24px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #a6824a 0%, #8b6a3d 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            border-radius: 8px;
+        }
+        .footer {
+            background-color: #1a3a2a;
+            padding: 28px 30px;
+            text-align: center;
+        }
+        .footer p {
+            margin: 0 0 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+        }
+        .footer a {
+            color: #a6824a;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                {% include "emails/_logo.html" with logo_url=logo_url logo_alt="TennisFan" logo_size=80 %}
+                <h1>TennisFan</h1>
+                <p>Новый отклик на вашу заявку</p>
+            </div>
+            <div class="content">
+                <p class="greeting">Здравствуйте, {{ user_name }}!</p>
+                <p class="intro">
+                    <strong>{{ respondent_name }}</strong> откликнулся на вашу заявку
+                    на спарринг. Контакты игрока — ниже, можно писать сразу.
+                </p>
+
+                <p class="section-title">Откликнувшийся игрок</p>
+                <div class="card">
+                    <a href="{{ respondent_profile_url }}" class="name" target="_blank" rel="noopener">{{ respondent_name }}</a>
+                    <p class="facts">
+                        {% if respondent_age %}<span>Возраст:</span> {{ respondent_age }} {{ respondent_age|years_suffix }}<br>{% endif %}
+                        {% if respondent_skill %}<span>Уровень:</span> {{ respondent_skill }}<br>{% endif %}
+                        <span>Рейтинг FAN:</span> {{ respondent_rating }}<br>
+                        {% if respondent_matches %}
+                        <span>Матчи:</span> {{ respondent_wins }} из {{ respondent_matches }} побед
+                        {% else %}
+                        <span>Матчи:</span> пока нет
+                        {% endif %}
+                    </p>
+                </div>
+
+                <p class="section-title">Контакты</p>
+                {% if contacts %}
+                {% if contact_method %}
+                <p class="contact-method">Игрок выбрал способ связи: <strong>{{ contact_method }}</strong></p>
+                {% endif %}
+                <ul class="contacts">
+                    {% for contact in contacts %}
+                    <li>
+                        {% if contact.url %}
+                        <a href="{{ contact.url }}" class="contact"{% if contact.external %} target="_blank" rel="noopener"{% endif %}>{{ contact.label }} <span>{{ contact.value }}</span></a>
+                        {% else %}
+                        <span class="contact">{{ contact.label }} <span>{{ contact.value }}</span></span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="contact-method">
+                    Игрок не указал внешние контакты. Откройте «Мои заявки» и нажмите «Написать в чат» для личного чата.
+                </p>
+                {% endif %}
+
+                <div class="request">
+                    <p class="title">Ваша заявка</p>
+                    <p class="facts">
+                        {% for fact in request_facts %}
+                        <span>{{ fact.0 }}:</span> {{ fact.1 }}<br>
+                        {% endfor %}
+                    </p>
+                    {% if request_description %}
+                    <p class="description">{{ request_description|linebreaksbr }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="cta-section">
+                    <a href="{{ my_requests_url }}" class="btn" target="_blank" rel="noopener">Открыть мои заявки</a>
+                </div>
+                <p style="color:#777777;font-size:14px;margin:0;">
+                    Если кнопка не работает, скопируйте ссылку в браузер:<br>
+                    <a href="{{ my_requests_url }}" style="color:#a6824a;word-break:break-all;">{{ my_requests_url }}</a>
+                </p>
+            </div>
+            <div class="footer">
+                <p>Вопросы: <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+                <p><a href="{{ base_url }}">tennisfan.ru</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

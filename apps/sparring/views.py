@@ -4,6 +4,7 @@ Sparring views.
 
 import json
 import logging
+from typing import cast
 from urllib.parse import urlencode
 
 from django.contrib import messages  # pyright: ignore[reportMissingImports]
@@ -24,6 +25,7 @@ from django.shortcuts import (
     redirect,
     render,
 )
+from django.template.loader import render_to_string
 
 # pyright: ignore[reportMissingImports]
 from django.urls import reverse
@@ -46,7 +48,7 @@ from apps.core.sports import sport_code
 from apps.core.text_search import filter_field_contains_ci
 from apps.sparring.feed import FEED_PAGE_SIZE, rank_sparring_feed
 from apps.sparring.formats import SPARRING_FORMAT_OPTIONS, parse_sparring_formats
-from apps.users.models import Player
+from apps.users.models import Player, User
 
 from .city_notify import schedule_published_sparring_notify
 from .court_suggest import suggest_sparring_courts
@@ -164,8 +166,13 @@ def _nearby_radius(raw: str | None) -> int | None:
 
 
 def _padel_entry_redirect(
-    request, player, sport, *, as_json: bool = False, next_url: str = ""
-):
+    request: HttpRequest,
+    player: Player,
+    sport: str | None,
+    *,
+    as_json: bool = False,
+    next_url: str = "",
+) -> HttpResponse | None:
     """Редирект на стартовый уровень падела, если он ещё не задан.
 
     Args:
@@ -390,6 +397,7 @@ def sparring_list(request: HttpRequest) -> HttpResponse:
         singles=singles,
         doubles=doubles,
         viewer_city=viewer.city if viewer is not None else "",
+        viewer_id=viewer.pk if viewer is not None else None,
     )
     context["feed_page"] = Paginator(feed, FEED_PAGE_SIZE).get_page(
         request.GET.get("page")
@@ -631,7 +639,7 @@ def sparring_my_requests(request):
     if sparring_type == "singles":
         requests_qs = (
             SparringRequest.objects.filter(player=player)
-            .prefetch_related("responses__respondent__user")
+            .prefetch_related("responses__respondent__user", "responses__matches")
             .order_by("-created_at")
         )
         context["sparring_requests"] = requests_qs
@@ -713,7 +721,7 @@ def sparring_confirm_response(request, response_id):
 
 
 def _build_contact_urls(player: Player) -> dict[str, str | None]:
-    """Возвращает контакты игрока для модалки связи."""
+    """Возвращает ссылки автора для клиентов ответа на отклик."""
     return {
         "telegram": _get_contact_url(player, "telegram"),
         "whatsapp": _get_contact_url(player, "whatsapp"),
@@ -724,13 +732,15 @@ def _build_contact_urls(player: Player) -> dict[str, str | None]:
 
 @require_http_methods(["GET", "POST"])
 @login_required
-@require_filled_profile
-@require_verified_player
-def sparring_respond(request, pk):
+# Основной профиль mypy не проверяет типы декораторов, в отличие от строгого.
+@require_filled_profile  # type: ignore[untyped-decorator, unused-ignore]
+@require_verified_player  # type: ignore[untyped-decorator, unused-ignore]
+def sparring_respond(request: HttpRequest, pk: int) -> HttpResponse:
     """
     Записать отклик и (при GET с method) перенаправить на контакт.
     GET /sparring/<id>/respond/?method=telegram|whatsapp|max — редирект на мессенджер.
-    POST /sparring/<id>/respond/ — только записать отклик, уведомить автора; JSON с contact_urls.
+    POST /sparring/<id>/respond/ — записать отклик, уведомить автора;
+    JSON со ссылками и разметкой контактов для карточки.
     """
     logger.debug(
         "sparring_respond: user=%s, pk=%s, method=%s",
@@ -739,7 +749,8 @@ def sparring_respond(request, pk):
         request.method,
     )
 
-    if not user_has_sparring_access(request.user):
+    user = cast(User, request.user)
+    if not user_has_sparring_access(user):
         if request.method == "POST":
             return JsonResponse(
                 {"success": False, "error": "Доступ к спаррингам по подписке."},
@@ -785,7 +796,7 @@ def sparring_respond(request, pk):
                 pass
 
     try:
-        respondent = request.user.player
+        respondent = user.player
         logger.debug("sparring_respond: respondent=%s", respondent.pk)
     except (AttributeError, Player.DoesNotExist):
         logger.warning(
@@ -853,10 +864,14 @@ def sparring_respond(request, pk):
     if request.method == "POST":
         try:
             contact_urls = _build_contact_urls(sparring.player)
+            contacts_html = render_to_string(
+                "sparring/_author_contacts.html", {"contacts": sparring.contact_links()}
+            )
             return JsonResponse(
                 {
                     "success": True,
                     "contact_urls": contact_urls,
+                    "contacts_html": contacts_html,
                     "message": (
                         "Отклик успешно отправлен!" if created else "Отклик обновлен."
                     ),
@@ -868,6 +883,7 @@ def sparring_respond(request, pk):
                 {
                     "success": True,
                     "contact_urls": {},
+                    "contacts_html": "",
                     "message": (
                         "Отклик успешно отправлен!" if created else "Отклик обновлен."
                     ),

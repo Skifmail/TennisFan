@@ -1422,28 +1422,53 @@ def notify_subscription_expiring(
 
 
 def notify_sparring_response(sparring_response: SparringResponse) -> None:
-    """
-    Уведомление автору заявки о новом отклике на спарринг.
+    """Уведомить автора о новом отклике, сохранив Telegram вместе с откликом.
 
-    Отправляет сообщение с данными откликнувшегося игрока и кнопками:
-    - Получить контакт
-    - Профиль игрока
-    - Подтвердить игру
+    Письмо с данными игрока и контактами отправляется после успешного коммита,
+    независимо от наличия Telegram-бота. Повторный email-дубль не создаётся.
     """
-    if not bot.is_configured():
-        return
-
     request = sparring_response.sparring_request
     respondent = sparring_response.respondent
     author = request.player.user
+
+    from apps.core.email_service import send_sparring_response_email
+
+    def deliver_email() -> None:
+        """Отправить письмо после сохранения отклика, не отменяя его при сбое почты."""
+        try:
+            email_accepted = send_sparring_response_email(
+                author, request=request, response=sparring_response
+            )
+        except Exception as exc:
+            logger.warning(
+                "Письмо об отклике не отправлено: response_id={}, error={}",
+                sparring_response.pk,
+                type(exc).__name__,
+            )
+            return
+        logger.info(
+            "Письмо об отклике: response_id={}, email_accepted={}",
+            sparring_response.pk,
+            email_accepted,
+        )
+
+    transaction.on_commit(deliver_email, robust=True)
+
+    if not bot.is_configured():
+        logger.info(
+            "Отклик на спарринг: Telegram-бот не настроен"
+            " | request_id={}, respondent_id={}",
+            request.pk,
+            respondent.pk,
+        )
+        return
 
     # Формируем текст сообщения
     lines = [
         "🎾 <b>Новый отклик на вашу заявку!</b>",
         "",
-        f"<b>Игрок:</b> {respondent}",
+        f"<b>Игрок:</b> {html.escape(str(respondent))}",
     ]
-
     # Добавляем возраст, если есть
     if respondent.age:
         lines.append(f"<b>Возраст:</b> {respondent.age} лет")
@@ -1453,7 +1478,7 @@ def notify_sparring_response(sparring_response: SparringResponse) -> None:
         skill_display = dict(SkillLevel.choices).get(
             respondent.skill_level, respondent.skill_level
         )
-        lines.append(f"<b>Уровень:</b> {skill_display}")
+        lines.append(f"<b>Уровень:</b> {html.escape(skill_display)}")
 
     # Добавляем FAN рейтинг
     if respondent.total_points:
@@ -1469,6 +1494,21 @@ def notify_sparring_response(sparring_response: SparringResponse) -> None:
         lines.append(
             f"<b>Статистика:</b> {respondent.matches_won}/{respondent.matches_played} побед ({win_rate:.0f}%)"
         )
+
+    contact_links = sparring_response.contact_links()
+    if contact_links:
+        lines.append("")
+        lines.append("<b>Контакты:</b>")
+        for contact in contact_links:
+            label = html.escape(str(contact.get("label") or ""))
+            value = html.escape(str(contact.get("value") or ""))
+            url = str(contact.get("url") or "")
+            if url and not url.startswith("tel:"):
+                lines.append(
+                    f'• {label}: <a href="{html.escape(url, quote=True)}">{value}</a>'
+                )
+            else:
+                lines.append(f"• {label}: {value}")
 
     lines.append("")
     lines.append("Выберите действие:")
@@ -1509,10 +1549,14 @@ def notify_sparring_response(sparring_response: SparringResponse) -> None:
     reply_markup = {"inline_keyboard": keyboard}
 
     ok = send_to_user_by_user(
-        author, text, reply_markup=reply_markup, event_key="sparring.response"
+        author,
+        text,
+        reply_markup=reply_markup,
+        event_key="sparring.response",
+        skip_email=True,
     )
     logger.info(
-        "Отклик на спарринг: request_id={}, respondent_id={}, queued_or_email_accepted={}",
+        "Отклик на спарринг: request_id={}, respondent_id={}, telegram_queued={}",
         request.pk,
         respondent.pk,
         ok,

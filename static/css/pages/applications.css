@@ -1,153 +1,312 @@
 /*
  * applications.css
  *
- * Описание: Стили откликов на спарринги: строки, бейджи статусов, кнопки действий и modal ответа.
- * Компоненты: .sparring-response-row, .sparring-response-badge, .sparring-btn--locked, .sparring-modal__*
+ * Описание: Стили откликов на спарринги: карточка игрока, контакты, статусы и действия, modal ответа.
+ * Компоненты: .sparring-response, .sparring-contact, .sparring-response__status, .sparring-btn--locked, .sparring-modal__*
  * Используется на: страницы заявок/откликов и модальные окна отклика
  *
- * Последнее обновление: 2026-03
+ * Последнее обновление: 2026-11
  */
 
-/* Строка отклика в «Мои заявки»: аватар | имя + статус | рейтинг | кнопки */
-.sparring-response-row {
+/* Карточка отклика в «Мои заявки»: человек, контакты и действия отдельными строками */
+.sparring-response {
+    container: sparring-response / inline-size;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     gap: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
+    min-width: 0;
+    padding: var(--spacing-md);
     background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border-light);
     border-radius: var(--radius-md);
 }
 
-.sparring-response-row__avatar {
-    flex-shrink: 0;
-    display: block;
-    border-radius: var(--radius-full);
-    overflow: hidden;
+.sparring-response--rejected {
+    opacity: 0.72;
 }
 
-.sparring-response-row__avatar .player-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-full);
-    object-fit: cover;
-    background: var(--color-bg);
-    display: block;
-}
-
-.sparring-response-row__avatar div.player-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-full);
-    background: var(--color-bg);
-}
-
-.sparring-response-row__info {
-    flex: 1 1 0;
+.sparring-response__person {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
     min-width: 0;
 }
 
-.sparring-response-row__rating {
+.sparring-response__avatar {
+    display: block;
     flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--color-bg);
+}
+
+/* Глобальное img { max-width: 100%; height: auto } иначе делает аватар овалом. */
+.sparring-response__avatar img.player-avatar {
+    display: block;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-bg);
+}
+
+.sparring-response__identity {
+    min-width: 0;
+}
+
+.sparring-response__name {
+    display: inline-block;
+    max-width: 100%;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--color-text);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+.sparring-response__meta {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.6rem;
+    margin: 0.25rem 0 0;
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
 }
 
-.sparring-response-rating__ntrp {
-    font-weight: 600;
-    color: var(--color-text);
+.sparring-response__stat {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-.sparring-response-rating__fan {
+/* Статус отклика: один размер и форма для всех состояний */
+.sparring-response__state {
+    margin: 0;
+    line-height: 1.2;
+}
+
+.sparring-response__status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    max-width: 100%;
+    font-size: max(0.6875rem, 11px);
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.sparring-response__status--pending {
+    background: rgb(234 179 8 / 15%);
+    border-color: rgb(234 179 8 / 40%);
+    color: #ca8a04;
+}
+
+.sparring-response__status--accepted {
+    background: rgb(34 197 94 / 15%);
+    border-color: rgb(34 197 94 / 40%);
+    color: #16a34a;
+}
+
+.sparring-response__status--rejected {
+    background: var(--color-bg);
+    border-color: var(--color-border-light);
     color: var(--color-text-muted);
 }
 
-.sparring-response-row__actions {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    gap: var(--spacing-sm);
-    flex-wrap: nowrap;
-}
-
-.sparring-response-form {
-    display: inline-flex;
+/* Две фирменные кнопки в ряд; телефон остаётся читаемым и на узком экране. */
+.sparring-response__contacts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
     margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sparring-response__contacts > li {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.sparring-contact {
+    --sparring-contact-accent: var(--color-primary);
+
+    display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+    min-height: 56px;
+    padding: 8px 6px;
+    border: 1px solid color-mix(in srgb, var(--sparring-contact-accent) 70%, var(--color-bg-card));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--sparring-contact-accent) 16%, var(--color-bg-card));
+    color: color-mix(in srgb, var(--sparring-contact-accent) 25%, #fff);
+    font-family: inherit;
+    font-size: max(var(--font-size-xs), 12px);
+    line-height: 1.3;
+    text-align: center;
+    text-decoration: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 160ms ease-out, background-color 160ms ease-out,
+        transform 160ms ease-out;
 }
 
-/* Бейджи статуса отклика */
-.sparring-response-badge {
-    font-size: var(--font-size-xs);
+.sparring-contact--telegram {
+    --sparring-contact-accent: #229ed9;
+}
+
+.sparring-contact--whatsapp {
+    --sparring-contact-accent: #25d366;
+}
+
+.sparring-contact--max {
+    --sparring-contact-accent: #6c63ff;
+}
+
+.sparring-contact:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.sparring-contact__icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    max-width: 18px;
+    max-height: 18px;
+    object-fit: contain;
+}
+
+.sparring-contact__icon--phone {
+    color: var(--sparring-contact-accent);
+}
+
+.sparring-contact__heading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    user-select: none;
+}
+
+.sparring-contact__label {
     font-weight: 600;
-    padding: 2px var(--spacing-xs);
-    border-radius: var(--radius-sm);
-}
-.sparring-response-badge--pending {
-    background: #fef08a;
-    color: #713f12;
-    border: 1px solid #eab308;
-}
-.sparring-response-badge--accepted {
-    background: #bbf7d0;
-    color: #14532d;
-    border: 1px solid #22c55e;
-}
-.sparring-response-badge--rejected {
-    background: #fecaca;
-    color: #7f1d1d;
-    border: 1px solid #ef4444;
+    white-space: nowrap;
 }
 
-/* Планшет и узкий экран: кнопки откликов на отдельную строку, флаги переносятся */
-@media (max-width: 640px) {
-    .sparring-response-row {
-        gap: var(--spacing-md);
+.sparring-contact__value {
+    min-width: 0;
+    max-width: 100%;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+.sparring-contact__hint {
+    font-size: max(0.6875rem, 11px);
+}
+
+.sparring-contact:focus-visible,
+.sparring-response__actions .btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+a.sparring-contact:active {
+    background: color-mix(in srgb, var(--sparring-contact-accent) 34%, var(--color-bg-card));
+    transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .sparring-response__name:hover {
+        color: var(--color-primary);
+        text-decoration: underline;
     }
 
-    .sparring-response-row__actions {
-        flex-basis: 100%;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        padding-top: var(--spacing-sm);
-        margin-top: var(--spacing-xs);
-        border-top: 1px solid var(--color-border-light);
-    }
-
-    .sparring-card__flags {
-        flex-wrap: wrap;
+    a.sparring-contact:hover {
+        border-color: var(--sparring-contact-accent);
+        background: color-mix(in srgb, var(--sparring-contact-accent) 26%, var(--color-bg-card));
+        color: color-mix(in srgb, var(--sparring-contact-accent) 25%, #fff);
     }
 }
 
-/* Мобильный: рейтинг под инфо, кнопки на всю ширину с крупными областями нажатия */
-@media (max-width: 480px) {
-    .sparring-response-row {
-        padding: var(--spacing-md);
-        gap: var(--spacing-sm);
+.sparring-response__no-contacts {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
+
+/* Действия отклика: равные колонки, одна высота для ссылок и POST-кнопок */
+.sparring-response__actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+}
+
+.sparring-response__actions > * {
+    min-width: 0;
+}
+
+.sparring-response__confirm,
+.sparring-response__actions > .direct-message-action {
+    display: flex;
+    margin: 0;
+}
+
+.sparring-response__actions .btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: var(--radius-md);
+    font-size: max(var(--font-size-xs), 12px);
+    line-height: 1.25;
+    white-space: normal;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.sparring-response__actions > :only-child {
+    grid-column: 1 / -1;
+}
+
+/* Узкая карточка, в том числе в двухколоночной сетке на планшете */
+@container sparring-response (width <= 30rem) {
+    .sparring-response__actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .sparring-response-row__avatar .player-avatar,
-    .sparring-response-row__avatar div.player-avatar {
-        width: 48px;
-        height: 48px;
+    .sparring-response__confirm,
+    .sparring-response__actions > :first-child:not(.sparring-response__confirm):nth-last-child(3) {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sparring-contact {
+        transition: none;
     }
 
-    .sparring-response-row__rating {
-        flex-basis: 100%;
-        align-items: flex-start;
-        margin-top: 2px;
+    a.sparring-contact:active {
+        transform: none;
     }
-
-    .sparring-response-row__actions {
-        gap: var(--spacing-sm);
-    }
-
 }
 
 /* Кнопка «Для отклика нужна подписка» — визуально неактивная, но ведёт на страницу тарифов */
@@ -156,6 +315,7 @@
     color: var(--color-text-muted);
     border-color: var(--color-text-muted);
 }
+
 .sparring-btn--locked:hover {
     background: transparent;
     color: var(--color-primary);

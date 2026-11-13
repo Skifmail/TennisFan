@@ -2,7 +2,7 @@
 Sparring models.
 """
 
-from typing import cast
+from typing import TypedDict, cast
 
 from django.db import models
 
@@ -122,6 +122,22 @@ class SparringRequest(models.Model):
         """Return True if at least one user has responded to this request."""
         return bool(self.responses.exists())
 
+    def contact_links(self) -> list["SparringContact"]:
+        """Собрать контакты автора для зрителя, уже отправившего собственный отклик."""
+        from .contacts import build_sparring_contacts
+
+        return build_sparring_contacts(self.player)
+
+
+class SparringContact(TypedDict):
+    """Контакт игрока: читаемое значение и необязательная ссылка для перехода."""
+
+    key: str
+    label: str
+    value: str
+    url: str
+    external: bool
+
 
 class SparringResponse(models.Model):
     """User response to a sparring request (отклик)."""
@@ -175,6 +191,30 @@ class SparringResponse(models.Model):
 
     def __str__(self) -> str:
         return f"{self.respondent} → {self.sparring_request}"
+
+    def contact_links(self) -> list[SparringContact]:
+        """Собрать все контакты откликнувшегося игрока для автора заявки.
+
+        Returns:
+            Список способов связи с ключом,
+            подписью, отображаемым значением и ссылкой.
+        """
+        from .contacts import build_sparring_contacts
+
+        return build_sparring_contacts(self.respondent)
+
+    def primary_contact(self) -> SparringContact | None:
+        """Вернуть рабочую ссылку на выбранный при отклике способ связи.
+
+        Returns:
+            Выбранный контакт или первая доступная ссылка, если указанный
+            способ связи больше не заполнен или задан только текстом.
+        """
+        links = [link for link in self.contact_links() if link["url"]]
+        for link in links:
+            if link["key"] == self.contact_method:
+                return link
+        return links[0] if links else None
 
 
 class SparringInvitation(models.Model):

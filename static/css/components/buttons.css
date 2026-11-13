@@ -289,46 +289,6 @@
     color: silver;
 }
 
-.sparring-response-form .btn,
-.sparring-response-row__actions .btn {
-    white-space: nowrap;
-    min-height: 32px;
-    flex-shrink: 0;
-}
-
-.sparring-response-row__actions .contact-btn--disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    pointer-events: none;
-    color: var(--color-text-muted);
-    border-color: var(--color-border-light);
-}
-
-.sparring-response-row__actions .text-muted,
-.sparring-response-row__actions .text-success {
-    flex-shrink: 0;
-}
-
-/* Планшет и узкий экран: кнопки откликов на отдельную строку, флаги переносятся */
-@media (max-width: 640px) {
-    .sparring-response-form .btn,
-    .sparring-response-row__actions .btn {
-        min-height: 44px;
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
-    }
-}
-
-/* Мобильный: рейтинг под инфо, кнопки на всю ширину с крупными областями нажатия */
-@media (max-width: 480px) {
-    .sparring-response-form .btn,
-    .sparring-response-row__actions .btn {
-        min-height: 44px;
-        flex: 1 1 auto;
-        min-width: 100px;
-    }
-}
-
 /* Кнопки управления заявкой (Редактировать, Отменить, Удалить) — удобный тап на мобильных */
 @media (max-width: 480px) {
     .sparring-card__actions .btn,

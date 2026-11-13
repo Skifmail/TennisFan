@@ -205,17 +205,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 
-    // Smooth scroll for in-page anchor links
+    // Smooth scroll for in-page anchor links.
+    // Ссылку проверяем в момент клика: модалки подменяют href="#" на внешний
+    // адрес мессенджера, и перехватывать такой переход нельзя.
     document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
         anchor.addEventListener('click', function(e) {
-            const targetId = this.getAttribute('href');
-            if (targetId && targetId.length > 1) {
-                e.preventDefault();
-                const target = document.querySelector(targetId);
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }
+            const href = this.getAttribute('href') || '';
+            if (href.length < 2 || href.charAt(0) !== '#') return;
+            const target = document.querySelector(href);
+            if (!target) return;
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    // Звонок запускается только после системного подтверждения; Enter работает так же, как клик.
+    document.addEventListener('click', function(event) {
+        if (event.defaultPrevented || !(event.target instanceof Element)) return;
+        const contact = event.target.closest('a.sparring-contact[data-confirm-call]');
+        if (contact && !window.confirm('Позвонить?')) event.preventDefault();
+    });
+
+    // Нативный фокус может оставить вкладку частично за краем прокручиваемого ряда.
+    // Показываем её целиком сразу, без анимации и изменения порядка Tab.
+    document.querySelectorAll('.sparring-tabs').forEach(function(tabs) {
+        tabs.addEventListener('focusin', function(event) {
+            const tab = event.target.closest('.sparring-tab');
+            if (!tab || tabs.scrollWidth <= tabs.clientWidth) return;
+            tab.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
         });
     });
 

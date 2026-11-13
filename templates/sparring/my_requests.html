@@ -48,10 +48,10 @@
     {% if sparring_type == 'singles' %}
     <div class="grid grid-2">
         {% for req in sparring_requests %}
-        <div class="card sparring-card {% if req.status == 'closed' %}sparring-card--closed{% endif %}">
+        <div class="card sparring-card sparring-card--mine {% if req.status == 'closed' %}sparring-card--closed{% endif %}">
             <div class="card-body sparring-card__inner">
                 <div class="sparring-card__flags">
-                    <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>
+                    <span class="sparring-flag sparring-flag--type">1×1</span>
                     {% if req.status == 'active' %}
                     <span class="sparring-flag sparring-flag--recruiting">Идёт набор</span>
                     {% endif %}
@@ -59,113 +59,136 @@
                     {% if req.is_friendly %}
                     <span class="sparring-flag sparring-flag--friendly" title="Результат не влияет на рейтинг">Дружеский</span>
                     {% endif %}
-                    {% if req.has_responses %}
-                    <span class="sparring-flag sparring-flag--responses">Есть отклики</span>
-                    {% endif %}
                     {% if req.status == 'closed' %}
                     <span class="sparring-flag sparring-flag--closed">Закрыта</span>
                     {% endif %}
                 </div>
-                <div class="sparring-card__layout sparring-card__layout--my-request">
-                    <div class="sparring-card__col sparring-card__col--main">
-                        <div class="sparring-card__chips">
-                            <span class="player-category sparring-card__chip sparring-card__chip--muted">{{ req.city }}</span>
-                            {% if req.desired_category %}
-                            <span class="sparring-desired-category">{{ req.get_desired_category_display }}</span>
-                            {% endif %}
-                        </div>
-                        <p class="sparring-card__desc text-secondary">{{ req.description }}</p>
-                        <div class="sparring-card__details">
-                            {% if req.preferred_days or req.preferred_time %}
-                            <span class="sparring-card__detail-line">
-                                {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
-                                {% if req.preferred_time %} · {{ req.preferred_time }}{% endif %}
-                            </span>
-                            {% endif %}
-                            {% if req.preferred_location %}
-                            <span class="sparring-card__detail-line">📍 {{ req.preferred_location }}</span>
-                            {% endif %}
-                            {% if req.desired_partner_age_min or req.desired_partner_age_max %}
-                            <span class="sparring-card__detail-line">
-                                Возраст партнёра:
-                                {% if req.desired_partner_age_min and req.desired_partner_age_max %}
-                                    {{ req.desired_partner_age_min }}–{{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
-                                {% elif req.desired_partner_age_min %}
-                                    от {{ req.desired_partner_age_min }} {{ req.desired_partner_age_min|years_suffix }}
-                                {% elif req.desired_partner_age_max %}
-                                    до {{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
-                                {% endif %}
-                            </span>
-                            {% endif %}
-                        </div>
+
+                <p class="sparring-card__desc">{{ req.description }}</p>
+
+                <dl class="sparring-card__facts">
+                    {% if req.preferred_days or req.preferred_time %}
+                    <div class="sparring-card__fact">
+                        <dt>Когда</dt>
+                        <dd>
+                            {% if req.preferred_days %}{{ req.preferred_days }}{% endif %}
+                            {% if req.preferred_days and req.preferred_time %} · {% endif %}
+                            {% if req.preferred_time %}{{ req.preferred_time }}{% endif %}
+                        </dd>
                     </div>
-                    <div class="sparring-card__col sparring-card__col--cta">
-                        <div class="sparring-card__actions">
-                            {% if req.status == 'active' %}
-                            <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Редактировать</a>
-                            <form action="{% url 'sparring_cancel' req.pk %}" method="post" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-outline btn-sm sparring-card__btn">Отменить</button>
-                            </form>
-                            {% endif %}
-                            <form action="{% url 'sparring_delete' req.pk %}" method="post" class="d-inline" onsubmit="return confirm('Удалить заявку?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Удалить</button>
-                            </form>
-                        </div>
+                    {% endif %}
+                    <div class="sparring-card__fact">
+                        <dt>Где</dt>
+                        <dd>{% if req.preferred_location %}{{ req.preferred_location }}, {% endif %}{{ req.city }}</dd>
                     </div>
+                    {% if req.desired_category %}
+                    <div class="sparring-card__fact">
+                        <dt>Уровень</dt>
+                        <dd>{{ req.get_desired_category_display }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if req.desired_partner_age_min or req.desired_partner_age_max %}
+                    <div class="sparring-card__fact">
+                        <dt>Возраст партнёра</dt>
+                        <dd>
+                            {% if req.desired_partner_age_min and req.desired_partner_age_max %}
+                                {{ req.desired_partner_age_min }}–{{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
+                            {% elif req.desired_partner_age_min %}
+                                от {{ req.desired_partner_age_min }} {{ req.desired_partner_age_min|years_suffix }}
+                            {% else %}
+                                до {{ req.desired_partner_age_max }} {{ req.desired_partner_age_max|years_suffix }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+
+                <div class="sparring-card__actions">
+                    {% if req.status == 'active' %}
+                    <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn sparring-card__btn--primary">Редактировать</a>
+                    <form action="{% url 'sparring_cancel' req.pk %}" method="post" class="sparring-card__action-form">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline btn-sm sparring-card__btn">Отменить</button>
+                    </form>
+                    {% endif %}
+                    <form action="{% url 'sparring_delete' req.pk %}" method="post" class="sparring-card__action-form" onsubmit="return confirm('Удалить заявку?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline btn-sm sparring-card__btn text-error">Удалить</button>
+                    </form>
                 </div>
+
                 {% if req.responses.exists %}
-                <div class="sparring-card__responses">
-                    <p class="sparring-card__responses-title">Отклики ({{ req.responses.count }})</p>
-                    {% for response in req.responses.all %}
-                    <div class="sparring-response-row">
-                        <a href="{% url 'profile' pk=response.respondent.pk %}" class="sparring-response-row__avatar">
-                            {% include 'includes/avatar.html' with avatar=response.respondent.avatar %}
-                        </a>
-                        <div class="sparring-response-row__info">
-                            <a href="{% url 'profile' pk=response.respondent.pk %}" class="text-primary" style="font-weight: 600;">{{ response.respondent }}</a>
-                            <span class="text-muted" style="font-size: var(--font-size-xs);">
-                                • {{ response.get_contact_method_display }}
-                                {% if response.status == 'pending' %}
-                                    <span class="badge sparring-response-badge sparring-response-badge--pending">Ожидает</span>
+                <section class="sparring-responses" aria-label="Отклики на заявку">
+                    <h2 class="sparring-responses__title">
+                        Отклики
+                        <span class="sparring-responses__count">{{ req.responses.count }}</span>
+                    </h2>
+                    <div class="sparring-responses__list">
+                        {% for response in req.responses.all %}
+                        <article class="sparring-response{% if response.status == 'rejected' %} sparring-response--rejected{% endif %}">
+                            <div class="sparring-response__person">
+                                <a href="{% url 'profile' pk=response.respondent.pk %}" class="sparring-response__avatar" aria-label="Профиль {{ response.respondent }}">
+                                    {% include 'includes/avatar.html' with avatar=response.respondent.avatar %}
+                                </a>
+                                <div class="sparring-response__identity">
+                                    <a href="{% url 'profile' pk=response.respondent.pk %}" class="sparring-response__name">{{ response.respondent }}</a>
+                                    <p class="sparring-response__meta">
+                                        <span class="sparring-response__stat" title="Уровень силы">Сила {{ response.respondent.ntrp_level|floatformat:2 }}</span>
+                                        <span class="sparring-response__stat" title="Рейтинг FAN">FAN {{ response.respondent.total_points|floatformat:0 }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="sparring-response__state">
+                                {% if response.status == 'pending' and req.status == 'active' %}
+                                <span class="sparring-response__status sparring-response__status--pending">Ожидает вашего подтверждения</span>
                                 {% elif response.status == 'accepted' %}
-                                    <span class="badge sparring-response-badge sparring-response-badge--accepted">Принят</span>
+                                <span class="sparring-response__status sparring-response__status--accepted">Отклик принят</span>
                                 {% elif response.status == 'rejected' %}
-                                    <span class="badge sparring-response-badge sparring-response-badge--rejected">Отклонён</span>
+                                <span class="sparring-response__status sparring-response__status--rejected">Отклик отклонён</span>
+                                {% else %}
+                                <span class="sparring-response__status sparring-response__status--rejected">Заявка закрыта</span>
                                 {% endif %}
-                            </span>
-                        </div>
-                        <div class="sparring-response-row__rating">
-                            <span class="sparring-response-rating__ntrp" title="Сила">Сила {{ response.respondent.ntrp_level|floatformat:2 }}</span>
-                            <span class="sparring-response-rating__fan" title="Рейтинг FAN">{{ response.respondent.total_points|floatformat:0 }}</span>
-                        </div>
-                        {% if response.status == 'pending' %}
-                        <div class="sparring-response-row__actions">
-                            {% if req.status == 'active' %}
-                            <form action="{% url 'sparring_confirm_response' response_id=response.pk %}" method="post" class="sparring-response-form" onsubmit="return confirm('Подтвердить отклик и создать матч? Заявка будет закрыта.');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-primary btn-sm">Подтвердить</button>
-                            </form>
+                            </p>
+
+                            {% if response.status != 'rejected' %}
+                            {% with links=response.contact_links %}
+                            {% if links %}
+                            <ul class="sparring-response__contacts" aria-label="Контакты игрока">
+                                {% for link in links %}
+                                <li>{% include 'sparring/_response_contact.html' with link=link %}</li>
+                                {% endfor %}
+                            </ul>
                             {% else %}
-                            <span class="text-muted" style="font-size: var(--font-size-xs);">Заявка закрыта</span>
+                            <p class="sparring-response__no-contacts">Игрок не указал внешние контакты. Кнопка «Написать в чат» откроет личный чат.</p>
                             {% endif %}
-                            <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
-                            {% if response.respondent.telegram or response.respondent.whatsapp or response.respondent.max_contact_display %}
-                            <a href="#" class="btn btn-outline btn-sm contact-btn" data-telegram="{% if response.respondent.telegram %}https://t.me/{{ response.respondent.telegram|cut:'@' }}{% endif %}" data-whatsapp="{% if response.respondent.whatsapp %}{{ response.respondent.whatsapp }}{% endif %}" data-max="{% if response.respondent.max_url %}{{ response.respondent.max_url }}{% endif %}" data-max-display="{% if response.respondent.max_contact_display %}{{ response.respondent.max_contact_display }}{% endif %}">Контакт</a>
+
+                            <div class="sparring-response__actions">
+                                {% if response.status == 'pending' and req.status == 'active' %}
+                                <form action="{% url 'sparring_confirm_response' response_id=response.pk %}" method="post" class="sparring-response__confirm" onsubmit="return confirm('Подтвердить отклик и создать матч? Заявка будет закрыта.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary btn-sm">Подтвердить</button>
+                                </form>
+                                {% endif %}
+                                {% include 'includes/direct_message_button.html' with target_player=response.respondent compact=True button_label='Написать в чат' %}
+                                <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
+                                {% if response.status == 'accepted' %}
+                                {% with match=response.matches.first %}
+                                {% if match %}
+                                <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline btn-sm">Матч</a>
+                                {% endif %}
+                                {% endwith %}
+                                {% endif %}
+                            </div>
+                            {% endwith %}
                             {% else %}
-                            <span class="btn btn-outline btn-sm contact-btn--disabled" title="Контакт не указан">Контакт</span>
+                            <div class="sparring-response__actions">
+                                <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
+                            </div>
                             {% endif %}
-                        </div>
-                        {% elif response.status == 'accepted' %}
-                        <div class="sparring-response-row__actions">
-                            <span class="text-success" style="font-size: var(--font-size-xs); font-weight: 600;">✓ Матч создан</span>
-                            <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
-                        </div>
-                        {% endif %}
+                        </article>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                </div>
+                </section>
                 {% endif %}
             </div>
         </div>
@@ -239,105 +262,4 @@
     </div>
     {% endif %}
 </div>
-
-<div class="sparring-modal hidden" id="sparring-contact-modal" role="dialog" aria-label="Выберите способ связи">
-    <div class="sparring-modal__backdrop" id="sparring-contact-backdrop"></div>
-    <div class="sparring-modal__box">
-        <h3 class="sparring-modal__title">Связаться с откликнувшимся</h3>
-        <p class="text-secondary sparring-modal__sub">Выберите способ связи:</p>
-        <div class="sparring-modal__buttons">
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--tg messenger-btn" id="contact-telegram" target="_blank" rel="noopener" style="display: none;">
-                <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> Telegram
-            </a>
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--wa messenger-btn" id="contact-whatsapp" target="_blank" rel="noopener" style="display: none;">
-                <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="20" height="20"> WhatsApp
-            </a>
-            <a href="#" class="btn sparring-modal__link sparring-modal__link--max messenger-btn" id="contact-max" style="display: none;">
-                <img src="{% static 'images/Max_logo_2025.png' %}" alt="" class="messenger-btn__icon" width="20" height="20"> <span id="contact-max-label">MAX</span>
-            </a>
-        </div>
-        <button type="button" class="btn btn-ghost sparring-modal__close" id="sparring-contact-close">Закрыть</button>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-(function() {
-    const modal = document.getElementById('sparring-contact-modal');
-    const backdrop = document.getElementById('sparring-contact-backdrop');
-    const closeBtn = document.getElementById('sparring-contact-close');
-    const contactBtns = document.querySelectorAll('.contact-btn');
-    const tgLink = document.getElementById('contact-telegram');
-    const waLink = document.getElementById('contact-whatsapp');
-    const maxLink = document.getElementById('contact-max');
-    const maxLabel = document.getElementById('contact-max-label');
-
-    function openContactModal(telegram, whatsapp, max, maxDisplay) {
-        if (telegram) {
-            tgLink.href = telegram;
-            tgLink.style.display = '';
-        } else {
-            tgLink.style.display = 'none';
-        }
-        if (whatsapp) {
-            let phone = whatsapp.replace(/\D/g, '');
-            if (phone.startsWith('8') && phone.length === 11) {
-                phone = '7' + phone.substring(1);
-            } else if (phone.startsWith('7') && phone.length === 11) {
-                // OK
-            } else if (phone.length === 10) {
-                phone = '7' + phone;
-            }
-            waLink.href = 'https://wa.me/' + phone;
-            waLink.style.display = '';
-        } else {
-            waLink.style.display = 'none';
-        }
-        if (max) {
-            maxLink.href = max;
-            maxLink.target = '_blank';
-            maxLink.rel = 'noopener';
-            if (maxLabel) maxLabel.textContent = 'MAX';
-            maxLink.style.display = '';
-        } else if (maxDisplay) {
-            maxLink.href = '#';
-            maxLink.removeAttribute('target');
-            maxLink.removeAttribute('rel');
-            if (maxLabel) maxLabel.textContent = 'MAX: ' + maxDisplay;
-            maxLink.style.display = '';
-        } else {
-            maxLink.style.display = 'none';
-        }
-        modal.classList.remove('hidden');
-    }
-
-    function closeContactModal() {
-        modal.classList.add('hidden');
-    }
-
-    contactBtns.forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const telegram = this.dataset.telegram || '';
-            const whatsapp = this.dataset.whatsapp || '';
-            const max = this.dataset.max || '';
-            const maxDisplay = this.dataset.maxDisplay || '';
-            openContactModal(telegram, whatsapp, max, maxDisplay);
-        });
-    });
-
-    if (maxLink) {
-        maxLink.addEventListener('click', function(e) {
-            if (this.getAttribute('href') !== '#') {
-                return;
-            }
-            e.preventDefault();
-        });
-    }
-
-    if (backdrop) backdrop.addEventListener('click', closeContactModal);
-    if (closeBtn) closeBtn.addEventListener('click', closeContactModal);
-})();
-</script>
 {% endblock %}

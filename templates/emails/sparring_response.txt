@@ -1,0 +1,26 @@
+{% load skill_tags %}{% autoescape off %}Здравствуйте, {{ user_name }}!
+
+{{ respondent_name }} откликнулся на вашу заявку на спарринг.
+
+Откликнувшийся игрок
+{{ respondent_name }}
+{% if respondent_age %}Возраст: {{ respondent_age }} {{ respondent_age|years_suffix }}
+{% endif %}{% if respondent_skill %}Уровень: {{ respondent_skill }}
+{% endif %}Рейтинг FAN: {{ respondent_rating }}
+Матчи: {% if respondent_matches %}{{ respondent_wins }} из {{ respondent_matches }} побед{% else %}пока нет{% endif %}
+Профиль: {{ respondent_profile_url }}
+
+Контакты
+{% if contacts and contact_method %}Игрок выбрал способ связи: {{ contact_method }}
+{% endif %}{% for contact in contacts %}{{ contact.label }}: {{ contact.value }}{% if contact.url and contact.url != contact.value %}
+{{ contact.url }}{% endif %}
+{% empty %}Игрок не указал внешние контакты. Откройте «Мои заявки» и нажмите «Написать в чат» для личного чата.
+{% endfor %}
+Ваша заявка
+{% for fact in request_facts %}{{ fact.0 }}: {{ fact.1 }}
+{% endfor %}{% if request_description %}{{ request_description }}
+{% endif %}
+Открыть мои заявки: {{ my_requests_url }}
+
+Вопросы: {{ support_email }}
+{{ base_url }}{% endautoescape %}

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from django.http import HttpRequest
 
     from apps.courts.models import CourtApplication
+    from apps.sparring.models import SparringRequest, SparringResponse
     from apps.tournaments.models import Match, Tournament
     from apps.training.models import CoachApplication, TrainingEnrollment
     from apps.users.models import User
@@ -74,6 +75,8 @@ def _send_html_email(
     timeout_seconds: float | None = None,
     notification_url: str = "",
     raise_on_failure: bool = False,
+    capture_event: bool = True,
+    text_template_name: str | None = None,
 ) -> bool:
     """Отправить HTML-письмо с текстовой fallback-версией.
 
@@ -87,6 +90,8 @@ def _send_html_email(
         timeout_seconds: Ограничение ожидания почтового транспорта для фоновых задач.
         notification_url: Относительный адрес раздела с подробностями для ЛК и push.
         raise_on_failure: Передать ошибку SMTP worker для честного uncertain.
+        capture_event: Создавать ли ЛК/push; отключается для уже записанного события.
+        text_template_name: Отдельный текстовый шаблон, сохраняющий адреса ссылок.
 
     Returns:
         bool: ``True`` при успешной отправке, иначе ``False``.
@@ -95,7 +100,11 @@ def _send_html_email(
         return False
     try:
         html_content = render_to_string(template_name, context)
-        text_content = strip_tags(html_content)
+        text_content = (
+            render_to_string(text_template_name, context).strip()
+            if text_template_name
+            else strip_tags(html_content)
+        )
     except Exception as exc:
         logger.exception("_send_html_email: template rendering failed: %s", exc)
         return False
@@ -108,6 +117,7 @@ def _send_html_email(
             to=[recipient],
             event_key=event_key,
             notification_url=notification_url,
+            capture_event=capture_event,
         )
         if timeout_seconds is not None:
             msg.connection = get_connection(timeout=timeout_seconds)
@@ -1233,4 +1243,109 @@ def send_city_sparring_email(
         recipient=email,
         category="other",
         event_key="sparring.published",
+    )
+
+
+def send_sparring_response_email(
+    user: User,
+    *,
+    request: SparringRequest,
+    response: SparringResponse,
+) -> bool:
+    """Отправить автору заявки письмо с данными откликнувшегося игрока и контактами.
+
+    Письмо уходит независимо от настроек Telegram-бота. Запись в личном кабинете
+    и push уже созданы бизнес-событием, поэтому повторно их не дублируем.
+
+    Args:
+        user: Автор заявки и получатель письма.
+        request: Заявка, на которую откликнулись.
+        response: Отклик с выбранным способом связи.
+
+    Returns:
+        bool: ``True``, если письмо принято почтовым транспортом.
+    """
+    from apps.users.models import SkillLevel, User
+
+    if not bool(getattr(settings, "USER_NOTIFICATIONS_EMAIL_ENABLED", True)):
+        return False
+    active_user = User.objects.filter(pk=user.pk, is_active=True).first()
+    if active_user is None:
+        return False
+    user = active_user
+    email = _resolve_user_email(user)
+    if not email:
+        return False
+    respondent = response.respondent
+    base_url = _get_site_base_url()
+    my_requests_url = f"{base_url}{reverse('sparring_my_requests')}"
+
+    schedule_parts = [
+        part.strip()
+        for part in (request.preferred_days, request.preferred_time)
+        if part and part.strip()
+    ]
+    place = ", ".join(
+        part for part in (request.preferred_location, request.city) if part
+    )
+    age_range = ""
+    if request.desired_partner_age_min and request.desired_partner_age_max:
+        age_range = (
+            f"{request.desired_partner_age_min}–{request.desired_partner_age_max} лет"
+        )
+    elif request.desired_partner_age_min:
+        age_range = f"от {request.desired_partner_age_min} лет"
+    elif request.desired_partner_age_max:
+        age_range = f"до {request.desired_partner_age_max} лет"
+
+    request_facts = [
+        ("Когда", " · ".join(schedule_parts)),
+        ("Где", place),
+        (
+            "Уровень",
+            request.get_desired_category_display() if request.desired_category else "",
+        ),
+        ("Возраст партнёра", age_range),
+    ]
+
+    return _send_html_email(
+        subject=f"TennisFan: {respondent} откликнулся на вашу заявку",
+        template_name="emails/sparring_response.html",
+        text_template_name="emails/sparring_response.txt",
+        context={
+            "user": user,
+            "user_name": user.get_display_name() or email.split("@")[0],
+            "respondent": respondent,
+            "respondent_name": str(respondent),
+            "respondent_age": respondent.age,
+            "respondent_skill": (
+                dict(SkillLevel.choices).get(
+                    respondent.skill_level, respondent.skill_level
+                )
+                if respondent.skill_level
+                else ""
+            ),
+            "respondent_rating": int(respondent.total_points or 0),
+            "respondent_matches": respondent.matches_played,
+            "respondent_wins": respondent.matches_won,
+            "contact_method": response.get_contact_method_display(),
+            "contacts": response.contact_links(),
+            "request": request,
+            "request_description": request.description,
+            "request_facts": [fact for fact in request_facts if fact[1]],
+            "my_requests_url": my_requests_url,
+            "respondent_profile_url": (
+                f"{base_url}{reverse('profile', args=[respondent.pk])}"
+            ),
+            "base_url": base_url,
+            "logo_url": f"{base_url}/static/images/logo.png",
+            "support_email": getattr(
+                settings, "DEFAULT_FROM_EMAIL", "tennis@tennisfan.ru"
+            ),
+        },
+        recipient=email,
+        category="other",
+        event_key="sparring.response",
+        notification_url=reverse("sparring_my_requests"),
+        capture_event=False,
     )

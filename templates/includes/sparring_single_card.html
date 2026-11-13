@@ -1,5 +1,5 @@
 {% load skill_tags %}
-        <div class="card sparring-card" id="sparring-{{ req.pk }}">
+        <div class="card sparring-card sparring-card--single" id="sparring-{{ req.pk }}">
             <div class="card-body sparring-card__inner">
                 <div class="sparring-card__flags">
                     <span class="sparring-flag sparring-flag--type">Одиночный 1×1</span>
@@ -64,14 +64,14 @@
                         <div class="sparring-card__actions">
                             <a href="{% url 'profile' pk=req.player.pk %}" class="btn btn-outline btn-sm sparring-card__btn" title="Посмотреть матчи и статистику игрока">Профиль игрока</a>
                             {% if user.is_authenticated and user.is_active and user.pk != req.player.user_id and req.player.user.is_active %}
-                            {% include 'includes/direct_message_button.html' with target_player=req.player compact=True %}
+                            {% include 'includes/direct_message_button.html' with target_player=req.player compact=True button_label='Написать в чат' %}
                             {% endif %}
                             {% if user.is_authenticated and user.player.pk == req.player_id %}
                             <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Редактировать</a>
                             <a href="{% url 'sparring_my_requests' %}" class="btn btn-outline btn-sm sparring-card__btn">Мои заявки</a>
-                            {% elif has_sparring_access %}
-                            <button type="button" class="btn btn-primary btn-sm sparring-card__btn sparring-respond-btn" data-id="{{ req.pk }}">
-                                Откликнуться
+                            {% elif entry.can_view_author_contacts or has_sparring_access %}
+                            <button type="button" class="btn btn-primary btn-sm sparring-card__btn sparring-respond-btn" data-respond-url="{% url 'sparring_respond' req.pk %}" aria-describedby="sparring-contact-status-{{ req.pk }}" data-id="{{ req.pk }}"{% if entry.can_view_author_contacts %} disabled{% endif %}>
+                                {% if entry.viewer_response.status == 'accepted' %}Отклик принят{% elif entry.can_view_author_contacts %}Отклик отправлен{% elif entry.viewer_response.status == 'rejected' %}Откликнуться снова{% else %}Откликнуться{% endif %}
                             </button>
                             {% else %}
                             <a href="{% url 'pricing' %}" class="btn btn-outline btn-sm sparring-card__btn sparring-btn--locked" title="Оформите подписку, чтобы откликаться на заявки">Нужна подписка</a>
@@ -79,5 +79,11 @@
                         </div>
                     </div>
                 </div>
+                {% if not user.is_authenticated or user.player.pk != req.player_id %}
+                <div class="sparring-card__contact-panel">
+                    <p class="sparring-card__contact-status" id="sparring-contact-status-{{ req.pk }}" role="status" aria-atomic="true">{% if entry.viewer_response.status == 'accepted' %}Ваш отклик принят.{% elif entry.can_view_author_contacts %}Вы откликнулись на спарринг.{% elif entry.viewer_response.status == 'rejected' %}Ваш отклик отклонён. Чтобы увидеть контакты автора, откликнитесь ещё раз.{% else %}Чтобы увидеть контакты автора, откликнитесь на спарринг.{% endif %}</p>
+                    <div class="sparring-card__author-contacts" data-author-contacts>{% if entry.can_view_author_contacts %}{% include 'sparring/_author_contacts.html' with contacts=entry.author_contacts only %}{% endif %}</div>
+                </div>
+                {% endif %}
             </div>
         </div>

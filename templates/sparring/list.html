@@ -4,9 +4,18 @@
 {% block title %}Спарринг{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Спарринг</h1>
-    <p class="page-subtitle">Найдите партнёра для игры</p>
+<div class="page-header sparring-page-header">
+    <div class="sparring-page-header__text">
+        <h1 class="page-title">Спарринг</h1>
+        <p class="page-subtitle">Найдите партнёра для игры</p>
+    </div>
+    <button
+        type="button"
+        class="sparring-help__trigger"
+        aria-haspopup="dialog"
+        aria-controls="sparring-help-dialog"
+        aria-label="Справка по спаррингам"
+    >?</button>
 </div>
 
 <div class="container">
@@ -196,7 +205,102 @@
 
 {% endblock %}
 
+{% block modals %}
+<dialog id="sparring-help-dialog" class="sparring-help__dialog" aria-labelledby="sparring-help-title">
+    <form method="dialog" class="sparring-help__form">
+        <header class="sparring-help__header">
+            <h2 id="sparring-help-title" class="sparring-help__title">Справка: спарринг</h2>
+            <p class="sparring-help__lead">Короткая памятка. Нажмите «Подробнее» в нужном шаге.</p>
+        </header>
+
+        <div class="sparring-help__body">
+            <ol class="sparring-help__steps">
+                <li class="sparring-help__step">
+                    <strong>1. Найдите или создайте заявку</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>В ленте есть фильтры по городу, уровню, полу, виду спорта и формату. Свою заявку можно создать с описанием, датами, местом и отметкой «дружеский матч».</p>
+                    </details>
+                </li>
+                <li class="sparring-help__step">
+                    <strong>2. Откликнитесь</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>Выберите Telegram, WhatsApp или Max. Автор получит уведомление. Отклик действует 48 часов; контакты пока не видны.</p>
+                    </details>
+                </li>
+                <li class="sparring-help__step">
+                    <strong>3. Автор подтверждает отклик</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>Автор может принять, отклонить или закрыть заявку. Срок ответа — 48 часов. Если он не ответил, матч создаётся автоматически по первому подходящему отклику.</p>
+                    </details>
+                </li>
+                <li class="sparring-help__step">
+                    <strong>4. Открываются контакты</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>Контакты видны обеим сторонам только после создания матча.</p>
+                    </details>
+                </li>
+                <li class="sparring-help__step">
+                    <strong>5. Сыграйте матч</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>У матча есть дедлайн: 7 дней. Система пришлёт напоминания за 3 дня, за 1 день, в день дедлайна и на следующий день.</p>
+                    </details>
+                </li>
+                <li class="sparring-help__step">
+                    <strong>6. Внесите результат</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>Один участник вносит счёт, второй подтверждает. Если соперник не ответил 6 часов, результат принимается автоматически. Неявка оформляется техническим результатом, а не счётом 0:0.</p>
+                    </details>
+                </li>
+                <li class="sparring-help__step">
+                    <strong>7. Если результат не внесён</strong>
+                    <details class="sparring-help__details">
+                        <summary>Подробнее</summary>
+                        <p>Через 3 дня после дедлайна матч отменяется без изменения рейтинга.</p>
+                    </details>
+                </li>
+            </ol>
+
+            <p class="sparring-help__note">
+                Сроки: отклик — 48 ч; матч — 7 дней; подтверждение результата — 6 ч; отмена просроченного матча — через 3 дня.
+            </p>
+        </div>
+
+        <footer class="sparring-help__footer">
+            <button type="submit" class="btn btn-primary" value="close">Закрыть</button>
+        </footer>
+    </form>
+</dialog>
+{% endblock %}
+
 {% block extra_js %}
 <script src="{% static 'js/sparring-menu.js' %}" defer></script>
 <script src="{% static 'js/sparring-respond.js' %}" defer></script>
+<script>
+(function () {
+    'use strict';
+    const dialog = document.getElementById('sparring-help-dialog');
+    const trigger = document.querySelector('.sparring-help__trigger');
+    if (!dialog || !trigger) return;
+
+    trigger.addEventListener('click', function () {
+        if (typeof dialog.showModal === 'function') {
+            dialog.showModal();
+        } else {
+            dialog.setAttribute('open', 'open');
+        }
+    });
+
+    dialog.addEventListener('click', function (event) {
+        if (event.target === dialog) {
+            dialog.close();
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -244,6 +244,163 @@
     border: 1px solid rgb(168 85 247 / 30%);
 }
 
+/* ==========================================================================
+   Справка по спаррингам (модальное окно)
+   ========================================================================== */
+
+.sparring-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+}
+
+.sparring-page-header__text {
+    min-width: 0;
+}
+
+.sparring-help__trigger {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-top: 0.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.sparring-help__trigger:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.sparring-help__dialog {
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 0;
+    width: min(34rem, calc(100vw - 1.5rem));
+    max-height: min(86vh, 42rem);
+    overflow: hidden;
+    background: var(--color-bg);
+    color: var(--color-text);
+    box-shadow: 0 1.5rem 3rem rgb(0 0 0 / 35%);
+}
+
+.sparring-help__dialog::backdrop {
+    background: rgb(0 0 0 / 55%);
+}
+
+.sparring-help__form {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+}
+
+.sparring-help__header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.sparring-help__title {
+    margin: 0 0 var(--spacing-xs);
+    font-size: var(--font-size-lg);
+}
+
+.sparring-help__lead {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.sparring-help__body {
+    padding: var(--spacing-lg);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.sparring-help__steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.sparring-help__step {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated);
+}
+
+.sparring-help__step strong {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+}
+
+.sparring-help__details {
+    margin-top: var(--spacing-xs);
+}
+
+.sparring-help__details summary {
+    cursor: pointer;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    list-style: none;
+}
+
+.sparring-help__details summary::-webkit-details-marker {
+    display: none;
+}
+
+.sparring-help__details p {
+    margin: var(--spacing-xs) 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.sparring-help__note {
+    margin: var(--spacing-md) 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+}
+
+.sparring-help__footer {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border-light);
+    text-align: right;
+}
+
+@media (max-width: 640px) {
+    .sparring-help__dialog {
+        width: 100vw;
+        max-width: 100vw;
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+        margin: 0;
+    }
+
+    .sparring-help__header,
+    .sparring-help__body,
+    .sparring-help__footer {
+        padding-left: var(--spacing-md);
+        padding-right: var(--spacing-md);
+    }
+}
+
 /* Сетка: аватар | текст | действия — заполняет ширину карточки */
 .sparring-card__layout {
     display: grid;

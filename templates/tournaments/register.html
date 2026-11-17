@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}Регистрация — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--spacing-2xl); max-width: 720px;">
+    <a href="{% url 'tournament_detail' slug=tournament.slug %}" class="text-secondary">&larr; Назад к турниру</a>
+    <h1 class="page-title mt-4 mb-2">Регистрация на турнир</h1>
+    <p class="text-secondary mb-4">{{ tournament.name }}</p>
+    <div class="card mb-4">
+        <div class="card-body">
+            {% if payment_error %}<p class="alert alert-danger" role="alert">{{ payment_error }}</p>{% endif %}
+            <form method="post">
+                {% csrf_token %}
+                {% include 'tournaments/_registration_payment_options.html' %}
+                <p class="text-secondary mb-3">Место будет занято только после отправки заявки или успешной онлайн-оплаты.</p>
+                <button type="submit" class="btn btn-primary">Продолжить регистрацию</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

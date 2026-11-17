@@ -1,0 +1,24 @@
+{% extends "admin/change_form.html" %}
+
+{% block submit_buttons_top %}{% endblock %}
+{% block submit_buttons_bottom %}{% endblock %}
+
+{% block content %}
+{{ block.super }}
+{% if can_confirm_receipt %}
+<section class="module aligned" aria-labelledby="receipt-confirmation-title">
+    <h2 id="receipt-confirmation-title">Подтверждение получения</h2>
+    <div class="form-row">
+        <p>Подтверждайте только после фактического получения {{ original.amount }} ₽ от {{ original.user }} на корте. Это действие сохранит дату и ваше имя в финансовой истории.</p>
+    </div>
+    <form method="post" action="{{ confirm_receipt_url }}">
+        {% csrf_token %}
+        <div class="submit-row">
+            <input type="submit" value="Подтвердить получение" class="default">
+        </div>
+    </form>
+</section>
+{% else %}
+<p class="help">Финансовая история доступна только для чтения. Закрытые ожидания и полученные взносы не удаляются.</p>
+{% endif %}
+{% endblock %}

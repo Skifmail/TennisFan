@@ -433,12 +433,12 @@ def get_member_plan_limits(
 
     plan = member_plan.plan
     year, month = _get_usage_period_for_member_plan(member_plan, today=today)
-    usage = _get_or_create_period_usage(
-        member,
-        plan,
-        year=year,
-        month=month,
-    )
+    # Проверка доступности (в том числе на GET) не создаёт и не меняет расход.
+    # Перепривязка к новому тарифу выполняется только при реальном списании.
+    usage = ClubPlanSlotUsage.objects.filter(
+        club_member=member, period_year=year, period_month=month, plan=plan
+    ).first()
+    used = int(usage.tournaments_used) if usage is not None else 0
 
     monthly_tournaments_limit = _get_plan_registration_limit(plan)
     bonus_balance = int(member_plan.bonus_tournaments_balance)
@@ -447,12 +447,10 @@ def get_member_plan_limits(
     if monthly_tournaments_limit is None:
         effective_limit = None
         tournaments_left = None
-        tournaments_used = usage.tournaments_used
+        tournaments_used = used
     else:
         effective_limit_int = monthly_tournaments_limit + bonus_balance
-        tournaments_left_int = (
-            max(monthly_tournaments_limit - usage.tournaments_used, 0) + bonus_balance
-        )
+        tournaments_left_int = max(monthly_tournaments_limit - used, 0) + bonus_balance
         effective_limit = effective_limit_int
         tournaments_left = tournaments_left_int
         tournaments_used = max(effective_limit_int - tournaments_left_int, 0)

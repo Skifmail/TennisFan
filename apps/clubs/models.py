@@ -3,7 +3,7 @@
 """
 
 import decimal
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -11,6 +11,9 @@ from django.db import models
 from django.utils import timezone
 
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
+if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import RelatedManager
 
 
 class ClubStatus(models.TextChoices):
@@ -335,6 +338,10 @@ class ClubMember(models.Model):
     """
     Участник клуба: связь пользователя платформы с клубом, роль и статус.
     """
+
+    if TYPE_CHECKING:
+        plan_slot_usages: "RelatedManager[ClubPlanSlotUsage]"
+        balance_transactions: "RelatedManager[ClubMemberBalanceTransaction]"
 
     club = models.ForeignKey(
         Club,
@@ -863,6 +870,9 @@ class ClubFeePayment(models.Model):
 
 class ClubMemberBalanceTransaction(models.Model):
     """Операция по балансу участника клуба."""
+
+    if TYPE_CHECKING:
+        club_id: int
 
     class Direction(models.TextChoices):
         """Направление движения средств."""

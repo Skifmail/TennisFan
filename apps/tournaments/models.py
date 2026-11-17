@@ -4,10 +4,13 @@ Tournament models: Tournaments, Matches, Ratings.
 
 from __future__ import annotations
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Case, IntegerField, When
 from django.utils import timezone
@@ -18,6 +21,8 @@ from apps.users.models import Player, SkillLevel
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
 
 if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import RelatedManager
+
     from apps.users.models import User
 
 
@@ -51,7 +56,7 @@ class TournamentGender(models.TextChoices):
 
 
 class TournamentDuration(models.TextChoices):
-    """Tournament duration type (категория турнира)."""
+    """Продолжительность проведения, независимая от формата сетки."""
 
     SINGLE_DAY = "single", "Однодневный"
     WEEKEND = "weekend", "Выходного дня"
@@ -183,7 +188,22 @@ class TournamentAllowedCategory(models.Model):
 
 
 class Tournament(CompressImageFieldsMixin, models.Model):
-    """Tournament model."""
+    """Турнир с независимыми настройками сетки и продолжительности."""
+
+    if TYPE_CHECKING:
+        id: int
+        club_id: int | None
+        court_id: int | None
+        geo_area_id: int | None
+        allowed_categories: RelatedManager[TournamentAllowedCategory]
+        onsite_payments: RelatedManager[TournamentOnsitePayment]
+        entry_payments: RelatedManager[TournamentEntryPayment]
+        postpayment_invoices: RelatedManager[TournamentPostpaymentInvoice]
+        registration_coverages: RelatedManager[TournamentRegistrationCoverage]
+        teams: RelatedManager[TournamentTeam]
+        matches: RelatedManager[Match]
+        tvd_groups: RelatedManager[TVDGroup]
+        fan_results: RelatedManager[TournamentPlayerResult]
 
     name = models.CharField("Название", max_length=200)
     slug = models.SlugField("URL", unique=True)
@@ -247,9 +267,8 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         "Однодневный турнир",
         default=False,
         help_text=(
-            "Влияет только на длительность и оплату: взнос платный для всех "
-            "(с учетом скидок), постоплата недоступна. Сетку не меняет — "
-            "формат выбирается выше."
+            "Служебный признак для совместимости с оплатой. "
+            "Синхронизируется с продолжительностью «Однодневный»."
         ),
     )
     allow_postpayment = models.BooleanField(
@@ -259,6 +278,15 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             "Разрешить регистрацию без немедленной оплаты вступительного взноса. "
             "После дедлайна регистрации участникам без оплаты отправляется ссылка; "
             "срок оплаты задаётся полем «Длительность окна постоплаты» ниже."
+        ),
+    )
+    allow_onsite_payment: models.BooleanField[bool, bool] = models.BooleanField(
+        "Оплата на корте",
+        default=False,
+        help_text=(
+            "Разрешить участнику выбрать оплату взноса на площадке. "
+            "Регистрация не означает получение денег: организатор подтверждает его отдельно. "
+            "Не создаёт долг постоплаты и не списывает FT."
         ),
     )
     postpayment_deadline_hours = models.PositiveSmallIntegerField(
@@ -297,6 +325,11 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         max_length=10,
         choices=TournamentDuration.choices,
         default=TournamentDuration.MULTI_DAY,
+        help_text=(
+            "Не зависит от формата сетки. Однодневный — все матчи в дату начала, "
+            "взнос для всех с учётом скидок, без постоплаты. Выходного дня — "
+            "до двух дней подряд. Многодневный — дедлайны по числу дней на раунд."
+        ),
     )
     tournament_type = models.CharField(
         "Тип турнира",
@@ -433,7 +466,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     match_days_per_round = models.PositiveSmallIntegerField(
         "Дней на раунд (дедлайн матча)",
         default=7,
-        help_text="Сколько дней у игроков на проведение матча раунда/тура.",
+        help_text=(
+            "Сколько дней у игроков на раунд многодневного турнира. "
+            "В коротких турнирах дедлайны ограничены датами проведения."
+        ),
     )
 
     start_date = models.DateField(
@@ -443,6 +479,15 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         help_text=(
             "Необязательна при режиме «Старт после набора» — "
             "дата проставится при автозапуске."
+        ),
+    )
+    start_time: models.TimeField[time | str | None, time | None] = models.TimeField(
+        "Время начала",
+        null=True,
+        blank=True,
+        help_text=(
+            "По часовому поясу сайта. Обязательно для однодневного турнира, "
+            "в том числе при старте после набора."
         ),
     )
     end_date = models.DateField("Дата окончания", null=True, blank=True)
@@ -487,7 +532,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
 
     class Meta:
         verbose_name = "Турнир"
-        verbose_name_plural = "Многодневные Турниры"
+        verbose_name_plural = "Турниры"
         ordering = ["-start_date"]
         indexes = [
             models.Index(fields=["status", "-start_date"]),
@@ -498,6 +543,48 @@ class Tournament(CompressImageFieldsMixin, models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.city})"
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Поддержать старое создание с флагом без явной продолжительности.
+
+        При загрузке из БД позиционные значения остаются нетронутыми:
+        нормализация существующих записей выполняется отдельной миграцией.
+        """
+        if not args:
+            if "duration" not in kwargs and kwargs.get("is_one_day"):
+                kwargs["duration"] = TournamentDuration.SINGLE_DAY
+            if "duration" in kwargs:
+                kwargs["is_one_day"] = (
+                    kwargs["duration"] == TournamentDuration.SINGLE_DAY
+                )
+        super().__init__(*args, **kwargs)
+
+    def get_event_end_date(self) -> date | None:
+        """Вернуть дату окончания с учётом выбранной продолжительности.
+
+        Незаданные даты короткого турнира выводятся из даты начала. Старые
+        противоречащие даты не перезаписываются; дедлайн всё равно ограничен
+        одним или двумя днями проведения.
+        """
+        return self._event_end_date(self.start_date, self.end_date, self.duration)
+
+    @staticmethod
+    def _event_end_date(
+        start: date | str | None, end: date | str | None, duration: str
+    ) -> date | None:
+        """Рассчитать конец события по эффективным, в том числе частично сохранённым полям."""
+        if isinstance(start, str):
+            start = date.fromisoformat(start)
+        if isinstance(end, str):
+            end = date.fromisoformat(end)
+        if start is None or duration == TournamentDuration.MULTI_DAY:
+            return end
+        if duration == TournamentDuration.SINGLE_DAY:
+            return start
+        if duration == TournamentDuration.WEEKEND:
+            latest = start + timedelta(days=1)
+            return max(start, min(end or latest, latest))
+        return end
 
     def is_singles(self) -> bool:
         """Check if tournament is singles (1v1)."""
@@ -558,9 +645,25 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             return False
         if self.start_after_fill or self.start_date is None:
             return True
-        # Пока сетка не сформирована, UI показывает условие старта
-        # (историческое поведение карточек турниров).
-        return True
+        # Старые формы сохраняли технический диапазон «начало плюс год».
+        # Обычные объявленные даты видны уже во время набора.
+        return bool(
+            self.start_time is None
+            and self.end_date
+            and (self.end_date - self.start_date).days in (365, 366)
+        )
+
+    def get_start_datetime(self) -> datetime | None:
+        """Вернуть объявленный старт в часовом поясе сайта без выдуманных часов."""
+        if self.start_date is None or self.start_time is None:
+            return None
+        return cast(
+            datetime,
+            timezone.make_aware(
+                datetime.combine(self.start_date, self.start_time),
+                timezone.get_current_timezone(),
+            ),
+        )
 
     def is_full(self) -> bool:
         """Check if tournament has reached max participants/teams."""
@@ -646,63 +749,198 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             if not self.region:
                 self.region = area.region
 
+    def get_calendar_errors(self) -> dict[str, str]:
+        """Вернуть противоречия календаря для проверки и предупреждений в формах."""
+        errors: dict[str, str] = {}
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                errors["end_date"] = "Дата окончания не может быть раньше даты начала."
+            elif (
+                self.duration == TournamentDuration.SINGLE_DAY
+                and self.end_date != self.start_date
+            ):
+                errors["end_date"] = (
+                    "Однодневный турнир должен закончиться в дату начала."
+                )
+            elif (
+                self.duration == TournamentDuration.WEEKEND
+                and self.end_date > self.start_date + timedelta(days=1)
+            ):
+                errors["end_date"] = (
+                    "Турнир выходного дня может длиться не больше двух дней подряд."
+                )
+        if self.start_date and self.registration_deadline:
+            deadline = self.registration_deadline
+            if timezone.is_naive(deadline):
+                deadline = timezone.make_aware(deadline)
+            if timezone.localtime(deadline).date() > self.start_date:
+                errors["registration_deadline"] = (
+                    "Дедлайн регистрации не может быть позже даты начала турнира."
+                )
+            elif (start_at := self.get_start_datetime()) and deadline > start_at:
+                errors["registration_deadline"] = (
+                    "Дедлайн регистрации не может быть позже времени начала турнира."
+                )
+        return errors
+
     def clean(self) -> None:
-        """Проверить согласованность региона и выбранного района/города.
+        """Проверить календарь, продолжительность и географию турнира.
+
+        Неизменённые ошибочные даты старых записей не блокируют правки других
+        настроек. Изменение дат или продолжительности требует корректного
+        календаря; существующие значения не исправляются молча.
 
         Raises:
-            ValidationError: Если площадка относится к другому региону.
+            ValidationError: Если новые даты или регион противоречат настройкам.
         """
         super().clean()
+        self.is_one_day = self.duration == TournamentDuration.SINGLE_DAY
+        errors = self.get_calendar_errors()
+        if errors and self.pk and not self._state.adding:
+            previous = (
+                type(self)
+                .objects.using(self._state.db)
+                .filter(pk=self.pk)
+                .values(
+                    "start_date",
+                    "start_time",
+                    "end_date",
+                    "duration",
+                    "registration_deadline",
+                )
+                .first()
+            )
+            if previous is not None:
+                dependencies = {
+                    "end_date": ("start_date", "end_date", "duration"),
+                    "registration_deadline": (
+                        "start_date",
+                        "start_time",
+                        "registration_deadline",
+                    ),
+                }
+                for field, calendar_fields in dependencies.items():
+                    if field in errors and all(
+                        getattr(self, related) == previous[related]
+                        for related in calendar_fields
+                    ):
+                        errors.pop(field)
+        if self.end_date is None:
+            self.end_date = self.get_event_end_date()
         if (self.city or "").strip() and not city_uses_moscow_geo(self.city):
             self.region = ""
             self.geo_area = None
-            return
-        if self.geo_area_id and self.region:
+        elif self.geo_area_id and self.region:
             if self.geo_area.region != self.region:
-                from django.core.exceptions import ValidationError
-
-                raise ValidationError(
-                    {
-                        "geo_area": (
-                            f"«{self.geo_area.name}» относится к региону "
-                            f"«{self.geo_area.get_region_display()}», "
-                            "а у турнира указан другой регион."
-                        )
-                    }
+                errors["geo_area"] = (
+                    f"«{self.geo_area.name}» относится к региону "
+                    f"«{self.geo_area.get_region_display()}», "
+                    "а у турнира указан другой регион."
                 )
+        if errors:
+            raise ValidationError(errors)
 
-    def save(self, *args, **kwargs) -> None:
-        """Custom save to normalize duration and reset notification flag when дедлайн сдвинут."""
-        from django.utils import timezone
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Согласовать продолжительность и оплату, сохранив старые интеграции."""
+        update_fields = kwargs.get("update_fields")
+        fields = set(update_fields) if update_fields is not None else None
+        if fields is not None and not fields:
+            return
 
         if self.sport == Sport.PADEL and self.variant != TournamentVariant.DOUBLES:
             self.variant = TournamentVariant.DOUBLES
-            update_fields = kwargs.get("update_fields")
-            if update_fields is not None and "variant" not in update_fields:
-                kwargs["update_fields"] = [*list(update_fields), "variant"]
+            if fields is not None:
+                fields.add("variant")
 
         old_deadline_hours: int | None = None
         old_status: str | None = None
+        previous: dict[str, Any] | None = None
         if self.pk:
             previous = (
                 type(self)
                 .objects.filter(pk=self.pk)
-                .values_list("postpayment_deadline_hours", "status")
+                .values(
+                    "postpayment_deadline_hours",
+                    "status",
+                    "duration",
+                    "is_one_day",
+                    "entry_fee",
+                    "start_date",
+                    "end_date",
+                )
                 .first()
             )
             if previous is not None:
-                old_deadline_hours, old_status = previous
+                old_deadline_hours = previous["postpayment_deadline_hours"]
+                old_status = previous["status"]
 
-        # ТВД (format=weekend_day) задаёт duration в админке; остальные — многодневные.
-        if self.format != TournamentFormat.WEEKEND_DAY:
-            self.duration = TournamentDuration.MULTI_DAY
-        # Постоплата разрешена только для многодневных турниров с положительным взносом.
-        if (
-            self.is_one_day
-            or self.format == TournamentFormat.WEEKEND_DAY
-            or float(self.entry_fee or 0) <= 0
-        ):
-            self.allow_postpayment = False
+        if fields is None or fields & {"duration", "is_one_day"}:
+            legacy_flag_changed = (
+                fields is not None
+                and "is_one_day" in fields
+                and "duration" not in fields
+            ) or (
+                fields is None
+                and previous is not None
+                and self.duration == previous["duration"]
+                and self.is_one_day != previous["is_one_day"]
+            )
+            legacy_one_day = (
+                fields is None
+                and previous is not None
+                and self.duration
+                == previous["duration"]
+                == TournamentDuration.MULTI_DAY
+                and self.is_one_day == previous["is_one_day"] is True
+            )
+            if legacy_flag_changed or legacy_one_day:
+                if self.is_one_day:
+                    self.duration = TournamentDuration.SINGLE_DAY
+                elif self.duration == TournamentDuration.SINGLE_DAY:
+                    self.duration = TournamentDuration.MULTI_DAY
+            self.is_one_day = self.duration == TournamentDuration.SINGLE_DAY
+            if fields is not None:
+                fields.update({"duration", "is_one_day"})
+
+        # Не сохраняем случайные несохранённые настройки при частичном update.
+        if fields is None or fields & {
+            "duration",
+            "is_one_day",
+            "entry_fee",
+            "allow_postpayment",
+        }:
+            duration = self.duration
+            entry_fee = self.entry_fee
+            if fields is not None and previous is not None:
+                if "duration" not in fields:
+                    duration = previous["duration"]
+                if "entry_fee" not in fields:
+                    entry_fee = previous["entry_fee"]
+            if duration == TournamentDuration.SINGLE_DAY or (entry_fee or 0) <= 0:
+                self.allow_postpayment = False
+                if fields is not None:
+                    fields.add("allow_postpayment")
+
+        if fields is None or fields & {
+            "start_date",
+            "end_date",
+            "duration",
+            "is_one_day",
+        }:
+            start, end, duration = self.start_date, self.end_date, self.duration
+            if fields is not None and previous is not None:
+                if "start_date" not in fields:
+                    start = previous["start_date"]
+                if "end_date" not in fields:
+                    end = previous["end_date"]
+                if "duration" not in fields:
+                    duration = previous["duration"]
+            if end is None:
+                end_date = self._event_end_date(start, end, duration)
+                if end_date is not None:
+                    self.end_date = end_date
+                    if fields is not None:
+                        fields.add("end_date")
         # Если дедлайн регистрации перенесли вперёд после отправки уведомления,
         # сбрасываем отметку, чтобы при следующей проверке уведомление могло уйти снова.
         if self.registration_deadline and self.insufficient_participants_notified_at:
@@ -710,8 +948,10 @@ class Tournament(CompressImageFieldsMixin, models.Model):
                 self.insufficient_participants_notified_at = None
         # Частичное сохранение не должно тянуть за собой географию: вызывающий
         # перечислил поля осознанно, а запрос к справочнику здесь был бы лишним.
-        if kwargs.get("update_fields") is None:
+        if fields is None:
             self.resolve_geography()
+        else:
+            kwargs["update_fields"] = fields
         super().save(*args, **kwargs)
 
         # Продление/сокращение окна постоплаты должно обновлять due_at инвойсов.
@@ -729,6 +969,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         if (
             old_status == TournamentStatus.CANCELLED
             and self.status != TournamentStatus.CANCELLED
+            and (fields is None or "status" in fields)
         ):
             from .cancel import restore_tournament_after_cancellation
 
@@ -833,6 +1074,94 @@ class TournamentEntryPayment(models.Model):
         return f"{self.tournament.name} — {self.user}"
 
 
+class TournamentOnsitePayment(models.Model):
+    """Ожидаемый взнос на корте и отдельная, сохраняемая отметка получения денег."""
+
+    if TYPE_CHECKING:
+        id: int
+        tournament_id: int
+        user_id: int
+        received_by_id: int | None
+        refund_request: TournamentEntryRefundRequest
+        get_status_display: Callable[[], str]
+
+    class Status(models.TextChoices):
+        """Состояние договорённости об оплате на площадке."""
+
+        EXPECTED = "expected", "Ожидается на корте"
+        RECEIVED = "received", "Получено на корте"
+        CANCELLED = "cancelled", "Ожидание отменено"
+        REPLACED = "replaced", "Оплачено онлайн"
+
+    tournament: models.ForeignKey[Tournament, Tournament] = models.ForeignKey(
+        Tournament,
+        on_delete=models.PROTECT,
+        related_name="onsite_payments",
+        verbose_name="Турнир",
+    )
+    user: models.ForeignKey[User, User] = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="tournament_onsite_payments",
+        verbose_name="Участник",
+    )
+    amount: models.DecimalField[Decimal, Decimal] = models.DecimalField(
+        "Сумма (руб)", max_digits=10, decimal_places=2
+    )
+    status: models.CharField[str, str] = models.CharField(
+        "Статус", max_length=16, choices=Status.choices, default=Status.EXPECTED
+    )
+    created_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
+        "Выбрано", auto_now_add=True
+    )
+    received_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField("Получено", null=True, blank=True)
+    )
+    received_by: models.ForeignKey[User | None, User | None] = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_tournament_onsite_payments",
+        verbose_name="Кто подтвердил получение",
+    )
+    closed_at: models.DateTimeField[datetime | None, datetime | None] = (
+        models.DateTimeField("Ожидание закрыто", null=True, blank=True)
+    )
+    closed_reason: models.CharField[str, str] = models.CharField(
+        "Причина закрытия", max_length=32, blank=True
+    )
+
+    class Meta:
+        verbose_name = "Оплата турнира на корте"
+        verbose_name_plural = "Оплаты турниров на корте"
+        ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tournament", "user"],
+                condition=models.Q(status__in=["expected", "received"]),
+                name="uniq_active_tournament_onsite_payment",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gte=0),
+                name="tournament_onsite_amount_nonnegative",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(status="received", received_at__isnull=False)
+                    | (
+                        ~models.Q(status="received")
+                        & models.Q(received_at__isnull=True)
+                    )
+                ),
+                name="tournament_onsite_receipt_timestamp",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tournament.name} — {self.user}: {self.get_status_display()}"
+
+
 class TournamentEntryRefundRequest(models.Model):
     """
     Заявка на возврат взноса: участник удалён админом, взнос был оплачен.
@@ -864,6 +1193,17 @@ class TournamentEntryRefundRequest(models.Model):
         unique=True,
         db_index=True,
     )
+    onsite_payment: models.OneToOneField[
+        TournamentOnsitePayment | None, TournamentOnsitePayment | None
+    ] = models.OneToOneField(
+        TournamentOnsitePayment,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="refund_request",
+        verbose_name="Полученная оплата на корте",
+        help_text="Заявка на ручной возврат не меняет историю получения денег.",
+    )
 
     class Meta:
         verbose_name = "Заявка на возврат взноса"
@@ -883,6 +1223,10 @@ class TournamentRegistrationCoverage(models.Model):
     Returns:
         None: Экземпляр используется ORM.
     """
+
+    if TYPE_CHECKING:
+        user_id: int
+        get_coverage_type_display: Callable[[], str]
 
     class CoverageType(models.TextChoices):
         """Тип покрытия регистрации.
@@ -1015,6 +1359,11 @@ class TournamentPostpaymentInvoice(models.Model):
         None: Экземпляр используется ORM.
     """
 
+    if TYPE_CHECKING:
+        id: int
+        tournament_id: int
+        user_id: int
+
     class Status(models.TextChoices):
         """Статусы постоплатного инвойса.
 
@@ -1133,6 +1482,11 @@ class TVDTournament(Tournament):
 class TournamentTeam(models.Model):
     """Команда (пара) в парном турнире. player2=null — ожидает партнёра."""
 
+    if TYPE_CHECKING:
+        id: int
+        player1_id: int
+        player2_id: int | None
+
     tournament = models.ForeignKey(
         Tournament,
         on_delete=models.CASCADE,
@@ -1182,6 +1536,10 @@ class TournamentTeam(models.Model):
 class TVDGroup(models.Model):
     """Группа турнира формата «Группы + плей-офф»."""
 
+    if TYPE_CHECKING:
+        members: RelatedManager[TVDGroupMember]
+        matches: RelatedManager[Match]
+
     tournament = models.ForeignKey(
         Tournament,
         on_delete=models.CASCADE,
@@ -1207,6 +1565,10 @@ class TVDGroupMember(models.Model):
     Участник группы турнира формата «Группы + плей-офф».
     Одиночный: group + player (team=null). Парный: group + team (player=null, для совместимости можно player=team.player1).
     """
+
+    if TYPE_CHECKING:
+        player_id: int | None
+        team_id: int | None
 
     group = models.ForeignKey(
         TVDGroup,
@@ -1280,6 +1642,17 @@ class TVDGroupMember(models.Model):
 
 class Match(models.Model):
     """Матч между двумя игроками или командами."""
+
+    if TYPE_CHECKING:
+        id: int
+        player1_id: int | None
+        player2_id: int | None
+        partner1_id: int | None
+        partner2_id: int | None
+        team1_id: int | None
+        team2_id: int | None
+        winner_id: int | None
+        winner_team_id: int | None
 
     # Служебные атрибуты сигналов: только типы, без полей БД и runtime-значений.
     _no_show_penalty_side1: float

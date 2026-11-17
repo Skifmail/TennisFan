@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, cast
 
 from django.db import transaction
 from django.utils import timezone
@@ -22,6 +22,7 @@ from .models import (
     ManualTournamentStage,
     Match,
     Tournament,
+    TournamentDuration,
     TournamentPlayerResult,
     TournamentStatus,
 )
@@ -70,6 +71,20 @@ def _validate_partition(
     return entities
 
 
+def _ready_deadline(tournament: Tournament, round_index: int) -> datetime:
+    """Дать готовому матчу полный круг, не продлевая короткое событие."""
+    deadline = _deadline(tournament, round_index)
+    if tournament.duration == TournamentDuration.MULTI_DAY:
+        return cast(
+            datetime,
+            max(
+                deadline,
+                timezone.now() + timedelta(days=tournament.match_days_per_round or 7),
+            ),
+        )
+    return deadline
+
+
 def _match(
     stage: ManualTournamentStage,
     round_index: int,
@@ -86,13 +101,7 @@ def _match(
         round_name=f"{stage.name} · круг {round_index}",
         is_consolation=stage.kind == ManualTournamentStage.Kind.CONSOLATION,
         deadline=(
-            max(
-                _deadline(stage.tournament, round_index),
-                timezone.now()
-                + timedelta(days=stage.tournament.match_days_per_round or 7),
-            )
-            if first and second
-            else None
+            _ready_deadline(stage.tournament, round_index) if first and second else None
         ),
     )
     if first:
@@ -249,10 +258,7 @@ def _advance(match: Match) -> None:
     if not was_ready and target.player1_id and target.player2_id:
         from .signals import notify_telegram_match_created
 
-        target.deadline = max(
-            _deadline(tournament, target.round_index),
-            timezone.now() + timedelta(days=tournament.match_days_per_round or 7),
-        )
+        target.deadline = _ready_deadline(tournament, target.round_index)
         Match.objects.filter(pk=target.pk).update(deadline=target.deadline)
         notify_telegram_match_created(Match, target, created=True)
 

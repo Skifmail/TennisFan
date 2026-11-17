@@ -22,11 +22,12 @@
                 <h3 class="h5 mb-2">Присоединиться к игроку без пары</h3>
                 <div class="d-flex flex-column gap-2">
                     {% for team in solo_teams %}
-                    <form method="post" class="d-flex align-items-center gap-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                    <form method="post" class="p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="join">
                         <input type="hidden" name="team_id" value="{{ team.id }}">
-                        <span class="flex-grow-1">{{ team.player1 }}</span>
+                        <p><strong>{{ team.player1 }}</strong></p>
+                        {% include 'tournaments/_registration_payment_options.html' %}
                         <button type="submit" class="btn btn-primary">Присоединиться</button>
                     </form>
                     {% endfor %}
@@ -42,6 +43,7 @@
                 <form method="post">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="solo">
+                    {% include 'tournaments/_registration_payment_options.html' %}
                     <button type="submit" class="btn btn-outline">Зарегистрироваться без партнёра</button>
                 </form>
             </div>
@@ -64,7 +66,8 @@
                 {% endif %}
                 <form method="get" action="{% url 'tournament_register_doubles' slug=tournament.slug %}" class="mb-3" id="partner-search-form" data-disable-auto-loading>
                     <div class="d-flex gap-2 flex-wrap">
-                        <input type="text" name="q" class="form-control" placeholder="ID, имя, телефон или email" style="max-width: 300px;" value="{{ request.GET.q }}">
+                        <label for="partner-search" class="sr-only">Поиск партнёра</label>
+                        <input type="text" id="partner-search" name="q" class="form-control" placeholder="ID, имя, телефон или email" style="max-width: 300px;" value="{{ request.GET.q }}">
                         <button type="submit" class="btn btn-outline">Найти</button>
                     </div>
                 </form>
@@ -72,18 +75,24 @@
                 <div id="partner-results">
                     {% if partner_search_results %}
                     <div class="d-flex flex-column gap-2">
-                        {% for p in partner_search_results %}
-                        <form method="post" class="d-flex align-items-center gap-2 p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
+                        {% for p, partner_options, partner_error in partner_search_rows %}
+                        <form method="post" class="p-3" style="background: var(--color-bg-elevated); border-radius: var(--radius-md);">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="add_partner">
                             <input type="hidden" name="partner_id" value="{{ p.id }}">
-                            <div class="flex-grow-1">
+                            <div class="mb-3">
                                 <div>{{ p }} (ID: {{ p.id }}) <span class="text-secondary">— УС: {{ p.ntrp_level|floatformat:2 }}, Р: {{ p.total_points|floatformat:0 }}</span></div>
                                 {% if tournament.is_mixed_doubles and p.gender %}
                                 <small class="text-muted">{{ p.get_gender_display }}</small>
                                 {% endif %}
                             </div>
+                            {% if partner_error %}
+                            <p class="text-secondary">{{ partner_error }}</p>
+                            {% else %}
+                            {% include 'tournaments/_registration_payment_options.html' with payment_legend="Ваш взнос" %}
+                            {% include 'tournaments/_registration_payment_options.html' with payment_options=partner_options payment_field="partner_payment_method" payment_legend="Взнос партнёра" selected_payment_method="" %}
                             <button type="submit" class="btn btn-primary">Добавить в пару</button>
+                            {% endif %}
                         </form>
                         {% endfor %}
                     </div>

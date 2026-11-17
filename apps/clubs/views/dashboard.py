@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -16,15 +16,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.core.sports import Sport
+from apps.tournaments.entry_payment import (
+    cancel_pending_entry_invoice,
+    close_expected_onsite_payments,
+    create_onsite_refund_request,
+    get_online_entry_payment_amount,
+)
 from apps.tournaments.models import (
     MANUAL_PAIRING_FORMATS_NOTE,
     Match,
     MatchResultProposal,
     Tournament,
-    TournamentDuration,
-    TournamentEntryPayment,
     TournamentGender,
     TournamentPostpaymentInvoice,
+    TournamentRegistrationCoverage,
     TournamentStatus,
     TournamentTeam,
     TournamentVariant,
@@ -35,7 +40,7 @@ from apps.tournaments.utils import (
     format_tournament_match_order_block_message,
     order_player_matches_for_display,
 )
-from apps.users.models import SkillLevel
+from apps.users.models import SkillLevel, User
 
 from ..court_search import search_tournament_courts
 from ..finance_services import credit_member_balance
@@ -1236,6 +1241,7 @@ def my_matches(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @require_POST
+@transaction.atomic
 def my_tournament_cancel(request: HttpRequest, tournament_slug: str) -> HttpResponse:
     """Отменяет запись текущего участника клуба на турнир до старта или формирования сетки."""
     member = _get_current_club_member(request)
@@ -1249,7 +1255,7 @@ def my_tournament_cancel(request: HttpRequest, tournament_slug: str) -> HttpResp
         return redirect("clubs:my_tournaments")
 
     tournament = get_object_or_404(
-        Tournament,
+        Tournament.objects.select_for_update(),
         slug=tournament_slug,
         club=member.club,
     )
@@ -1262,11 +1268,19 @@ def my_tournament_cancel(request: HttpRequest, tournament_slug: str) -> HttpResp
             "После формирования групп или сетки отмена записи недоступна.",
         )
         return redirect("clubs:my_tournaments")
+    if tournament.postpayment_window_started_at is not None:
+        messages.error(
+            request,
+            "После открытия окна постоплаты состав участников уже зафиксирован.",
+        )
+        return redirect("clubs:my_tournaments")
+    member = cast(ClubMember, ClubMember.objects.select_for_update().get(pk=member.pk))
 
     registration_removed = False
     if tournament.is_doubles():
         team = (
-            TournamentTeam.objects.filter(tournament=tournament)
+            TournamentTeam.objects.select_for_update()
+            .filter(tournament=tournament)
             .filter(Q(player1=player) | Q(player2=player))
             .select_related("player1__user", "player2__user")
             .first()
@@ -1293,33 +1307,31 @@ def my_tournament_cancel(request: HttpRequest, tournament_slug: str) -> HttpResp
         registration_removed = True
 
     restored_limit = False
-    paid_entry_qs = TournamentEntryPayment.objects.filter(
-        tournament=tournament,
-        user=request.user,
-    )
-    had_paid_entry = paid_entry_qs.exists()
-    tournament_has_entry_fee = bool(
-        getattr(tournament, "entry_fee", None)
-        and float(getattr(tournament, "entry_fee", 0)) > 0
-    )
-    if (
-        registration_removed
-        and not tournament.is_one_day
-        and (not tournament_has_entry_fee or not had_paid_entry)
-    ):
+    user = cast(User, request.user)
+    coverage = tournament.registration_coverages.filter(
+        user=user,
+        coverage_type=TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
+    ).first()
+    if registration_removed and coverage is not None:
         restored_limit = restore_member_tournament_limit(member)
+        if restored_limit:
+            coverage.delete()
+
+    close_expected_onsite_payments(tournament, user=user, reason="registration_removed")
+    cancel_pending_entry_invoice(tournament, user)
+    onsite_refund = create_onsite_refund_request(tournament, user)
+    online_amount = get_online_entry_payment_amount(tournament, user)
 
     refunded_to_balance = False
-    if registration_removed and tournament_has_entry_fee and had_paid_entry:
+    if registration_removed and online_amount is not None and online_amount > 0:
         credit_member_balance(
             member,
-            tournament.entry_fee or Decimal("0"),
+            online_amount,
             source=ClubMemberBalanceTransaction.Source.TOURNAMENT_REFUND,
             description=f"Возврат за отмену турнира «{tournament.name}»",
             reference=f"tournament:{tournament.id}",
             metadata={"tournament_id": tournament.id},
         )
-        paid_entry_qs.delete()
         paid_ids = request.session.get("tournament_entry_paid") or []
         if tournament.id in paid_ids:
             request.session["tournament_entry_paid"] = [
@@ -1328,7 +1340,13 @@ def my_tournament_cancel(request: HttpRequest, tournament_slug: str) -> HttpResp
             request.session.modified = True
         refunded_to_balance = True
 
-    if refunded_to_balance and restored_limit:
+    if onsite_refund is not None:
+        messages.success(
+            request,
+            "Запись на турнир отменена. Для возврата полученного на корте взноса "
+            "создана заявка — обратитесь к организатору. Возврат ещё не выполнен.",
+        )
+    elif refunded_to_balance and restored_limit:
         messages.success(
             request,
             "Запись на турнир отменена. Оплаченная сумма возвращена на баланс, лимит регистраций восстановлен.",
@@ -1590,11 +1608,6 @@ def tournament_create(request: HttpRequest, slug: str) -> HttpResponse:
             tournament.is_open_interclub = bool(
                 form.cleaned_data.get("is_open_interclub")
             ) and bool(is_pro)
-            tournament.duration = (
-                TournamentDuration.SINGLE_DAY
-                if form.cleaned_data.get("is_one_day")
-                else TournamentDuration.MULTI_DAY
-            )
             if not tournament.registration_deadline and tournament.start_date:
                 tournament.registration_deadline = timezone.make_aware(
                     datetime.combine(tournament.start_date, time(23, 59)),
@@ -1679,11 +1692,6 @@ def tournament_edit(
             tournament.is_open_interclub = bool(
                 form.cleaned_data.get("is_open_interclub")
             ) and bool(is_pro)
-            tournament.duration = (
-                TournamentDuration.SINGLE_DAY
-                if form.cleaned_data.get("is_one_day")
-                else TournamentDuration.MULTI_DAY
-            )
             if not tournament.registration_deadline and tournament.start_date:
                 tournament.registration_deadline = timezone.make_aware(
                     datetime.combine(tournament.start_date, time(23, 59)),

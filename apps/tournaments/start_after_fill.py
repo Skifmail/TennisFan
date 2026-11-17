@@ -60,32 +60,10 @@ def _max_required(tournament: Tournament) -> int | None:
 
 def _dispatch_generate(tournament: Tournament) -> tuple[bool, str]:
     """Запустить формирование сетки/групп по формату турнира."""
-    from apps.tournaments.fan import _is_fan
-    from apps.tournaments.fan import generate_bracket as fan_generate
-    from apps.tournaments.olympic_consolation import (
-        _is_olympic,
-    )
-    from apps.tournaments.olympic_consolation import (
-        generate_bracket as olympic_generate,
-    )
-    from apps.tournaments.round_robin import (
-        _is_round_robin,
-    )
-    from apps.tournaments.round_robin import (
-        generate_bracket as rr_generate,
-    )
-    from apps.tournaments.tvd import _is_tvd
-    from apps.tournaments.tvd import generate_groups as tvd_generate
+    from .views import _tournament_manual_generate
 
-    if _is_tvd(tournament):
-        return tvd_generate(tournament)
-    if _is_fan(tournament):
-        return fan_generate(tournament)
-    if _is_olympic(tournament):
-        return olympic_generate(tournament)
-    if _is_round_robin(tournament):
-        return rr_generate(tournament)
-    return False, "Неизвестный формат турнира."
+    ok, message, _ = _tournament_manual_generate(tournament)
+    return ok, message
 
 
 def _notify_min_fill(tournament_id: int) -> None:
@@ -121,7 +99,7 @@ def _auto_start_tournament(tournament_id: int) -> ProgressResult:
         if (
             not locked.start_after_fill
             or locked.bracket_generated
-            or locked.status == TournamentStatus.CANCELLED
+            or locked.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED)
         ):
             return "skipped"
 
@@ -130,7 +108,9 @@ def _auto_start_tournament(tournament_id: int) -> ProgressResult:
         if max_required is None or count < max_required:
             return "waiting_max"
 
-        if locked.allow_postpayment and locked.postpayment_window_started_at is None:
+        if locked.postpayment_window_started_at is not None:
+            return "postpayment_opened"
+        if locked.allow_postpayment:
             from apps.tournaments.postpayment import (
                 get_pending_postpayment_users,
                 open_postpayment_window,
@@ -156,19 +136,11 @@ def _auto_start_tournament(tournament_id: int) -> ProgressResult:
                     return "postpayment_opened"
                 # Долги закрыты (например, FanCoin settle) — продолжаем старт.
 
-        previous_start = locked.start_date
-        if locked.start_date is None:
-            locked.start_date = timezone.localdate()
-            locked.save(update_fields=["start_date", "updated_at"])
-
         ok, msg = _dispatch_generate(locked)
         if ok:
             logger.info("Auto-started fill tournament %s: %s", locked.slug, msg)
             return "started"
 
-        if previous_start is None and not locked.bracket_generated:
-            locked.start_date = None
-            locked.save(update_fields=["start_date", "updated_at"])
         logger.warning("Auto-start failed for fill tournament %s: %s", locked.slug, msg)
         return "start_failed"
 
@@ -186,7 +158,7 @@ def maybe_progress_start_after_fill(tournament: Tournament) -> ProgressResult:
         return "skipped"
     if tournament.bracket_generated:
         return "skipped"
-    if tournament.status == TournamentStatus.CANCELLED:
+    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
         return "skipped"
     if tournament.pk is None:
         return "skipped"
@@ -203,7 +175,7 @@ def maybe_progress_start_after_fill(tournament: Tournament) -> ProgressResult:
         if (
             not locked.start_after_fill
             or locked.bracket_generated
-            or locked.status == TournamentStatus.CANCELLED
+            or locked.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED)
         ):
             return "skipped"
 

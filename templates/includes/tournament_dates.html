@@ -1,0 +1,1 @@
+{% if tournament.start_date_is_pending %}{{ pending_label|default:"Старт после набора" }}{% else %}{{ tournament.start_date|date:"d.m.Y" }}{% if tournament.end_date and tournament.end_date != tournament.start_date %} — {{ tournament.end_date|date:"d.m.Y" }}{% endif %}{% endif %}{% if tournament.start_time %}, начало в {{ tournament.start_time|time:"H:i" }}{% endif %}

@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from apps.tournaments.models import Tournament
+
 
 def build_tournament_sports_event_json(
-    tournament, *, absolute_url: str, site_base_url: str
+    tournament: Tournament, *, absolute_url: str, site_base_url: str
 ) -> str:
     """Собрать JSON-LD SportsEvent для страницы турнира.
 
@@ -70,23 +72,22 @@ def build_tournament_sports_event_json(
         not getattr(tournament, "start_date_is_pending", False)
         and tournament.start_date
     ):
-        data["startDate"] = tournament.start_date.isoformat()
+        start_at = tournament.get_start_datetime()
+        data["startDate"] = (
+            start_at.isoformat() if start_at else tournament.start_date.isoformat()
+        )
         if tournament.end_date:
             data["endDate"] = tournament.end_date.isoformat()
 
     fee = float(tournament.entry_fee or 0)
     if fee > 0:
-        try:
-            slots = int(tournament.available_slots)
-        except Exception:  # noqa: BLE001
-            slots = 1
         data["offers"] = {
             "@type": "Offer",
             "price": f"{fee:g}",
             "priceCurrency": "RUB",
             "availability": (
                 "https://schema.org/InStock"
-                if slots > 0
+                if not tournament.is_full()
                 else "https://schema.org/SoldOut"
             ),
             "url": absolute_url,

@@ -11,6 +11,7 @@
     const FAN_FORMAT = "single_elimination";
     const OLYMPIC_FORMAT = "olympic_consolation";
     const ROUND_ROBIN_FORMAT = "round_robin";
+    const GROUPS_FORMAT = "weekend_day";
     const VARIANT_DOUBLES = "doubles";
     const PADEL_SPORT = "padel";
     const PADEL_VARIANT_LOCK = "id_variant_padel_lock";
@@ -185,12 +186,13 @@
         const isFan = format === FAN_FORMAT;
         const isOlympic = format === OLYMPIC_FORMAT;
         const isRoundRobin = format === ROUND_ROBIN_FORMAT;
-        // Общие поля — при любом выбранном формате (одноэтапная, Олимпийская, Круговой).
-        toggleSections(".format-common-section", isFan || isOlympic || isRoundRobin);
+        const isGroups = format === GROUPS_FORMAT;
+        // Календарь и допуск не зависят от структуры сетки и всегда доступны.
+        toggleSections(".format-common-section", true);
         // Секция очков за раунды/места: одноэтапная сетка, Олимпийская и Круговой (одни и те же поля)
         // Эта секция имеет все три класса (format-fan-section, format-olympic-section, format-round-robin-section)
         // Показываем её для любого из форматов
-        const showPointsSection = isFan || isOlympic || isRoundRobin;
+        const showPointsSection = isFan || isOlympic || isRoundRobin || isGroups;
         toggleSections(".format-fan-section", showPointsSection);
         toggleSections(".format-olympic-section", showPointsSection);
         // Секция "Круговой: формат матча" имеет только класс format-round-robin-section (без format-fan-section и format-olympic-section)
@@ -205,7 +207,7 @@
                     ? section 
                     : section.closest("fieldset") || section.closest(".module") || section;
                 if (container) {
-                    container.style.display = isRoundRobin ? "" : "none";
+                    container.style.display = isRoundRobin || isGroups ? "" : "none";
                 }
             }
         });
@@ -277,9 +279,7 @@
                 input.classList.add("vDateField--fill-mode");
                 input.setAttribute("aria-disabled", "true");
                 // Не используем disabled: такие поля не уходят в POST.
-                if (name === "registration_deadline") {
-                    input.value = "";
-                }
+                // Даты новой формы очищает сервер; существующий календарь не затираем.
             } else if (enabled && bracketDone) {
                 input.readOnly = true;
                 input.setAttribute("aria-disabled", "true");
@@ -297,12 +297,10 @@
 
     function init() {
         const formatSelect = getFormatSelect();
-        if (!formatSelect) {
-            return;
+        if (formatSelect) {
+            formatSelect.addEventListener("change", updateVisibility);
+            formatSelect.addEventListener("input", updateVisibility);
         }
-
-        formatSelect.addEventListener("change", updateVisibility);
-        formatSelect.addEventListener("input", updateVisibility);
         const variantSelect = getVariantSelect();
         if (variantSelect) {
             variantSelect.addEventListener("change", updateVariantVisibility);

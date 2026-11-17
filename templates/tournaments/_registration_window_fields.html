@@ -1,0 +1,26 @@
+{% if lifecycle_form.errors %}
+<div id="lifecycle-errors" class="alert alert-error mb-3" role="alert" tabindex="-1" autofocus aria-labelledby="lifecycle-errors-title">
+    <p id="lifecycle-errors-title"><strong>Не удалось сохранить календарь</strong></p>
+    <ul class="mb-0">
+        {% for error in lifecycle_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        {% for field in lifecycle_form %}
+            {% for error in field.errors %}<li><a href="#{{ field.id_for_label }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+<div class="d-flex flex-wrap align-items-end gap-3">
+    {% for field in lifecycle_form %}
+    <div>
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span>{% endif %}</label>
+        {{ field }}
+        {{ field.errors }}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+</div>
+<p class="text-secondary small mt-2 mb-0">
+    Дедлайн должен быть в будущем и не позже даты и времени начала.
+    Для однодневного турнира время обязательно. При переносе сохраняется продолжительность события.
+    Уже открытое окно постоплаты и история счетов не сбрасываются.
+</p>

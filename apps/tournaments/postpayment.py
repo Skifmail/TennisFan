@@ -1,4 +1,4 @@
-"""Сервис постоплаты для многодневных турниров."""
+"""Сервис постоплаты для турниров, проводимых дольше одного дня."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q, QuerySet
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,12 +20,23 @@ from apps.subscriptions.models import FancoinTransaction
 from apps.telegram_bot.notifications import send_to_user_by_user
 
 from .cancel import cancel_tournament
+from .entry_payment import (
+    active_onsite_payments,
+    get_paid_entry_user_ids,
+    has_onsite_payment,
+    has_received_entry_payment,
+)
 from .models import (
     Tournament,
+    TournamentOnsitePayment,
     TournamentPostpaymentCallLog,
     TournamentPostpaymentInvoice,
     TournamentRegistrationCoverage,
+    TournamentStatus,
 )
+
+if TYPE_CHECKING:
+    from apps.users.models import User
 
 PaymentStatusTone = Literal["success", "warning", "danger", "neutral"]
 
@@ -49,6 +60,7 @@ ADMIN_CONFIRMABLE_PAYMENT_STATUSES: frozenset[str] = frozenset(
         "Не оплатил (срок истёк)",
         "Инвойс отменён",
         "Без отметки оплаты",
+        "Взнос возвращён (₽)",
     }
 )
 
@@ -85,6 +97,7 @@ class ParticipantPaymentStatus:
     phone: str = ""
     called_at: datetime | None = None
     link_resent_at: datetime | None = None
+    onsite_payment_id: int | None = None
 
 
 def phone_to_tel_href(phone: str) -> str:
@@ -150,6 +163,7 @@ def participant_payment_status_tone(status: str) -> PaymentStatusTone:
         "Выдано администратором",
         "Оплачен взнос (₽)",
         "Оплачено постоплатой (₽)",
+        "Оплачено на корте (₽)",
     }
     danger_statuses = {
         "Ожидает оплату (₽)",
@@ -160,6 +174,8 @@ def participant_payment_status_tone(status: str) -> PaymentStatusTone:
         "Постоплата (окно не открыто)",
         "Инвойс отменён",
         "Без отметки оплаты",
+        "Ожидается оплата на корте (₽)",
+        "Взнос возвращён (₽)",
     }
     if status in success_statuses:
         return "success"
@@ -187,7 +203,7 @@ def tournament_allows_postpayment_registration(tournament: Tournament) -> bool:
     )
 
 
-def get_pending_postpayment_users(tournament: Tournament) -> list:
+def get_pending_postpayment_users(tournament: Tournament) -> list[User]:
     """Вернуть пользователей, которым нужно оплатить взнос.
 
     Args:
@@ -196,39 +212,44 @@ def get_pending_postpayment_users(tournament: Tournament) -> list:
     Returns:
         list: Список пользователей без оплаты и без покрытия лимитом.
     """
-    paid_user_ids = set(
-        tournament.entry_payments.values_list("user_id", flat=True).distinct()
-    )
-    paid_user_ids |= set(
-        tournament.postpayment_invoices.filter(
-            status=TournamentPostpaymentInvoice.Status.PAID
-        ).values_list("user_id", flat=True)
-    )
+    paid_user_ids = get_paid_entry_user_ids(tournament)
     covered_user_ids = set(
         tournament.registration_coverages.values_list("user_id", flat=True).distinct()
     )
-    required_exclude_ids = paid_user_ids | covered_user_ids
-    user_ids: set[int] = set(
-        int(uid)
-        for uid in tournament.participants.exclude(user_id__in=required_exclude_ids)
-        .values_list("user_id", flat=True)
-        .distinct()
+    onsite_user_ids = set(
+        active_onsite_payments(tournament).values_list("user_id", flat=True)
     )
-    if tournament.is_doubles():
-        team_user_ids = (
-            tournament.teams.filter(player2__isnull=False)
-            .values_list("player1__user_id", "player2__user_id")
-            .distinct()
-        )
-        for user_id_1, user_id_2 in team_user_ids:
-            if user_id_1 not in required_exclude_ids:
-                user_ids.add(int(user_id_1))
-            if user_id_2 not in required_exclude_ids:
-                user_ids.add(int(user_id_2))
-    from django.contrib.auth import get_user_model
+    required_exclude_ids = paid_user_ids | covered_user_ids | onsite_user_ids
+    return [
+        user
+        for user in _collect_tournament_participant_users(tournament)
+        if user.pk not in required_exclude_ids
+    ]
 
-    user_model = get_user_model()
-    return list(user_model.objects.filter(id__in=user_ids))
+
+def get_pending_postpayment_invoices(
+    tournament: Tournament | None = None,
+) -> QuerySet[TournamentPostpaymentInvoice]:
+    """Вернуть действующие онлайн-счета, исключив выбранную оплату на площадке.
+
+    Сопоставление делается по турниру и пользователю одновременно: выбор оплаты
+    на корте в одном турнире не отменяет долг того же игрока в другом.
+    Исторические строки счетов не меняются и не удаляются.
+    """
+    onsite = TournamentOnsitePayment.objects.filter(
+        tournament_id=OuterRef("tournament_id"),
+        user_id=OuterRef("user_id"),
+        status__in=[
+            TournamentOnsitePayment.Status.EXPECTED,
+            TournamentOnsitePayment.Status.RECEIVED,
+        ],
+    )
+    invoices = TournamentPostpaymentInvoice.objects.filter(
+        status=TournamentPostpaymentInvoice.Status.PENDING,
+    ).filter(~Exists(onsite))
+    if tournament is not None:
+        invoices = invoices.filter(tournament=tournament)
+    return cast(QuerySet[TournamentPostpaymentInvoice], invoices)
 
 
 def _can_pay_entry_with_fancoin(tournament: Tournament) -> bool:
@@ -252,7 +273,7 @@ def _can_pay_entry_with_fancoin(tournament: Tournament) -> bool:
     )
 
 
-def _user_already_settled_for_tournament(tournament: Tournament, user) -> bool:
+def _user_already_settled_for_tournament(tournament: Tournament, user: User) -> bool:
     """Проверить, закрыта ли оплата участия пользователя без постоплаты.
 
     Args:
@@ -264,17 +285,11 @@ def _user_already_settled_for_tournament(tournament: Tournament, user) -> bool:
     """
     if tournament.registration_coverages.filter(user=user).exists():
         return True
-    if tournament.entry_payments.filter(user=user).exists():
-        return True
-    return bool(
-        tournament.postpayment_invoices.filter(
-            user=user,
-            status=TournamentPostpaymentInvoice.Status.PAID,
-        ).exists()
-    )
+    return has_received_entry_payment(tournament, user)
 
 
-def try_cover_registration_with_fancoin(tournament: Tournament, user) -> bool:
+@transaction.atomic
+def try_cover_registration_with_fancoin(tournament: Tournament, user: User) -> bool:
     """Списать FT и отметить покрытие регистрации, если хватает баланса.
 
     Args:
@@ -284,6 +299,9 @@ def try_cover_registration_with_fancoin(tournament: Tournament, user) -> bool:
     Returns:
         bool: ``True``, если участие уже было или успешно покрыто FT.
     """
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+    if has_onsite_payment(tournament, user):
+        return False
     if _user_already_settled_for_tournament(tournament, user):
         return True
     if not _can_pay_entry_with_fancoin(tournament):
@@ -296,7 +314,10 @@ def try_cover_registration_with_fancoin(tournament: Tournament, user) -> bool:
         return False
     if not sub.spend_fancoin(
         TOURNAMENT_REGISTRATION_COST,
-        reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+        reason=cast(
+            FancoinTransaction.Reason,
+            FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
+        ),
         tournament=tournament,
     ):
         return False
@@ -404,7 +425,7 @@ def _send_fancoin_settled_notification(
 def try_settle_pending_users_with_fancoin(
     tournament: Tournament,
     *,
-    users: list | None = None,
+    users: list[User] | None = None,
 ) -> int:
     """Попытаться покрыть FT участников без оплаты взноса.
 
@@ -419,11 +440,12 @@ def try_settle_pending_users_with_fancoin(
         users = get_pending_postpayment_users(tournament)
     settled = 0
     for user in users:
+        if has_onsite_payment(tournament, user):
+            continue
         already_settled = _user_already_settled_for_tournament(tournament, user)
-        had_pending_invoice = tournament.postpayment_invoices.filter(
-            user=user,
-            status=TournamentPostpaymentInvoice.Status.PENDING,
-        ).exists()
+        had_pending_invoice = (
+            get_pending_postpayment_invoices(tournament).filter(user=user).exists()
+        )
         if try_cover_registration_with_fancoin(tournament, user):
             _cancel_pending_postpayment_invoice(tournament, user)
             if (
@@ -464,14 +486,10 @@ def tournament_needs_fancoin_settlement(tournament: Tournament) -> bool:
         return False
     if get_pending_postpayment_users(tournament):
         return True
-    return bool(
-        tournament.postpayment_invoices.filter(
-            status=TournamentPostpaymentInvoice.Status.PENDING,
-        ).exists()
-    )
+    return bool(get_pending_postpayment_invoices(tournament).exists())
 
 
-def _users_for_fancoin_settlement(tournament: Tournament) -> list:
+def _users_for_fancoin_settlement(tournament: Tournament) -> list[User]:
     """Собрать пользователей, для которых нужно попытаться списать FT.
 
     Args:
@@ -481,9 +499,7 @@ def _users_for_fancoin_settlement(tournament: Tournament) -> list:
         list: Уникальные пользователи с pending-инвойсом или без покрытия взноса.
     """
     pending_invoices = list(
-        tournament.postpayment_invoices.filter(
-            status=TournamentPostpaymentInvoice.Status.PENDING,
-        ).select_related("user")
+        get_pending_postpayment_invoices(tournament).select_related("user")
     )
     user_by_id = {invoice.user.pk: invoice.user for invoice in pending_invoices}
     for user in get_pending_postpayment_users(tournament):
@@ -498,10 +514,11 @@ def _collect_tournament_ids_for_fancoin_settlement() -> set[int]:
         set[int]: ID турниров с постоплатой и незакрытыми участниками.
     """
     tournament_ids: set[int] = set(
-        TournamentPostpaymentInvoice.objects.filter(
-            status=TournamentPostpaymentInvoice.Status.PENDING,
+        get_pending_postpayment_invoices()
+        .filter(
             tournament__allow_postpayment=True,
-        ).values_list("tournament_id", flat=True)
+        )
+        .values_list("tournament_id", flat=True)
     )
     tournament_ids |= set(
         Tournament.objects.filter(
@@ -520,7 +537,7 @@ def _collect_tournament_ids_for_fancoin_settlement() -> set[int]:
     return tournament_ids
 
 
-def try_settle_postpayment_for_user(user) -> int:
+def try_settle_postpayment_for_user(user: User) -> int:
     """Списать FT по постоплате для всех турниров пользователя при появлении баланса.
 
     Вызывается после пополнения FT (покупка подписки и т.п.), чтобы не ждать cron.
@@ -532,18 +549,24 @@ def try_settle_postpayment_for_user(user) -> int:
         int: Число турниров, где выполнено новое покрытие FT.
     """
     tournament_ids: set[int] = set(
-        TournamentPostpaymentInvoice.objects.filter(
+        get_pending_postpayment_invoices()
+        .filter(
             user=user,
-            status=TournamentPostpaymentInvoice.Status.PENDING,
             tournament__allow_postpayment=True,
-        ).values_list("tournament_id", flat=True)
+        )
+        .values_list("tournament_id", flat=True)
     )
     tournament_ids |= set(
         Tournament.objects.filter(
             allow_postpayment=True,
             bracket_generated=False,
-            participants__user=user,
-        ).values_list("pk", flat=True)
+        )
+        .filter(
+            Q(participants__user=user)
+            | Q(teams__player1__user=user)
+            | Q(teams__player2__user=user)
+        )
+        .values_list("pk", flat=True)
     )
     settled = 0
     for tournament in Tournament.objects.filter(pk__in=tournament_ids):
@@ -608,7 +631,7 @@ def mark_registration_covered(
 
 def admin_confirm_postpayment_participation(
     tournament: Tournament,
-    user,
+    user: User,
 ) -> bool:
     """Подтвердить участие администратором: покрытие + отмена инвойса.
 
@@ -619,6 +642,8 @@ def admin_confirm_postpayment_participation(
     Returns:
         bool: ``True``, если участие подтверждено (или уже было подтверждено).
     """
+    if has_onsite_payment(tournament, user):
+        return False
     if _user_already_settled_for_tournament(tournament, user):
         _cancel_pending_postpayment_invoice(tournament, user)
         return True
@@ -694,21 +719,18 @@ def sync_postpayment_invoices_deadline(tournament: Tournament) -> int:
     new_due_at = started_at + timedelta(hours=hours)
     now = timezone.now()
     updated = int(
-        TournamentPostpaymentInvoice.objects.filter(
-            tournament=tournament,
-            status=TournamentPostpaymentInvoice.Status.PENDING,
-        ).update(due_at=new_due_at)
+        get_pending_postpayment_invoices(tournament).update(due_at=new_due_at)
     )
     # Если окно снова в будущем — вернуть EXPIRED→PENDING участникам, ещё в турнире.
     if new_due_at > now:
+        participant_user_ids = {
+            user.pk for user in get_pending_postpayment_users(tournament)
+        }
         expired = TournamentPostpaymentInvoice.objects.filter(
             tournament=tournament,
             status=TournamentPostpaymentInvoice.Status.EXPIRED,
+            user_id__in=participant_user_ids,
         ).select_related("user")
-        participant_user_ids = {
-            int(uid)
-            for uid in tournament.participants.values_list("user_id", flat=True)
-        }
         reopen_ids: list[int] = []
         for invoice in expired:
             if invoice.user_id in participant_user_ids:
@@ -784,7 +806,7 @@ def _send_postpayment_opened_notification(
 
 def resend_postpayment_payment_link(
     tournament: Tournament,
-    user,
+    user: User,
 ) -> tuple[bool, str]:
     """Повторно отправить ссылку на оплату участнику с PENDING-инвойсом.
 
@@ -796,9 +818,9 @@ def resend_postpayment_payment_link(
         tuple[bool, str]: Успех и текст для сообщения администратору.
     """
     invoice = (
-        tournament.postpayment_invoices.filter(
+        get_pending_postpayment_invoices(tournament)
+        .filter(
             user=user,
-            status=TournamentPostpaymentInvoice.Status.PENDING,
         )
         .select_related("user")
         .first()
@@ -865,7 +887,7 @@ def resend_postpayment_payment_link(
     )
 
 
-def _collect_tournament_participant_users(tournament: Tournament) -> list:
+def _collect_tournament_participant_users(tournament: Tournament) -> list[User]:
     """Собрать пользователей всех зарегистрированных участников турнира.
 
     Args:
@@ -881,18 +903,21 @@ def _collect_tournament_participant_users(tournament: Tournament) -> list:
         for uid in tournament.participants.values_list("user_id", flat=True).distinct()
     )
     if tournament.is_doubles():
-        for user_id_1, user_id_2 in tournament.teams.filter(
-            player2__isnull=False
-        ).values_list("player1__user_id", "player2__user_id"):
+        for user_id_1, user_id_2 in tournament.teams.values_list(
+            "player1__user_id", "player2__user_id"
+        ):
             if user_id_1:
                 user_ids.add(int(user_id_1))
             if user_id_2:
                 user_ids.add(int(user_id_2))
     user_model = get_user_model()
-    return list(
-        user_model.objects.filter(id__in=user_ids)
-        .select_related("player")
-        .order_by("last_name", "first_name", "email")
+    return cast(
+        "list[User]",
+        list(
+            user_model.objects.filter(id__in=user_ids)
+            .select_related("player")
+            .order_by("last_name", "first_name", "email")
+        ),
     )
 
 
@@ -911,7 +936,14 @@ def build_participant_payment_statuses(
         row.user_id: row
         for row in tournament.registration_coverages.select_related("user")
     }
-    entry_paid_ids = set(tournament.entry_payments.values_list("user_id", flat=True))
+    paid_user_ids = get_paid_entry_user_ids(tournament)
+    entry_paid_ids = paid_user_ids & set(
+        tournament.entry_payments.values_list("user_id", flat=True)
+    )
+    onsite_payments = {
+        row.user_id: row
+        for row in active_onsite_payments(tournament).select_related("received_by")
+    }
     invoices = {
         row.user_id: row
         for row in tournament.postpayment_invoices.select_related("user")
@@ -940,6 +972,7 @@ def build_participant_payment_statuses(
         display_name = user.get_full_name() or user.email or f"ID {user.pk}"
         coverage = coverages.get(user.pk)
         invoice = invoices.get(user.pk)
+        onsite_payment = onsite_payments.get(user.pk)
         if coverage:
             status = coverage_labels.get(
                 coverage.coverage_type,
@@ -964,9 +997,39 @@ def build_participant_payment_statuses(
         elif user.pk in entry_paid_ids:
             status = "Оплачен взнос (₽)"
             details = "Запись TournamentEntryPayment"
+        elif onsite_payment is not None:
+            details_parts = [f"Сумма: {onsite_payment.amount} ₽"]
+            if onsite_payment.status == TournamentOnsitePayment.Status.RECEIVED:
+                status = "Оплачено на корте (₽)"
+                if onsite_payment.received_at is not None:
+                    details_parts.append(
+                        "получено: "
+                        f"{timezone.localtime(onsite_payment.received_at).strftime('%d.%m.%Y %H:%M')}"
+                    )
+                if onsite_payment.received_by is not None:
+                    details_parts.append(
+                        "подтвердил: "
+                        f"{onsite_payment.received_by.get_full_name() or onsite_payment.received_by.email}"
+                    )
+            else:
+                status = "Ожидается оплата на корте (₽)"
+                details_parts.append("получение денег ещё не подтверждено")
+            details = "; ".join(details_parts)
         elif invoice:
-            status = invoice_status_labels.get(invoice.status, invoice.status)
+            returned = (
+                invoice.status == TournamentPostpaymentInvoice.Status.PAID
+                and user.pk not in paid_user_ids
+            )
+            status = (
+                "Взнос возвращён (₽)"
+                if returned
+                else invoice_status_labels.get(invoice.status, invoice.status)
+            )
             details_parts = [f"Сумма: {invoice.amount} ₽"]
+            if returned:
+                details_parts.append(
+                    "возврат выполнен; прежняя оплата больше не действует"
+                )
             if invoice.due_at:
                 details_parts.append(
                     f"до {timezone.localtime(invoice.due_at).strftime('%d.%m.%Y %H:%M')}"
@@ -1015,6 +1078,9 @@ def build_participant_payment_statuses(
                 called_at=call_times.get(user.pk),
                 link_resent_at=(
                     invoice.payment_link_resent_at if invoice is not None else None
+                ),
+                onsite_payment_id=(
+                    onsite_payment.pk if onsite_payment is not None else None
                 ),
             )
         )
@@ -1111,13 +1177,14 @@ def send_1h_reminders() -> int:
     """
     now = timezone.now()
     one_hour_later = now + timedelta(hours=1)
-    invoices = TournamentPostpaymentInvoice.objects.select_related(
-        "tournament", "user"
-    ).filter(
-        status=TournamentPostpaymentInvoice.Status.PENDING,
-        reminder_1h_sent_at__isnull=True,
-        due_at__lte=one_hour_later,
-        due_at__gte=now,
+    invoices = (
+        get_pending_postpayment_invoices()
+        .select_related("tournament", "user")
+        .filter(
+            reminder_1h_sent_at__isnull=True,
+            due_at__lte=one_hour_later,
+            due_at__gte=now,
+        )
     )
     total = 0
     for invoice in invoices:
@@ -1163,6 +1230,7 @@ def send_1h_reminders() -> int:
     return total
 
 
+@transaction.atomic
 def _remove_unpaid_players(tournament: Tournament) -> int:
     """Удалить неоплативших игроков из турнира.
 
@@ -1172,10 +1240,11 @@ def _remove_unpaid_players(tournament: Tournament) -> int:
     Returns:
         int: Количество удалённых пользователей.
     """
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
     now = timezone.now()
-    expired = TournamentPostpaymentInvoice.objects.filter(
-        tournament=tournament,
-        status=TournamentPostpaymentInvoice.Status.PENDING,
+    unpaid_user_ids = [user.pk for user in get_pending_postpayment_users(tournament)]
+    expired = get_pending_postpayment_invoices(tournament).filter(
+        user_id__in=unpaid_user_ids,
         due_at__lte=now,
     )
     removed_user_ids = list(expired.values_list("user_id", flat=True))
@@ -1186,10 +1255,26 @@ def _remove_unpaid_players(tournament: Tournament) -> int:
         *tournament.participants.filter(user_id__in=removed_user_ids)
     )
     if tournament.is_doubles():
-        tournament.teams.filter(
-            Q(player1__user_id__in=removed_user_ids)
-            | Q(player2__user_id__in=removed_user_ids)
-        ).delete()
+        teams = (
+            tournament.teams.select_for_update()
+            .filter(
+                Q(player1__user_id__in=removed_user_ids)
+                | Q(player2__user_id__in=removed_user_ids)
+            )
+            .select_related("player1", "player2")
+        )
+        for team in teams:
+            remaining_players = [
+                player
+                for player in (team.player1, team.player2)
+                if player is not None and player.user_id not in removed_user_ids
+            ]
+            if remaining_players:
+                team.player1 = remaining_players[0]
+                team.player2 = None
+                team.save(update_fields=["player1", "player2"])
+            else:
+                team.delete()
     from django.contrib.auth import get_user_model
 
     user_model = get_user_model()
@@ -1203,6 +1288,7 @@ def _remove_unpaid_players(tournament: Tournament) -> int:
 
 
 def _generate_after_postpayment(tournament: Tournament) -> tuple[bool, str]:
+    """Запустить общий сценарий формирования структуры после проверки оплаты."""
     from .views import _tournament_manual_generate
 
     ok, msg, _ = _tournament_manual_generate(tournament)
@@ -1213,6 +1299,9 @@ def _generate_after_postpayment(tournament: Tournament) -> tuple[bool, str]:
 def finalize_postpayment_window(tournament: Tournament) -> tuple[bool, str]:
     """Завершить окно постоплаты и сформировать сетку.
 
+    Участники бесплатного турнира без выставленного счёта не создают долг.
+    Уже выставленные неоплаченные счета сохраняют силу при обнулении взноса.
+
     Args:
         tournament (Tournament): Турнир.
 
@@ -1220,8 +1309,12 @@ def finalize_postpayment_window(tournament: Tournament) -> tuple[bool, str]:
         tuple[bool, str]: Результат выполнения (успех, сообщение).
     """
     tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+    if tournament.status in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED):
+        return False, "Завершённый или отменённый турнир нельзя запустить."
     if tournament.bracket_generated and tournament_has_generated_matches(tournament):
         return True, "Сетка уже сформирована."
+    if tournament.postpayment_window_started_at is None:
+        return False, "Окно постоплаты ещё не открыто."
     if tournament.bracket_generated and not tournament_has_generated_matches(
         tournament
     ):
@@ -1234,6 +1327,16 @@ def finalize_postpayment_window(tournament: Tournament) -> tuple[bool, str]:
         tournament.bracket_generated = False
         tournament.save(update_fields=["bracket_generated", "updated_at"])
     _remove_unpaid_players(tournament)
+    pending_users = get_pending_postpayment_users(tournament)
+    if pending_users and (
+        (tournament.entry_fee or 0) > 0
+        or get_pending_postpayment_invoices(tournament)
+        .filter(
+            user_id__in=[user.pk for user in pending_users],
+        )
+        .exists()
+    ):
+        return False, "Окно постоплаты ещё не завершено: участники ожидают оплату."
     if tournament.is_doubles():
         current_count = tournament.full_teams_count()
         min_required = tournament.min_teams
@@ -1264,13 +1367,10 @@ def get_postpayment_progress(tournament: Tournament) -> dict[str, int | bool]:
     stats = tournament.postpayment_invoices.aggregate(
         total=Count("id"),
         paid=Count("id", filter=Q(status=TournamentPostpaymentInvoice.Status.PAID)),
-        pending=Count(
-            "id", filter=Q(status=TournamentPostpaymentInvoice.Status.PENDING)
-        ),
     )
     total = int(stats["total"] or 0)
     paid = int(stats["paid"] or 0)
-    pending = int(stats["pending"] or 0)
+    pending = get_pending_postpayment_invoices(tournament).count()
     return {
         "total": total,
         "paid": paid,

@@ -207,6 +207,7 @@ class RegistrationEntryPointTestCase(TestCase):
         self.assertEqual(response.url, self.register_url)
 
     def test_unverified_player_is_not_bounced_to_profile(self) -> None:
+        """Полный профиль без ручной верификации проходит подтверждение на POST."""
         user = User.objects.create_user(
             email="funnel-unverified@test.local",
             password="testpass123",
@@ -224,8 +225,20 @@ class RegistrationEntryPointTestCase(TestCase):
 
         response = self.client.get(self.register_url, secure=True)
 
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "tournaments/register.html")
+        self.assertFalse(self.tournament.participants.filter(user=user).exists())
+        self.assertFalse(self.tournament.registration_coverages.exists())
+        self.assertFalse(self.tournament.entry_payments.exists())
+        self.assertFalse(self.tournament.onsite_payments.exists())
+
+        response = self.client.post(
+            self.register_url, {"payment_method": "free"}, secure=True
+        )
+
         self.assertEqual(response.status_code, 302)
         self.assertNotEqual(response.url, reverse("profile_edit"))
+        self.assertTrue(self.tournament.participants.filter(user=user).exists())
 
 
 class PendingStartDateTestCase(TestCase):

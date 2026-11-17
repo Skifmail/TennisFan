@@ -79,6 +79,32 @@
     </header>
 
     {% include "tournaments/_postpayment_status_banner.html" %}
+    {% if onsite_payments %}
+    <section class="card manage-card mb-4" aria-labelledby="onsite-payments-title">
+        <div class="card-body">
+            <h2 id="onsite-payments-title" class="section-title mb-3">Взносы на корте</h2>
+            <p class="text-secondary mb-3">Выбор оплаты на корте — не факт оплаты. Подтверждайте получение только после передачи денег. История отменённых ожиданий и полученных взносов сохраняется.</p>
+            <div class="d-flex flex-column gap-3">
+                {% for payment in onsite_payments %}
+                <div class="p-3" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow-wrap: anywhere;">
+                    <strong>{{ payment.user.get_full_name|default:payment.user.email }}</strong> — {{ payment.amount }} ₽
+                    <p class="mb-2">{{ payment.get_status_display }}</p>
+                    {% if payment.received_at %}
+                    <p class="text-secondary mb-0">Получено {{ payment.received_at|date:"d.m.Y H:i" }}{% if payment.received_by %}, подтвердил: {{ payment.received_by.get_full_name|default:payment.received_by.email }}{% endif %}.{% if payment.refund_request %} Создана заявка на ручной возврат — деньги не отмечены возвращёнными.{% endif %}</p>
+                    {% elif payment.status == 'expected' and tournament.status != 'cancelled' %}
+                    <form method="post" action="{% url 'tournament_manage_confirm_onsite_payment' slug=tournament.slug payment_id=payment.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline">Деньги получены: {{ payment.amount }} ₽</button>
+                    </form>
+                    {% else %}
+                    <p class="text-secondary mb-0">Ожидание закрыто {{ payment.closed_at|date:"d.m.Y H:i" }}.</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
 
     <!-- Секция 1: Статус и действия -->
@@ -202,39 +228,17 @@
             {% endif %}
             {% if can_reopen_tournament %}
             <div class="alert alert-error mb-3">
-                Турнир отменён. Укажите новую дату начала и дедлайн, чтобы возобновить набор.
+                Турнир отменён. Укажите новую дату, время начала и дедлайн, чтобы возобновить набор.
                 Участники сохранятся; FT будут списаны снова при наличии баланса.
             </div>
             <form action="{% url 'tournament_manage_reopen' slug=tournament.slug %}" method="post" class="manage-lifecycle-form">
                 {% csrf_token %}
-                <div class="d-flex flex-wrap align-items-end gap-3">
-                    <div>
-                        <label class="form-label" for="reopen-start">Дата начала</label>
-                        <input type="date" name="start_date" id="reopen-start" class="form-control" required>
-                    </div>
-                    <div>
-                        <label class="form-label" for="reopen-deadline">Дедлайн регистрации</label>
-                        <input type="datetime-local" name="registration_deadline" id="reopen-deadline" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Возобновить набор</button>
-                </div>
-                <p class="text-secondary small mt-2 mb-0">Дедлайн не может быть позже даты начала и должен быть в будущем.</p>
+                {% include "tournaments/_registration_window_fields.html" with submit_label="Возобновить набор" %}
             </form>
             {% elif can_extend_registration %}
             <form action="{% url 'tournament_manage_extend_registration' slug=tournament.slug %}" method="post" class="manage-lifecycle-form">
                 {% csrf_token %}
-                <div class="d-flex flex-wrap align-items-end gap-3">
-                    <div>
-                        <label class="form-label" for="extend-deadline">Новый дедлайн регистрации</label>
-                        <input type="datetime-local" name="registration_deadline" id="extend-deadline" class="form-control" required>
-                    </div>
-                    <div>
-                        <label class="form-label" for="extend-start">Дата начала (если нужно сдвинуть)</label>
-                        <input type="date" name="start_date" id="extend-start" class="form-control" value="{{ tournament.start_date|date:'Y-m-d' }}">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Продлить регистрацию</button>
-                </div>
-                <p class="text-secondary small mt-2 mb-0">Если старт уже прошёл или близок, сдвиньте и дату начала — иначе дедлайн не сохранится.</p>
+                {% include "tournaments/_registration_window_fields.html" with submit_label="Продлить регистрацию" %}
             </form>
             {% endif %}
         </div>
@@ -708,6 +712,20 @@
 </style>
 {% block extra_js %}
 <script defer src="{% static 'js/export-download.js' %}"></script>
+<script>
+(function() {
+    var summary = document.getElementById('lifecycle-errors');
+    if (!summary) return;
+    summary.querySelectorAll('a[href^="#"]').forEach(function(link) {
+        link.addEventListener('click', function(event) {
+            var field = document.getElementById(link.hash.slice(1));
+            if (!field) return;
+            event.preventDefault();
+            field.focus();
+        });
+    });
+})();
+</script>
 <script>
 (function() {
     var menus = Array.prototype.slice.call(document.querySelectorAll('[data-export-menu]'));

@@ -3,9 +3,10 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.tournaments.models import Tournament, TournamentPostpaymentInvoice
+from apps.tournaments.models import Tournament
 from apps.tournaments.postpayment import (
     finalize_postpayment_window,
+    get_pending_postpayment_invoices,
     get_postpayment_progress,
     send_1h_reminders,
     settle_postpayment_with_available_fancoin,
@@ -43,11 +44,13 @@ class Command(BaseCommand):
             sync_postpayment_invoices_deadline(tournament)
             progress = get_postpayment_progress(tournament)
             is_completed = bool(progress["completed"])
-            has_expired_pending = TournamentPostpaymentInvoice.objects.filter(
-                tournament=tournament,
-                status=TournamentPostpaymentInvoice.Status.PENDING,
-                due_at__lte=now,
-            ).exists()
+            has_expired_pending = (
+                get_pending_postpayment_invoices(tournament)
+                .filter(
+                    due_at__lte=now,
+                )
+                .exists()
+            )
             if is_completed or has_expired_pending:
                 finalize_postpayment_window(tournament)
                 processed += 1

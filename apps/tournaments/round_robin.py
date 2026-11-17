@@ -3,15 +3,14 @@
 """
 
 import logging
-from datetime import timedelta
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 from django.db.models import Q
 
 from apps.users.models import Player
 
 from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
-from .utils import tournament_deadline_schedule_start
+from .utils import tournament_match_deadline_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +30,20 @@ def _round_robin_points_for_place(tournament: Tournament, place: int) -> int:
 
 ROUND_ROBIN_FORMAT = "round_robin"
 BYE_EMAIL = "bye@tennisfan.local"
+
+
+class _RoundRobinStats(TypedDict):
+    """Состав участника и числовая статистика строки кругового турнира."""
+
+    player: Player | None
+    team: TournamentTeam | None
+    matches: int
+    wins: int
+    losses: int
+    sets_won: int
+    sets_lost: int
+    games_won: int
+    games_lost: int
 
 
 def _is_round_robin(t: Tournament) -> bool:
@@ -98,6 +111,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
                 removed,
                 tournament.slug,
             )
+    entities: list[Player] | list[TournamentTeam]
     if is_doubles:
         entities = list(
             tournament.teams.filter(player2__isnull=False)
@@ -128,9 +142,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         )
 
     schedule = _circle_schedule(entities)
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
 
     created = 0
     for round_idx, round_pairs in enumerate(schedule, 1):
@@ -251,6 +263,7 @@ def compute_standings(tournament: Tournament) -> list[dict]:
     Поддерживает одиночные и парные турниры.
     """
     is_doubles = tournament.is_doubles()
+    entities: list[Player] | list[TournamentTeam]
     if is_doubles:
         entities = list(
             tournament.teams.filter(player2__isnull=False)
@@ -267,13 +280,13 @@ def compute_standings(tournament: Tournament) -> list[dict]:
         status__in=[Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER],
     ).select_related("player1", "player2", "winner", "team1", "team2", "winner_team")
 
-    stats = {}
+    stats: dict[int, _RoundRobinStats] = {}
     for e in entities:
         if is_doubles:
-            if getattr(e.player1, "is_bye", False):
+            if getattr(cast(TournamentTeam, e).player1, "is_bye", False):
                 continue
             stats[e.id] = {
-                "team": e,
+                "team": cast(TournamentTeam, e),
                 "player": None,
                 "matches": 0,
                 "wins": 0,
@@ -287,7 +300,7 @@ def compute_standings(tournament: Tournament) -> list[dict]:
             if getattr(e, "is_bye", False):
                 continue
             stats[e.id] = {
-                "player": e,
+                "player": cast(Player, e),
                 "team": None,
                 "matches": 0,
                 "wins": 0,
@@ -387,7 +400,7 @@ def compute_standings(tournament: Tournament) -> list[dict]:
                     return 1 if m.winner_id == e1_id else -1
         return 0
 
-    def entity_id(row: dict) -> int | None:
+    def entity_id(row: _RoundRobinStats) -> int | None:
         t, p = row.get("team"), row.get("player")
         if t is not None and t.id is not None:
             return int(t.id)
@@ -395,7 +408,7 @@ def compute_standings(tournament: Tournament) -> list[dict]:
             return int(p.id)
         return None
 
-    def sort_key(row: dict) -> tuple[int, int, int, int, int, int]:
+    def sort_key(row: _RoundRobinStats) -> tuple[int, int, int, int, int, int]:
         eid = entity_id(row)
         if eid is None:
             return (0, 0, 0, 0, 0, 0)
@@ -442,6 +455,7 @@ def get_match_matrix(tournament: Tournament) -> tuple[list, list]:
     matrix_rows[i][j] = {"win": 0|1, "games": "X/Y"} с точки зрения участника i против j.
     """
     is_doubles = tournament.is_doubles()
+    participants: list[Player] | list[TournamentTeam]
     if is_doubles:
         participants = list(
             tournament.teams.filter(player2__isnull=False)
@@ -581,13 +595,13 @@ def compute_standings_for_entities(
         if m.status in (Match.MatchStatus.COMPLETED, Match.MatchStatus.WALKOVER)
         and (m.winner_id or m.winner_team_id or m.is_mutual_no_show_walkover())
     ]
-    stats: dict[int, Any] = {}
+    stats: dict[int, _RoundRobinStats] = {}
     for e in entities:
         if is_doubles:
             if getattr(getattr(e, "player1", None), "is_bye", False):
                 continue
             stats[e.id] = {
-                "team": e,
+                "team": cast(TournamentTeam, e),
                 "player": None,
                 "matches": 0,
                 "wins": 0,
@@ -601,7 +615,7 @@ def compute_standings_for_entities(
             if getattr(e, "is_bye", False):
                 continue
             stats[e.id] = {
-                "player": e,
+                "player": cast(Player, e),
                 "team": None,
                 "matches": 0,
                 "wins": 0,
@@ -701,7 +715,7 @@ def compute_standings_for_entities(
                     return 1 if m.winner_id == e1_id else -1
         return 0
 
-    def entity_id(row: dict) -> int | None:
+    def entity_id(row: _RoundRobinStats) -> int | None:
         t, p = row.get("team"), row.get("player")
         if t is not None and t.id is not None:
             return int(t.id)
@@ -709,7 +723,7 @@ def compute_standings_for_entities(
             return int(p.id)
         return None
 
-    def sort_key(row: dict) -> tuple[int, int, int, int, int, int]:
+    def sort_key(row: _RoundRobinStats) -> tuple[int, int, int, int, int, int]:
         eid = entity_id(row)
         if eid is None:
             return (0, 0, 0, 0, 0, 0)
@@ -782,6 +796,8 @@ def get_match_matrix_for_entities(
             i = pid_to_idx.get(m.team1_id)
             j = pid_to_idx.get(m.team2_id)
         else:
+            if m.player1_id is None or m.player2_id is None:
+                continue
             if getattr(m.player1, "is_bye", False) or getattr(
                 m.player2, "is_bye", False
             ):

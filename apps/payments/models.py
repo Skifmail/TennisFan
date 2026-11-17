@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -172,6 +176,9 @@ class PaymentRecord(models.Model):
     платежа или после успешного рекуррентного списания.
     """
 
+    if TYPE_CHECKING:
+        user_id: int
+
     class PaymentType(models.TextChoices):
         """Типы оплат, фиксируемые в журнале."""
 
@@ -204,7 +211,7 @@ class PaymentRecord(models.Model):
         max_length=255,
         blank=True,
     )
-    amount = models.DecimalField(
+    amount: models.DecimalField[Decimal, Decimal] = models.DecimalField(
         "Сумма",
         max_digits=10,
         decimal_places=2,
@@ -240,7 +247,7 @@ class PaymentRecord(models.Model):
         default=dict,
         blank=True,
     )
-    paid_at = models.DateTimeField(
+    paid_at: models.DateTimeField[datetime, datetime] = models.DateTimeField(
         "Дата оплаты",
         default=timezone.now,
         db_index=True,

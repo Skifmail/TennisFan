@@ -5,7 +5,6 @@
 
 import logging
 import math
-from datetime import timedelta
 from typing import cast
 
 from django.utils import timezone
@@ -17,7 +16,7 @@ from .fan import (
     _get_bye_player,
 )
 from .models import Match, Tournament, TournamentPlayerResult, TournamentTeam
-from .utils import tournament_deadline_schedule_start
+from .utils import tournament_match_deadline_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -199,9 +198,7 @@ def create_consolation_bracket_for_round(
         round_index, _count_main_participants(tournament)
     )
 
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
     base = start + delta * (round_index + 1)
     round_label = f"Места {place_min}–{place_max}"
     existing = tournament.matches.filter(
@@ -361,7 +358,7 @@ def advance_winner_olympic(match: Match, skip_points: bool = False) -> Match | N
     t = match.tournament
     if not _is_olympic(t):
         return None
-    is_doubles = t.is_doubles() and match.team1_id and match.team2_id
+    is_doubles = bool(t.is_doubles() and match.team1_id and match.team2_id)
     winner_team = getattr(match, "winner_team", None)
     winner = match.winner
     if not winner and not winner_team:

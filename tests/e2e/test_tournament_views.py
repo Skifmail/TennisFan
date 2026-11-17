@@ -87,7 +87,9 @@ class TournamentListCardStateTestCase(TestCase):
             email="list-user@test.local",
             password="testpass123",
         )
-        self.player = Player.objects.create(user=self.user, skill_level="amateur")
+        self.player = Player.objects.create(
+            user=self.user, skill_level="amateur", gender="male"
+        )
         self.opponent = Player.objects.create(
             user=User.objects.create_user(
                 email="list-opponent@test.local",

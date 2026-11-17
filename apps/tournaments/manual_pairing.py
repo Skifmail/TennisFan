@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime
 from typing import cast
 
 from django.db import transaction
@@ -28,7 +28,7 @@ from .models import (
     TournamentStatus,
     TournamentTeam,
 )
-from .utils import tournament_deadline_schedule_start
+from .utils import tournament_match_deadline_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -403,7 +403,7 @@ def _round_label(tournament: Tournament, round_index: int, pairs_count: int) -> 
     return f"{round_index} круг"
 
 
-def _deadline(tournament: Tournament, round_index: int):
+def _deadline(tournament: Tournament, round_index: int) -> datetime:
     """Дедлайн матчей круга.
 
     Args:
@@ -413,9 +413,8 @@ def _deadline(tournament: Tournament, round_index: int):
     Returns:
         datetime: Дедлайн.
     """
-    start = tournament_deadline_schedule_start(tournament)
-    days = int(getattr(tournament, "match_days_per_round", 7) or 7)
-    return start + timedelta(days=days) * round_index
+    start, delta = tournament_match_deadline_schedule(tournament)
+    return start + delta * round_index
 
 
 def _assign_match_side(

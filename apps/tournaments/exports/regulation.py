@@ -415,17 +415,20 @@ def _hours_label(hours: int) -> str:
 
 def _dates_label(tournament: Tournament) -> str:
     """Сроки: явные даты или запуск по набору."""
+    time_label = (
+        f", начало в {tournament.start_time.strftime('%H:%M')}"
+        if tournament.start_time is not None
+        else ""
+    )
+    if tournament.start_date_is_pending:
+        return f"Старт после набора состава{time_label}"
     if tournament.start_after_fill and tournament.start_date is None:
-        return "Старт после набора состава"
+        return f"Старт после набора состава{time_label}"
     start = _fmt_date(tournament.start_date)
     end = _fmt_date(tournament.end_date)
-    if tournament.start_after_fill:
-        if start:
-            return f"Старт после набора состава (ориентир: {start})"
-        return "Старт после набора состава"
-    if start and end:
-        return f"{start} — {end}"
-    return start or "Не указаны"
+    if start and end and tournament.start_date != tournament.end_date:
+        return f"{start} — {end}{time_label}"
+    return f"{start or 'Не указаны'}{time_label}"
 
 
 def _place_label(tournament: Tournament) -> str:

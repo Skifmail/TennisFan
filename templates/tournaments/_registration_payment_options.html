@@ -1,0 +1,22 @@
+<fieldset class="mb-3">
+    <legend class="h5 mb-2">{{ payment_legend|default:"Способ оплаты взноса" }}</legend>
+    {% if payment_options|length == 1 %}
+        {% for option in payment_options %}
+        <input type="hidden" name="{{ payment_field|default:'payment_method' }}" value="{{ option.value }}">
+        <p class="mb-1"><strong>{{ option.label }}</strong></p>
+        <p class="text-secondary mb-0">{{ option.description }}</p>
+        {% endfor %}
+    {% else %}
+        <div class="d-flex flex-column gap-2">
+            {% for option in payment_options %}
+            <label class="d-flex gap-2 p-3" style="background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer;">
+                <input type="radio" name="{{ payment_field|default:'payment_method' }}" value="{{ option.value }}" required {% if selected_payment_method == option.value %}checked{% endif %}>
+                <span>
+                    <strong>{{ option.label }}</strong>
+                    <span class="d-block text-secondary">{{ option.description }}</span>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+    {% endif %}
+</fieldset>

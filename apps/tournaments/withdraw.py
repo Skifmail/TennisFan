@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import logging
-import secrets
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -25,10 +24,14 @@ from apps.subscriptions.models import FancoinTransaction
 from apps.telegram_bot.notifications import send_to_user_by_user
 from apps.users.models import Player
 
+from .entry_payment import (
+    cancel_pending_entry_invoice,
+    close_expected_onsite_payments,
+    create_entry_refund_request,
+)
 from .models import (
     Match,
     Tournament,
-    TournamentEntryPayment,
     TournamentEntryRefundRequest,
     TournamentRegistrationCoverage,
     TournamentStatus,
@@ -38,6 +41,8 @@ from .models import (
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
+
+    from apps.users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -217,24 +222,11 @@ def _restore_club_plan_slot(user, tournament: Tournament) -> bool:
 
 
 def _create_entry_refund_request(
-    user, tournament: Tournament
+    user: User, tournament: Tournament
 ) -> TournamentEntryRefundRequest | None:
     """Создать заявку на возврат ₽-взноса, если он был оплачен."""
-    entry_fee = getattr(tournament, "entry_fee", None) or 0
-    if not entry_fee or float(entry_fee) <= 0:
-        return None
-    if not TournamentEntryPayment.objects.filter(
-        tournament=tournament, user=user
-    ).exists():
-        return None
-    refund_ref = "REF-" + secrets.token_urlsafe(8).upper()[:10]
-    while TournamentEntryRefundRequest.objects.filter(refund_ref=refund_ref).exists():
-        refund_ref = "REF-" + secrets.token_urlsafe(8).upper()[:10]
-    refund: TournamentEntryRefundRequest = TournamentEntryRefundRequest.objects.create(
-        tournament=tournament,
-        user=user,
-        amount=entry_fee,
-        refund_ref=refund_ref,
+    refund: TournamentEntryRefundRequest | None = create_entry_refund_request(
+        tournament, user
     )
     return refund
 
@@ -647,7 +639,7 @@ def _notify_opponents(
 
 
 def _process_user_refunds(
-    user,
+    user: User,
     tournament: Tournament,
     *,
     finished_count: int,
@@ -657,6 +649,8 @@ def _process_user_refunds(
     Returns:
         tuple: (fancoin_refunded, entry_refund_request_or_none).
     """
+    close_expected_onsite_payments(tournament, user=user, reason="withdrawn")
+    cancel_pending_entry_invoice(tournament, user)
     if finished_count > 0:
         return False, None
 
@@ -753,6 +747,7 @@ def withdraw_participant(
     Returns:
         tuple[bool, str]: Успех и сообщение для UI.
     """
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
     if not _is_round_robin(tournament):
         return False, "Снятие после старта доступно только для кругового турнира."
     if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):

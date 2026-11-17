@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 import logging
 import secrets
 from decimal import Decimal
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -10,19 +12,33 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.decorators import login_required
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from loguru import logger as payment_log
 
 from apps.core.models import LegalAcceptanceLog
 from apps.legal.utils import get_legal_document_version
 from apps.subscriptions.models import SubscriptionTier
+from apps.tournaments.entry_payment import (
+    cancel_pending_entry_invoice,
+    close_expected_onsite_payments,
+    get_registration_closed_reason,
+    get_tournament_entry_amount,
+    has_onsite_payment,
+    has_received_entry_payment,
+    user_is_registered,
+)
 from apps.tournaments.models import Tournament, TournamentPostpaymentInvoice
-from apps.tournaments.postpayment import finalize_postpayment_window
+from apps.tournaments.postpayment import (
+    finalize_postpayment_window,
+    get_pending_postpayment_invoices,
+)
+from apps.users.models import User
 
 from .forms import DonateForm
 from .models import PaymentRecord, SavedPaymentMethod
@@ -32,6 +48,9 @@ from .yookassa_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from apps.clubs.models import ClubMemberBalanceTransaction
 
 
 def _get_request_ip(request: HttpRequest) -> str | None:
@@ -140,22 +159,66 @@ def _get_discounted_tournament_entry_fee(
     request: HttpRequest,
     tournament: Tournament,
 ) -> Decimal:
-    entry_fee: Decimal = tournament.entry_fee or Decimal("0")
-    if tournament.club_id:
-        return entry_fee
-    if (
-        request.user.is_authenticated
-        and hasattr(request.user, "subscription")
-        and request.user.subscription.is_valid()
-    ):
-        discount_percent = request.user.subscription.tier.one_day_tournament_discount
-        if discount_percent > 0:
-            discount = entry_fee * (Decimal(discount_percent) / 100)
-            entry_fee = entry_fee - discount
-    return entry_fee
+    """Рассчитать ту же сумму взноса, что и при выборе оплаты на площадке."""
+    if request.user.is_authenticated:
+        return get_tournament_entry_amount(tournament, cast(User, request.user))
+    return Decimal(tournament.entry_fee or 0)
 
 
-def _get_balance_transaction_by_id(transaction_id_raw: str):
+def _tournament_payment_unavailable_reason(
+    tournament: Tournament,
+    user: User,
+    invoice: TournamentPostpaymentInvoice | None,
+) -> str | None:
+    """Проверить допустимость нового платежа до резервирования денег и обращения в шлюз."""
+    if tournament.status in ("cancelled", "completed"):
+        return "Оплата недоступна: турнир отменён или завершён."
+    if has_received_entry_payment(tournament, user):
+        return "Взнос уже оплачен. Повторная оплата не нужна."
+    if tournament.registration_coverages.filter(user=user).exists():
+        return "Участие уже покрыто тарифом или FT. Повторная оплата не нужна."
+    if invoice is not None:
+        now = timezone.now()
+        started_at = tournament.postpayment_window_started_at
+        ends_at = tournament.get_postpayment_window_ends_at()
+        if (
+            not tournament.allow_postpayment
+            or tournament.is_one_day
+            or tournament.bracket_generated
+            or started_at is None
+            or started_at > now
+            or ends_at is None
+            or ends_at <= now
+        ):
+            return "Окно постоплаты ещё не открыто или уже завершено."
+        if (
+            invoice.tournament_id != tournament.pk
+            or invoice.user_id != user.pk
+            or not user_is_registered(tournament, user)
+        ):
+            return "Счёт недействителен: участник не зарегистрирован в этом турнире."
+        if has_onsite_payment(tournament, user):
+            return "Вы выбрали оплату на корте. Онлайн-счёт постоплаты больше не действует."
+        if (
+            invoice.status != TournamentPostpaymentInvoice.Status.PENDING
+            or invoice.due_at <= now
+        ):
+            return "Срок этого счёта истёк или счёт уже закрыт."
+        return None
+    if tournament.allow_postpayment and not tournament.is_one_day:
+        return (
+            "Постоплата доступна только по счёту после открытия её окна. "
+            "До этого платить не нужно."
+        )
+    if not user_is_registered(tournament, user):
+        return get_registration_closed_reason(tournament)
+    return None
+
+
+def _get_balance_transaction_by_id(
+    transaction_id_raw: str,
+) -> ClubMemberBalanceTransaction | None:
+    """Найти и заблокировать финансовую операцию внутри транзакции финализации."""
     try:
         transaction_id = int(str(transaction_id_raw or "").strip())
     except (TypeError, ValueError):
@@ -166,7 +229,52 @@ def _get_balance_transaction_by_id(transaction_id_raw: str):
 
     from apps.clubs.models import ClubMemberBalanceTransaction
 
-    return ClubMemberBalanceTransaction.objects.filter(pk=transaction_id).first()
+    return cast(
+        ClubMemberBalanceTransaction | None,
+        ClubMemberBalanceTransaction.objects.select_for_update()
+        .select_related("member")
+        .filter(pk=transaction_id)
+        .first(),
+    )
+
+
+def _confirm_tournament_balance_payment(
+    record: PaymentRecord, tournament: Tournament
+) -> None:
+    """Подтвердить только принадлежащий этому пользователю и турниру резерв баланса."""
+    from apps.clubs.finance_services import confirm_reserved_balance
+    from apps.clubs.models import ClubMemberBalanceTransaction
+
+    metadata = record.metadata or {}
+    transaction_id_raw = str(metadata.get("balance_transaction_id") or "")
+    try:
+        balance_amount = Decimal(str(metadata.get("balance_amount") or "0"))
+    except (ArithmeticError, ValueError) as exc:
+        raise ValueError("Некорректная сумма резерва клубного баланса.") from exc
+    if not balance_amount.is_finite() or balance_amount < 0:
+        raise ValueError("Некорректная сумма резерва клубного баланса.")
+    if not transaction_id_raw and balance_amount == 0:
+        return
+    reserved = _get_balance_transaction_by_id(transaction_id_raw)
+    if (
+        reserved is None
+        or not tournament.club_id
+        or reserved.club_id != tournament.club_id
+        or reserved.member.club_id != tournament.club_id
+        or reserved.member.user_id != record.user_id
+        or reserved.direction != ClubMemberBalanceTransaction.Direction.DEBIT
+        or reserved.source != ClubMemberBalanceTransaction.Source.TOURNAMENT_PAYMENT
+        or reserved.reference != f"tournament:{tournament.pk}"
+        or reserved.amount != balance_amount
+        or balance_amount <= 0
+        or reserved.status
+        not in (
+            ClubMemberBalanceTransaction.Status.PENDING,
+            ClubMemberBalanceTransaction.Status.COMPLETED,
+        )
+    ):
+        raise ValueError("Платежу не принадлежит действующий резерв клубного баланса.")
+    confirm_reserved_balance(reserved)
 
 
 def _log_offer_acceptance(
@@ -454,6 +562,13 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
             if invoice.status != TournamentPostpaymentInvoice.Status.PENDING:
                 messages.error(request, "Этот инвойс постоплаты недоступен для оплаты.")
                 return redirect("tournament_detail", slug=tournament.slug)
+        payment_user = invoice.user if invoice is not None else cast(User, request.user)
+        unavailable_reason = _tournament_payment_unavailable_reason(
+            tournament, payment_user, invoice
+        )
+        if unavailable_reason:
+            messages.info(request, unavailable_reason)
+            return redirect("tournament_detail", slug=tournament.slug)
         next_url = request.GET.get("next", "").strip()
         tournament_member = _get_tournament_club_member(request.user, tournament)
 
@@ -493,10 +608,15 @@ def payment_preview(request: HttpRequest) -> HttpResponse:
 
         # Calculate price (handle discount if user has subscription)
         raw_entry_fee: Decimal = tournament.entry_fee or Decimal("0")
-        entry_fee = _get_discounted_tournament_entry_fee(request, tournament)
+        entry_fee = (
+            invoice.amount
+            if invoice is not None
+            else _get_discounted_tournament_entry_fee(request, tournament)
+        )
         discount: Decimal = Decimal("0")
         if (
-            not tournament.club_id
+            invoice is None
+            and not tournament.club_id
             and request.user.is_authenticated
             and hasattr(request.user, "subscription")
             and request.user.subscription.is_valid()
@@ -702,6 +822,12 @@ def payment_process(request: HttpRequest) -> HttpResponse:
             ):
                 messages.error(request, "Инвойс постоплаты недоступен для оплаты.")
                 return redirect("tournament_detail", slug=tournament.slug)
+        unavailable_reason = _tournament_payment_unavailable_reason(
+            tournament, cast(User, request.user), postpayment_invoice
+        )
+        if unavailable_reason:
+            messages.info(request, unavailable_reason)
+            return redirect("tournament_detail", slug=tournament.slug)
         tournament_member = _get_tournament_club_member(request.user, tournament)
         if (
             tournament.club_id
@@ -717,7 +843,12 @@ def payment_process(request: HttpRequest) -> HttpResponse:
             )
             return redirect("tournament_detail", slug=tournament.slug)
 
-        amount_decimal = _get_discounted_tournament_entry_fee(request, tournament)
+        amount_decimal = (
+            postpayment_invoice.amount
+            if postpayment_invoice is not None
+            else _get_discounted_tournament_entry_fee(request, tournament)
+        )
+        tournament_total_amount = amount_decimal
         balance_to_apply = Decimal("0.00")
         if tournament_member is not None:
             from apps.clubs.finance_services import (
@@ -772,6 +903,10 @@ def payment_process(request: HttpRequest) -> HttpResponse:
                         str(balance_transaction.id) if balance_transaction else ""
                     ),
                 }
+                if postpayment_invoice is not None:
+                    record_metadata["postpayment_invoice_id"] = str(
+                        postpayment_invoice.pk
+                    )
 
                 pr = PaymentRecord.objects.create(
                     user=request.user,
@@ -804,6 +939,10 @@ def payment_process(request: HttpRequest) -> HttpResponse:
 
             club_payment_settings = _get_club_payment_settings(tournament.club)
             if club_payment_settings is None:
+                if balance_transaction is not None:
+                    from apps.clubs.finance_services import cancel_reserved_balance
+
+                    cancel_reserved_balance(balance_transaction)
                 messages.error(
                     request,
                     "Клуб ещё не подключил свою YooKassa. Онлайн-оплата турнира временно недоступна.",
@@ -993,9 +1132,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         record_metadata["comment"] = request.POST.get("comment", "").strip()
     if tournament is not None:
         record_metadata["balance_amount"] = f"{balance_to_apply:.2f}"
-        record_metadata["total_amount"] = (
-            f"{_get_discounted_tournament_entry_fee(request, tournament):.2f}"
-        )
+        record_metadata["total_amount"] = f"{tournament_total_amount:.2f}"
         if tournament.club_id:
             record_metadata["club_id"] = str(tournament.club_id)
             record_metadata["club_slug"] = tournament.club.slug
@@ -1036,9 +1173,7 @@ def payment_process(request: HttpRequest) -> HttpResponse:
         pending_data["amount"] = amount_str
     if payment_type == "tournament" and tournament is not None:
         pending_data["balance_amount"] = f"{balance_to_apply:.2f}"
-        pending_data["total_amount"] = (
-            f"{_get_discounted_tournament_entry_fee(request, tournament):.2f}"
-        )
+        pending_data["total_amount"] = f"{tournament_total_amount:.2f}"
         if tournament.club_id:
             pending_data["club_id"] = str(tournament.club_id)
             pending_data["club_slug"] = tournament.club.slug
@@ -1051,8 +1186,160 @@ def payment_process(request: HttpRequest) -> HttpResponse:
     return redirect(confirmation_url)
 
 
-def finalize_successful_payment(payment_record, request=None) -> None:
-    """Выдача услуг после успешной оплаты. Вызывается один раз."""
+_TOURNAMENT_ENTRY_FINALIZED_AT = "_tournament_entry_finalized_at"
+
+
+def _notify_successful_tournament_payment(
+    tournament: Tournament,
+    user: User,
+    *,
+    amount: str,
+    is_postpayment: bool,
+) -> None:
+    """Отправить подтверждения уже сохранённого платежа, не откатывая его из-за уведомлений."""
+    try:
+        from apps.core.telegram_notify import notify_tournament_entry_payment
+
+        notify_tournament_entry_payment(tournament, user, amount=amount)
+    except Exception:
+        payment_log.exception("Ошибка уведомления об оплате турнира {}", tournament.pk)
+    try:
+        from apps.core.email_service import send_tournament_entry_receipt_email
+
+        send_tournament_entry_receipt_email(
+            user, tournament, amount=amount, is_postpayment=is_postpayment
+        )
+    except Exception:
+        payment_log.exception("Ошибка отправки квитанции турнира {}", tournament.pk)
+
+
+def _progress_tournament_after_payment(tournament_id: int) -> None:
+    """Проверить запуск после фиксации оплаты; ошибка сетки не отменяет получение денег."""
+    tournament = Tournament.objects.filter(pk=tournament_id).first()
+    if (
+        tournament is None
+        or tournament.postpayment_window_started_at is None
+        or tournament.bracket_generated
+        or tournament.status in ("cancelled", "completed")
+        or get_pending_postpayment_invoices(tournament).exists()
+    ):
+        return
+    try:
+        finalize_postpayment_window(tournament)
+    except Exception:
+        payment_log.exception(
+            "Не удалось запустить турнир {} после оплаты", tournament_id
+        )
+
+
+@transaction.atomic
+def _finalize_successful_tournament_payment(payment_record: PaymentRecord) -> None:
+    """Сохранить любой полученный взнос один раз, не открывая закрытую регистрацию."""
+    from apps.tournaments.models import (
+        TournamentEntryPayment,
+        TournamentEntryRefundRequest,
+    )
+
+    record = PaymentRecord.objects.select_for_update().get(pk=payment_record.pk)
+    metadata = dict(record.metadata or {})
+    if record.status != "succeeded" or metadata.get(_TOURNAMENT_ENTRY_FINALIZED_AT):
+        return
+    try:
+        tournament_id = int(record.item_id)
+    except (TypeError, ValueError):
+        payment_log.warning("У платежа {} некорректный ID турнира", record.pk)
+        return
+    tournament = Tournament.objects.select_for_update().filter(pk=tournament_id).first()
+    if tournament is None:
+        payment_log.warning("Турнир платежа {} не найден", record.pk)
+        return
+    _confirm_tournament_balance_payment(record, tournament)
+    user = cast(User, record.user)
+    already_registered = user_is_registered(tournament, user)
+    had_received_onsite = tournament.onsite_payments.filter(
+        user=user, status="received"
+    ).exists()
+    TournamentEntryPayment.objects.get_or_create(tournament=tournament, user=user)
+    close_expected_onsite_payments(tournament, user=user, reason="online_payment")
+    invoice_id_raw = metadata.get("postpayment_invoice_id")
+    invoice = None
+    if invoice_id_raw:
+        try:
+            invoice_id = int(invoice_id_raw)
+        except (TypeError, ValueError):
+            invoice_id = None
+        if invoice_id is not None:
+            invoice = (
+                TournamentPostpaymentInvoice.objects.select_for_update()
+                .filter(pk=invoice_id, tournament=tournament, user=user)
+                .first()
+            )
+        if (
+            invoice is not None
+            and invoice.status != TournamentPostpaymentInvoice.Status.PAID
+        ):
+            invoice.status = TournamentPostpaymentInvoice.Status.PAID
+            if invoice.paid_at is None:
+                invoice.paid_at = timezone.now()
+            invoice.save(update_fields=["status", "paid_at"])
+    cancel_pending_entry_invoice(tournament, user)
+    # Отмена сохраняет участников для возобновления, но не отменяет возврат
+    # пришедшего позже взноса. Открытое окно постоплаты действующего участника
+    # при этом не считается причиной для возврата.
+    closed_reason = (
+        get_registration_closed_reason(tournament)
+        if not already_registered or tournament.status in ("cancelled", "completed")
+        else None
+    )
+    player = getattr(user, "player", None)
+    if (
+        not already_registered
+        and player is not None
+        and not tournament.is_doubles()
+        and closed_reason is None
+    ):
+        tournament.participants.add(player)
+    if closed_reason or had_received_onsite:
+        amount = record.amount
+        try:
+            total_amount = Decimal(str(metadata.get("total_amount", record.amount)))
+        except (ArithmeticError, ValueError):
+            total_amount = record.amount
+        if total_amount.is_finite() and total_amount >= record.amount:
+            amount = total_amount
+        refund = TournamentEntryRefundRequest.objects.create(
+            tournament=tournament,
+            user=user,
+            amount=amount,
+            refund_ref="REF-" + secrets.token_hex(8).upper(),
+        )
+        metadata["tournament_entry_refund_ref"] = refund.refund_ref
+        payment_log.warning(
+            "Платёж {} получен без новой регистрации; создана заявка {} на ручной возврат",
+            record.pk,
+            refund.pk,
+        )
+    metadata[_TOURNAMENT_ENTRY_FINALIZED_AT] = timezone.now().isoformat()
+    record.metadata = metadata
+    record.save(update_fields=["metadata"])
+    transaction.on_commit(
+        lambda: _notify_successful_tournament_payment(
+            tournament,
+            user,
+            amount=str(record.amount),
+            is_postpayment=invoice is not None,
+        )
+    )
+    transaction.on_commit(lambda: _progress_tournament_after_payment(tournament.pk))
+
+
+def finalize_successful_payment(
+    payment_record: PaymentRecord, request: HttpRequest | None = None
+) -> None:
+    """Выдать услуги после подтверждения платежа; турнирный взнос фиксировать идемпотентно."""
+    if payment_record.payment_type == "tournament":
+        _finalize_successful_tournament_payment(payment_record)
+        return
     if payment_record.status != "succeeded":
         return
 
@@ -1185,67 +1472,6 @@ def finalize_successful_payment(payment_record, request=None) -> None:
                 except Exception:
                     pass
 
-    elif payment_type == "tournament" and item_id:
-        invoice_id_raw = metadata.get("postpayment_invoice_id", "")
-        try:
-            tid = int(item_id)
-        except (TypeError, ValueError):
-            tid = None
-        if tid is not None:
-            tournament = Tournament.objects.filter(pk=tid).first()
-            if tournament:
-                if invoice_id_raw:
-                    try:
-                        invoice = TournamentPostpaymentInvoice.objects.get(
-                            pk=int(invoice_id_raw),
-                            tournament=tournament,
-                            user=user,
-                        )
-                        invoice.status = TournamentPostpaymentInvoice.Status.PAID
-                        invoice.paid_at = timezone.now()
-                        invoice.save(update_fields=["status", "paid_at"])
-                    except (TournamentPostpaymentInvoice.DoesNotExist, ValueError):
-                        pass
-                try:
-                    from apps.core.telegram_notify import (
-                        notify_tournament_entry_payment,
-                    )
-
-                    notify_tournament_entry_payment(tournament, user, amount=amount_str)
-                except Exception as e:
-                    logger.warning(
-                        "Telegram notify_tournament_entry_payment failed: %s", e
-                    )
-                try:
-                    from apps.core.email_service import (
-                        send_tournament_entry_receipt_email,
-                    )
-
-                    send_tournament_entry_receipt_email(
-                        user,
-                        tournament,
-                        amount=amount_str,
-                        is_postpayment=bool(invoice_id_raw),
-                    )
-                except Exception:
-                    pass
-            if tournament and not tournament.is_doubles():
-                player = getattr(user, "player", None)
-                if player and not tournament.participants.filter(pk=player.pk).exists():
-                    tournament.participants.add(player)
-                    from apps.tournaments.models import TournamentEntryPayment
-
-                    TournamentEntryPayment.objects.get_or_create(
-                        tournament=tournament,
-                        user=user,
-                    )
-                pending_count = TournamentPostpaymentInvoice.objects.filter(
-                    tournament=tournament,
-                    status=TournamentPostpaymentInvoice.Status.PENDING,
-                ).count()
-                if pending_count == 0 and tournament.postpayment_window_started_at:
-                    finalize_postpayment_window(tournament)
-
     if metadata.get("enable_autopay") == "1" and payment_record.yookassa_payment_id:
         try:
             from apps.payments.yookassa_client import (
@@ -1325,6 +1551,10 @@ def yookassa_webhook(request: HttpRequest) -> HttpResponse:
         return HttpResponse(status=200)
 
     if pr.status == "succeeded":
+        if pr.payment_type == "tournament" and not pr.metadata.get(
+            _TOURNAMENT_ENTRY_FINALIZED_AT
+        ):
+            finalize_successful_payment(pr)
         return HttpResponse(status=200)
 
     # Server-side verification
@@ -1407,6 +1637,8 @@ def payment_return(request: HttpRequest) -> HttpResponse:
                     pr.status = "succeeded"
                     pr.save(update_fields=["status"])
                     finalize_successful_payment(pr, request)
+            elif pr.status == "succeeded" and pr.payment_type == "tournament":
+                finalize_successful_payment(pr, request)
         except PaymentRecord.DoesNotExist:
             pass
 

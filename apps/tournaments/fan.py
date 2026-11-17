@@ -16,13 +16,14 @@ from .models import (
     Match,
     SeasonPoints,
     Tournament,
+    TournamentFormat,
     TournamentPlayerResult,
     TournamentStatus,
     TournamentTeam,
 )
 from .postpayment import get_pending_postpayment_users, open_postpayment_window
 from .season_utils import get_current_season, get_season_display
-from .utils import tournament_deadline_schedule_start
+from .utils import tournament_match_deadline_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ def _round_eliminated(round_index: int) -> str:
 
 def check_and_generate_past_deadline_brackets() -> int:
     """
-    Найти турниры (FAN и круговые) с истёкшим дедлайном регистрации и сформировать сетку.
+    Найти турниры всех форматов с истёкшим дедлайном регистрации и сформировать сетку.
     Вызывать при загрузке страниц турниров (или по cron).
     Возвращает количество сформированных сеток.
     """
@@ -210,6 +211,7 @@ def check_and_generate_past_deadline_brackets() -> int:
     from django.core.cache import cache
 
     from .round_robin import generate_bracket as generate_round_robin_bracket
+    from .tvd import generate_groups
 
     cache_key = "tournament_generate_brackets_last_run"
     # В режиме разработки уменьшаем время кэширования для более быстрой отладки
@@ -230,16 +232,19 @@ def check_and_generate_past_deadline_brackets() -> int:
     now = timezone.now()
     qs = list(
         Tournament.objects.filter(
-            format__in=["single_elimination", "olympic_consolation", "round_robin"],
+            format__in=TournamentFormat.values,
             bracket_generated=False,
             registration_deadline__lte=now,
             registration_deadline__isnull=False,
             start_after_fill=False,
-        ).exclude(status=TournamentStatus.CANCELLED)
+        ).exclude(status__in=(TournamentStatus.CANCELLED, TournamentStatus.COMPLETED))
     )
     total = 0
     for t in qs:
-        if t.allow_postpayment and t.postpayment_window_started_at is None:
+        # Открытое окно обрабатывает финализатор постоплаты, а не повторный cron.
+        if t.postpayment_window_started_at is not None:
+            continue
+        if t.allow_postpayment:
             pending_users = get_pending_postpayment_users(t)
             if pending_users:
                 open_postpayment_window(t)
@@ -339,6 +344,8 @@ def check_and_generate_past_deadline_brackets() -> int:
             ok, msg = generate_bracket(t)
         elif _is_olympic(t):
             ok, msg = generate_olympic_bracket(t)
+        elif t.format == TournamentFormat.WEEKEND_DAY:
+            ok, msg = generate_groups(t)
         else:
             ok, msg = generate_round_robin_bracket(t)
         if ok:
@@ -412,6 +419,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
                 tournament.slug,
             )
 
+    entities: list[Player] | list[TournamentTeam]
     if tournament.is_doubles():
         entities = list(
             tournament.teams.filter(player2__isnull=False)
@@ -464,8 +472,8 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         )
 
     bracket_size, total_rounds = _bracket_params(n)
-    padded = list(entities)
-    bye_entity = (
+    padded: list[Player | TournamentTeam] = list(entities)
+    bye_entity: Player | TournamentTeam = (
         bye_player
         if not tournament.is_doubles()
         else _get_or_create_bye_team(tournament, bye_player)
@@ -473,9 +481,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     while len(padded) < bracket_size:
         padded.append(bye_entity)
 
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
     is_doubles = tournament.is_doubles()
 
     matches: dict[tuple[int, int], Match] = {}
@@ -510,8 +516,8 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
         if is_doubles:
             m.team1 = a
             m.team2 = b
-            m.player1 = a.player1
-            m.player2 = b.player1
+            m.player1 = cast(TournamentTeam, a).player1
+            m.player2 = cast(TournamentTeam, b).player1
         else:
             m.player1 = a
             m.player2 = b
@@ -526,7 +532,7 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
             winner_entity = b if is_bye_a else a
             if is_doubles:
                 m.winner_team = winner_entity
-                m.winner = winner_entity.player1
+                m.winner = cast(TournamentTeam, winner_entity).player1
             else:
                 m.winner = winner_entity
             m.status = Match.MatchStatus.WALKOVER
@@ -595,9 +601,7 @@ def create_consolation_matches(tournament: Tournament) -> tuple[bool, str]:
     if n < 2:
         return True, "Подвал не создаётся: меньше двух проигравших в R1."
 
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
     base = start + delta
     bye_player = _get_bye_player()
     half = n // 2

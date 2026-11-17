@@ -6,9 +6,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from html import escape
 from typing import TYPE_CHECKING, cast
 
@@ -34,7 +34,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.text import slugify
 
-from .models import Match, Tournament, TournamentStatus
+from .models import Match, Tournament, TournamentDuration, TournamentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -113,11 +113,61 @@ def tournament_deadline_schedule_start(tournament: Tournament) -> datetime:
     return max(planned_start, today_start)
 
 
+def tournament_match_deadline_schedule(
+    tournament: Tournament,
+) -> tuple[datetime, timedelta]:
+    """Вернуть базовый дедлайн и шаг между кругами для выбранной длительности.
+
+    У коротких турниров все этапы должны закончиться в последний день
+    проведения: базовая точка — конец этого дня в локальном часовом поясе,
+    шаг равен нулю. Поздняя генерация не переносит фиксированные даты.
+    У многодневных турниров сохраняется прежний отсчёт по дням на круг.
+    """
+    if tournament.duration in (
+        TournamentDuration.SINGLE_DAY,
+        TournamentDuration.WEEKEND,
+    ):
+        end_date = tournament.get_event_end_date()
+        if end_date is None:
+            end_date = timezone.localdate()
+            if tournament.duration == TournamentDuration.WEEKEND:
+                end_date += timedelta(days=1)
+        deadline = timezone.make_aware(datetime.combine(end_date, time.max))
+        return cast(datetime, deadline), timedelta(0)
+    days = int(tournament.match_days_per_round or 7)
+    return tournament_deadline_schedule_start(tournament), timedelta(days=days)
+
+
+def generate_tournament_with_start_date(
+    tournament: Tournament,
+    generate_fn: Callable[[Tournament], tuple[bool, str]],
+) -> tuple[bool, str]:
+    """Зафиксировать фактический старт после набора только при успешном запуске.
+
+    Фиксированные даты не изменяются. Дата окончания короткого турнира
+    заполняется моделью. Неудачная генерация откатывает назначение дат и
+    частично созданную структуру; блокировка защищает от повторного запуска.
+    """
+    with transaction.atomic():
+        locked = Tournament.objects.select_for_update().get(pk=tournament.pk)
+        if locked.status in (TournamentStatus.COMPLETED, TournamentStatus.CANCELLED):
+            ok, message = False, "Завершённый или отменённый турнир нельзя запустить."
+        else:
+            if locked.start_after_fill and locked.start_date is None:
+                locked.start_date = timezone.localdate()
+                locked.save(update_fields=["start_date", "updated_at"])
+            ok, message = generate_fn(locked)
+            if not ok:
+                transaction.set_rollback(True)
+    tournament.refresh_from_db()
+    return ok, message
+
+
 def recalculate_tournament_match_deadlines(tournament: Tournament) -> int:
     """Пересчитать deadline всех матчей турнира от актуальной базовой даты.
 
-    Используйте, если сетка была сформирована позже ``start_date`` и дедлайны
-    оказались в прошлом.
+    У многодневных турниров отсчёт начинается не раньше текущих суток.
+    У коротких турниров дедлайны ограничены календарными датами проведения.
 
     Args:
         tournament (Tournament): Турнир с уже созданными матчами.
@@ -125,9 +175,7 @@ def recalculate_tournament_match_deadlines(tournament: Tournament) -> int:
     Returns:
         int: Число обновлённых матчей.
     """
-    days = int(getattr(tournament, "match_days_per_round", 7) or 7)
-    delta = timedelta(days=days)
-    start = tournament_deadline_schedule_start(tournament)
+    start, delta = tournament_match_deadline_schedule(tournament)
     updated = 0
     for match in tournament.matches.filter(round_index__isnull=False):
         round_index = match.round_index

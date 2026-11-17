@@ -2,11 +2,13 @@
 Формы клубного раздела: регистрация клуба, инвайты, приглашения, панель клуба.
 """
 
+from collections.abc import Mapping
 from typing import Any, cast
 
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.http import QueryDict
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -27,6 +29,7 @@ from apps.courts.models import Court
 from apps.tournaments.models import (
     MatchFormat,
     Tournament,
+    TournamentDuration,
     TournamentFormat,
     TournamentType,
     TournamentVariant,
@@ -579,9 +582,10 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "sport",
             "format",
             "variant",
+            "duration",
             "entry_fee",
-            "is_one_day",
             "allow_postpayment",
+            "allow_onsite_payment",
             "postpayment_deadline_hours",
             "city",
             "region",
@@ -592,6 +596,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "tournament_type",
             "start_after_fill",
             "start_date",
+            "start_time",
             "end_date",
             "registration_deadline",
             "min_participants",
@@ -608,10 +613,25 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "is_open_interclub",
         ]
 
-    def __init__(self, *args, club: Club | None = None, is_pro: bool = False, **kwargs):
+    def __init__(
+        self, *args: Any, club: Club | None = None, is_pro: bool = False, **kwargs: Any
+    ) -> None:
         self.club = club
         self.is_pro = is_pro
         super().__init__(*args, **kwargs)
+        if self.is_bound and "duration" not in self.data:
+            # Совместимость с уже открытой старой формой и прежними интеграциями.
+            legacy_data: dict[str, Any] | QueryDict = (
+                self.data.copy()
+                if isinstance(self.data, QueryDict)
+                else dict(self.data)
+            )
+            legacy_data["duration"] = (
+                TournamentDuration.SINGLE_DAY
+                if legacy_data.get("is_one_day") in (True, "on", "True", "1")
+                else TournamentDuration.MULTI_DAY
+            )
+            self.data: Mapping[str, Any] = legacy_data
 
         if self.instance and self.instance.pk:
             self.fields["allowed_categories"].initial = list(
@@ -686,6 +706,15 @@ class ClubTournamentCreateForm(forms.ModelForm):
             format="%Y-%m-%d",
         )
         self.fields["start_date"].input_formats = ["%Y-%m-%d", "%d.%m.%Y"]
+        self.fields["start_time"].widget = forms.TimeInput(
+            attrs={"type": "time"}, format="%H:%M"
+        )
+        duration = (
+            self.data.get("duration")
+            if self.is_bound
+            else self.initial.get("duration", self.instance.duration)
+        )
+        self.fields["start_time"].required = duration == TournamentDuration.SINGLE_DAY
         self.fields["end_date"].widget = forms.DateInput(
             attrs={"type": "date"},
             format="%Y-%m-%d",
@@ -750,6 +779,14 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "Район Москвы или город области — для рекламных страниц. "
             "Для остальных населённых пунктов достаточно поля «Населённый пункт»."
         )
+        if self.instance and self.instance.pk:
+            for field, error in self.instance.get_calendar_errors().items():
+                if field in self.fields:
+                    self.fields[field].help_text = format_html(
+                        "{} Существующее значение: {} При изменении других настроек дата будет сохранена.",
+                        self.fields[field].help_text or "",
+                        error,
+                    )
         self.fields["is_open_interclub"].disabled = not is_pro
         if not is_pro:
             self.fields["is_open_interclub"].help_text = (
@@ -856,6 +893,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "sport",
             "format",
             "variant",
+            "duration",
             "gender",
             "allowed_categories",
             "tournament_type",
@@ -873,6 +911,7 @@ class ClubTournamentCreateForm(forms.ModelForm):
             "fan_points_winner",
             "is_open_interclub",
             "allow_postpayment",
+            "allow_onsite_payment",
         ):
             if field_name in self.fields:
                 self.fields[field_name].disabled = True
@@ -899,8 +938,8 @@ class ClubTournamentCreateForm(forms.ModelForm):
             value = timezone.make_aware(value, timezone.get_current_timezone())
         return value
 
-    def clean(self):
-        cleaned_data = super().clean()
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean() or {}
 
         sport = sport_code(cleaned_data.get("sport") or Sport.TENNIS)
         cleaned_data["sport"] = sport
@@ -922,13 +961,18 @@ class ClubTournamentCreateForm(forms.ModelForm):
                     "Для тенниса выберите теннисный корт или площадку «теннис и падел».",
                 )
         gender = cleaned_data.get("gender")
-        is_one_day = cleaned_data.get("is_one_day")
+        is_one_day = (
+            cleaned_data.get("duration", self.instance.duration)
+            == TournamentDuration.SINGLE_DAY
+        )
+        if is_one_day and not cleaned_data.get("start_time"):
+            if "start_time" not in self.errors:
+                self.add_error(
+                    "start_time", "Укажите время начала однодневного турнира."
+                )
         allow_postpayment = bool(cleaned_data.get("allow_postpayment"))
         entry_fee = cleaned_data.get("entry_fee")
-        tournament_format = cleaned_data.get("format")
         start_date = cleaned_data.get("start_date")
-        end_date = cleaned_data.get("end_date")
-        registration_deadline = cleaned_data.get("registration_deadline")
 
         if variant == TournamentVariant.SINGLES and gender == "mixed":
             raise ValidationError(
@@ -942,49 +986,28 @@ class ClubTournamentCreateForm(forms.ModelForm):
             else False
         )
         if start_after_fill:
-            cleaned_data["registration_deadline"] = None
-            if not bracket_generated:
+            if not self.instance.pk:
+                cleaned_data["registration_deadline"] = None
                 cleaned_data["start_date"] = None
                 cleaned_data["end_date"] = None
-            else:
-                if not cleaned_data.get("start_date") and self.instance.start_date:
-                    cleaned_data["start_date"] = self.instance.start_date
-                if not cleaned_data.get("end_date") and self.instance.end_date:
-                    cleaned_data["end_date"] = self.instance.end_date
-            start_date = cleaned_data.get("start_date")
-            end_date = cleaned_data.get("end_date")
-            registration_deadline = None
+            elif bracket_generated:
+                for field in ("start_date", "end_date", "registration_deadline"):
+                    if cleaned_data.get(field) is None:
+                        cleaned_data[field] = getattr(self.instance, field)
         else:
             if not start_date:
                 self.add_error("start_date", "Укажите дату начала турнира.")
 
-        if start_date and end_date and end_date < start_date:
+        if not is_one_day and (entry_fee is None or entry_fee <= 0):
             self.add_error(
-                "end_date", "Дата окончания не может быть раньше даты начала."
-            )
-
-        if registration_deadline and start_date:
-            deadline_date = timezone.localtime(registration_deadline).date()
-            if deadline_date > start_date:
-                self.add_error(
-                    "registration_deadline",
-                    "Дедлайн регистрации не может быть позже даты начала турнира.",
-                )
-
-        if is_one_day is False and (entry_fee is None or float(entry_fee or 0) <= 0):
-            raise ValidationError(
-                "Для многодневного турнира укажите вступительный взнос больше 0 ₽."
+                "entry_fee",
+                "Для турнира выходного дня или многодневного турнира укажите вступительный взнос больше 0 ₽.",
             )
         if allow_postpayment:
             if is_one_day:
                 self.add_error(
                     "allow_postpayment",
                     "Постоплата недоступна для однодневных турниров.",
-                )
-            if tournament_format == TournamentFormat.WEEKEND_DAY:
-                self.add_error(
-                    "allow_postpayment",
-                    "Постоплата недоступна для формата «Группы + плей-офф».",
                 )
             if float(entry_fee or 0) <= 0:
                 self.add_error(

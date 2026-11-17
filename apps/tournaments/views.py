@@ -5,6 +5,7 @@ Tournaments views.
 import json
 import logging
 from collections import defaultdict
+from datetime import date, datetime, time
 from functools import wraps
 from itertools import groupby
 from typing import cast
@@ -12,6 +13,7 @@ from urllib.parse import quote, urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import Count, Min, Prefetch, Q, prefetch_related_objects
@@ -21,6 +23,7 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseForbidden,
+    HttpResponseRedirect,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -38,7 +41,6 @@ from apps.clubs.models import (
 from apps.clubs.plan_services import (
     RegistrationMode,
     can_member_register_for_tournament,
-    consume_member_tournament_limit,
 )
 from apps.clubs.plan_services import (
     check_tournament_registration_eligibility as check_club_tournament_registration_eligibility,
@@ -55,10 +57,8 @@ from apps.core.metrika import (
 )
 from apps.core.text_search import filter_field_contains_ci
 from apps.notifications.services import create_notification
-from apps.subscriptions.fancoin import TOURNAMENT_REGISTRATION_COST
-from apps.subscriptions.models import FancoinTransaction
 from apps.tournaments.local_feed import rank_tournaments_near_player
-from apps.users.models import Player, SkillLevel
+from apps.users.models import Player, SkillLevel, User
 
 from .cancel import (
     TournamentLifecycleError,
@@ -66,9 +66,23 @@ from .cancel import (
     extend_registration,
     reopen_tournament,
 )
+from .entry_payment import (
+    RegistrationPaymentError,
+    RegistrationPaymentMethod,
+    apply_registration_payment,
+    cancel_pending_entry_invoice,
+    close_expected_onsite_payments,
+    confirm_onsite_payment,
+    create_entry_refund_request,
+    get_registration_closed_reason,
+    get_registration_payment_options,
+    lock_registration_payment_users,
+    resolve_registration_payment_method,
+    user_is_registered,
+)
 from .fan import _is_fan
 from .fan import generate_bracket as fan_generate_bracket
-from .forms import TournamentPhotoUploadForm
+from .forms import TournamentPhotoUploadForm, TournamentRegistrationWindowForm
 from .landing import (
     VARIANT_BY_VALUE,
     build_tournament_filter_chips,
@@ -100,10 +114,9 @@ from .models import (
     TournamentEntryPayment,
     TournamentEntryRefundRequest,
     TournamentFormat,
+    TournamentOnsitePayment,
     TournamentPhoto,
     TournamentPlayerResult,
-    TournamentPostpaymentInvoice,
-    TournamentRegistrationCoverage,
     TournamentStatus,
     TournamentTeam,
     TournamentType,
@@ -129,9 +142,9 @@ from .platform_home import (
 from .postpayment import (
     finalize_postpayment_window,
     format_postpayment_open_summary,
+    get_pending_postpayment_invoices,
     get_pending_postpayment_users,
     get_postpayment_progress,
-    mark_registration_covered,
     open_postpayment_window,
     tournament_allows_postpayment_registration,
 )
@@ -185,6 +198,7 @@ from .utils import (
     attach_tournament_result_order_flags,
     find_blocking_earlier_tournament_match,
     format_tournament_match_order_block_message,
+    generate_tournament_with_start_date,
     get_match_opponent_users,
     order_player_matches_for_display,
 )
@@ -1590,17 +1604,19 @@ def _tournament_manage_get_any_tournament(
 def _tournament_manual_generate(tournament: Tournament) -> tuple[bool, str, str]:
     """Ручной запуск турнира без ожидания дедлайна регистрации."""
     if tournament.uses_manual_pairing() and supports_manual_pairing(tournament):
-        ok, msg = start_manual_tournament(tournament)
-        return ok, msg, "Перейти к парам"
-    if _is_tvd(tournament):
-        return (*tvd_generate_groups(tournament), "Сформировать группы")
-    if _is_fan(tournament):
-        return (*fan_generate_bracket(tournament), "Сформировать сетку")
-    if _is_olympic(tournament):
-        return (*olympic_generate_bracket(tournament), "Сформировать сетку")
-    if _is_round_robin(tournament):
-        return (*round_robin_generate_bracket(tournament), "Сформировать матчи")
-    return False, "Неизвестный формат турнира.", "Запустить турнир"
+        generate_fn, label = start_manual_tournament, "Перейти к парам"
+    elif _is_tvd(tournament):
+        generate_fn, label = tvd_generate_groups, "Сформировать группы"
+    elif _is_fan(tournament):
+        generate_fn, label = fan_generate_bracket, "Сформировать сетку"
+    elif _is_olympic(tournament):
+        generate_fn, label = olympic_generate_bracket, "Сформировать сетку"
+    elif _is_round_robin(tournament):
+        generate_fn, label = round_robin_generate_bracket, "Сформировать матчи"
+    else:
+        return False, "Неизвестный формат турнира.", "Запустить турнир"
+    ok, message = generate_tournament_with_start_date(tournament, generate_fn)
+    return ok, message, label
 
 
 def _tournament_manage_primary_action(tournament: Tournament) -> tuple[bool, str]:
@@ -1640,7 +1656,12 @@ def _insufficient_grace_deadline(tournament: Tournament):
 
 
 @login_required
-def tournament_manage(request, slug):
+def tournament_manage(
+    request: HttpRequest,
+    slug: str,
+    *,
+    lifecycle_form: TournamentRegistrationWindowForm | None = None,
+) -> HttpResponse:
     """Интерактивная страница управления турниром (staff или admin/manager клуба)."""
     tournament = get_object_or_404(
         Tournament.objects.prefetch_related(
@@ -1949,6 +1970,16 @@ def tournament_manage(request, slug):
             else tournament.min_participants
         ),
         "insufficient_grace_deadline": _insufficient_grace_deadline(tournament),
+        "lifecycle_form": lifecycle_form
+        or TournamentRegistrationWindowForm(
+            tournament=tournament,
+            reopening=tournament.status == TournamentStatus.CANCELLED,
+            auto_id=(
+                "reopen-%s"
+                if tournament.status == TournamentStatus.CANCELLED
+                else "extend-%s"
+            ),
+        ),
         "players_available_to_add": players_available_to_add,
         "withdrawn_player_ids": withdrawn_player_ids,
         "withdrawn_team_ids": withdrawn_team_ids,
@@ -1967,14 +1998,47 @@ def tournament_manage(request, slug):
     }
     context["postpayment_progress"] = get_postpayment_progress(tournament)
     context["postpayment_invoices"] = list(
-        tournament.postpayment_invoices.select_related("user")
-        .filter(status=TournamentPostpaymentInvoice.Status.PENDING)
+        get_pending_postpayment_invoices(tournament)
+        .select_related("user")
         .order_by("due_at", "created_at")
+    )
+    context["onsite_payments"] = list(
+        tournament.onsite_payments.select_related("user", "received_by")
     )
     if tournament.club_id:
         context["club"] = tournament.club
         context["is_club_panel"] = True
     return render(request, "tournaments/manage.html", context)
+
+
+@login_required
+@require_POST
+def tournament_manage_confirm_onsite_payment(
+    request: HttpRequest, slug: str, payment_id: int
+) -> HttpResponse:
+    """Подтвердить фактическое получение взноса на корте с проверкой прав и CSRF."""
+    tournament = get_object_or_404(Tournament, slug=slug)
+    if not _can_manage_tournament(request, tournament):
+        return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
+    payment = get_object_or_404(
+        TournamentOnsitePayment, tournament=tournament, pk=payment_id
+    )
+    try:
+        confirmed = confirm_onsite_payment(
+            tournament, payment.pk, received_by=cast(User, request.user)
+        )
+    except RegistrationPaymentError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            (
+                "Получение взноса на корте подтверждено."
+                if confirmed
+                else "Получение этого взноса уже подтверждено."
+            ),
+        )
+    return redirect("tournament_manage", slug=slug)
 
 
 def _tournament_manage_get_tournament(request, slug):
@@ -1992,7 +2056,7 @@ def _tournament_manage_get_tournament(request, slug):
 
 
 @login_required
-def tournament_manage_generate_bracket(request, slug):
+def tournament_manage_generate_bracket(request: HttpRequest, slug: str) -> HttpResponse:
     """POST: ручной запуск турнира для любого формата без ожидания дедлайна."""
     if request.method != "POST":
         return redirect("tournament_manage", slug=slug)
@@ -2038,7 +2102,7 @@ def tournament_manage_generate_bracket(request, slug):
         return redirect("tournament_manage", slug=slug)
     if tournament.postpayment_window_started_at is not None:
         progress = get_postpayment_progress(tournament)
-        if bool(progress["completed"]):
+        if bool(progress["completed"]) or not pending_users:
             ok, msg = finalize_postpayment_window(tournament)
             if ok:
                 messages.success(request, msg)
@@ -2459,110 +2523,68 @@ def tournament_manage_cancel(request, slug):
 
 
 @login_required
-def tournament_manage_extend_registration(request, slug):
+def tournament_manage_extend_registration(
+    request: HttpRequest, slug: str
+) -> HttpResponse:
     """POST: продлить дедлайн регистрации из панели управления."""
-    from datetime import date, datetime
-
-    from django.utils import timezone
-    from django.utils.dateparse import parse_date, parse_datetime
-
-    if request.method != "POST":
-        return redirect("tournament_manage", slug=slug)
-    tournament = _tournament_manage_get_any_tournament(request, slug)
-    if tournament is None:
-        return redirect("tournament_list")
-
-    raw_deadline = (request.POST.get("registration_deadline") or "").strip()
-    raw_start = (request.POST.get("start_date") or "").strip()
-    deadline = parse_datetime(raw_deadline.replace("T", " ")) if raw_deadline else None
-    if deadline is None and raw_deadline:
-        # datetime-local: 2026-09-22T18:00
-        try:
-            deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M")
-        except ValueError:
-            try:
-                deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M:%S")
-            except ValueError:
-                deadline = None
-    if deadline is not None and timezone.is_naive(deadline):
-        deadline = timezone.make_aware(deadline, timezone.get_current_timezone())
-
-    start_date = parse_date(raw_start) if raw_start else None
-    if start_date is None and raw_start:
-        try:
-            start_date = date.fromisoformat(raw_start)
-        except ValueError:
-            start_date = None
-
-    if deadline is None:
-        messages.error(request, "Укажите новый дедлайн регистрации.")
-        return redirect("tournament_manage", slug=slug)
-
-    try:
-        extend_registration(
-            tournament,
-            registration_deadline=deadline,
-            start_date=start_date,
-        )
-        messages.success(request, "Дедлайн регистрации продлён.")
-    except TournamentLifecycleError as exc:
-        messages.error(request, str(exc))
-    return redirect("tournament_manage", slug=slug)
+    return _manage_registration_window(request, slug, reopening=False)
 
 
 @login_required
-def tournament_manage_reopen(request, slug):
+def tournament_manage_reopen(request: HttpRequest, slug: str) -> HttpResponse:
     """POST: возобновить набор после отмены турнира."""
-    from datetime import date, datetime
+    return _manage_registration_window(request, slug, reopening=True)
 
-    from django.utils import timezone
-    from django.utils.dateparse import parse_date
 
+def _manage_registration_window(
+    request: HttpRequest, slug: str, *, reopening: bool
+) -> HttpResponse:
+    """Проверить общую форму и сохранить ошибочный ввод без изменения турнира."""
     if request.method != "POST":
         return redirect("tournament_manage", slug=slug)
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
 
-    raw_deadline = (request.POST.get("registration_deadline") or "").strip()
-    raw_start = (request.POST.get("start_date") or "").strip()
-
-    deadline = None
-    if raw_deadline:
+    form = TournamentRegistrationWindowForm(
+        request.POST,
+        tournament=tournament,
+        reopening=reopening,
+        auto_id="reopen-%s" if reopening else "extend-%s",
+    )
+    if form.is_valid():
+        deadline = cast(datetime, form.cleaned_data["registration_deadline"])
+        start_date = cast(date | None, form.cleaned_data["start_date"])
+        start_time = cast(time | None, form.cleaned_data["start_time"])
         try:
-            deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M")
-        except ValueError:
-            try:
-                deadline = datetime.strptime(raw_deadline, "%Y-%m-%dT%H:%M:%S")
-            except ValueError:
-                deadline = None
-    if deadline is not None and timezone.is_naive(deadline):
-        deadline = timezone.make_aware(deadline, timezone.get_current_timezone())
-
-    start_date = parse_date(raw_start) if raw_start else None
-    if start_date is None and raw_start:
-        try:
-            start_date = date.fromisoformat(raw_start)
-        except ValueError:
-            start_date = None
-
-    if deadline is None or start_date is None:
-        messages.error(
-            request,
-            "Укажите новую дату начала и дедлайн регистрации.",
-        )
-        return redirect("tournament_manage", slug=slug)
-
-    try:
-        reopen_tournament(
-            tournament,
-            start_date=start_date,
-            registration_deadline=deadline,
-        )
-        messages.success(request, "Набор на турнир возобновлён.")
-    except TournamentLifecycleError as exc:
-        messages.error(request, str(exc))
-    return redirect("tournament_manage", slug=slug)
+            if reopening:
+                assert start_date is not None
+                reopen_tournament(
+                    tournament,
+                    start_date=start_date,
+                    start_time=start_time,
+                    registration_deadline=deadline,
+                )
+            else:
+                extend_registration(
+                    tournament,
+                    start_date=start_date,
+                    start_time=start_time,
+                    registration_deadline=deadline,
+                )
+        except TournamentLifecycleError as exc:
+            form.add_error(exc.field if exc.field in form.fields else None, str(exc))
+        else:
+            messages.success(
+                request,
+                (
+                    "Набор на турнир возобновлён."
+                    if reopening
+                    else "Дедлайн регистрации продлён."
+                ),
+            )
+            return redirect("tournament_manage", slug=slug)
+    return tournament_manage(request, slug, lifecycle_form=form)
 
 
 def _player_in_full_team(tournament, player_id: int) -> bool:
@@ -2660,19 +2682,14 @@ def tournament_manage_compose_pair(request, slug):
 
 
 @login_required
-def tournament_manage_generate_groups(request, slug):
-    """POST: сформировать группы ТВД (HTMX)."""
+def tournament_manage_generate_groups(request: HttpRequest, slug: str) -> HttpResponse:
+    """Сформировать группы через общую проверку прав и ожидания постоплаты."""
     if request.method != "POST":
         return redirect("tournament_manage", slug=slug)
     tournament = _tournament_manage_get_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
-    ok, msg = tvd_generate_groups(tournament)
-    if ok:
-        messages.success(request, msg)
-    else:
-        messages.warning(request, msg)
-    return redirect("tournament_manage", slug=slug)
+    return tournament_manage_generate_bracket(request, slug)
 
 
 @login_required
@@ -3210,15 +3227,19 @@ def _notify_removed_participant_no_refund(request, user, tournament):
 
 
 @login_required
-def tournament_manage_remove_participant(request, slug):
+@transaction.atomic
+def tournament_manage_remove_participant(
+    request: HttpRequest, slug: str
+) -> HttpResponse:
     """POST: удалить участника (player_id для одиночного, team_id для парного). При оплаченном взносе — заявка на возврат и уведомление."""
-    import secrets
-
     if request.method != "POST":
         return redirect("tournament_manage", slug=slug)
     tournament = _tournament_manage_get_any_tournament(request, slug)
     if tournament is None:
         return redirect("tournament_list")
+    tournament = cast(
+        Tournament, Tournament.objects.select_for_update().get(pk=tournament.pk)
+    )
     if getattr(tournament, "bracket_generated", False):
         messages.error(
             request, "Нельзя удалять участников после формирования групп/сетки."
@@ -3226,45 +3247,36 @@ def tournament_manage_remove_participant(request, slug):
         return redirect("tournament_manage", slug=slug)
     team_id = _parse_int_post(request, "team_id")
     player_id = _parse_int_post(request, "player_id")
-    entry_fee = (tournament.entry_fee or 0) if hasattr(tournament, "entry_fee") else 0
-    removed_users = []  # list of (user, had_paid)
+    removed_users: list[User] = []
 
     if tournament.is_doubles() and team_id:
-        team = get_object_or_404(TournamentTeam, pk=team_id, tournament=tournament)
+        team = get_object_or_404(
+            TournamentTeam.objects.select_for_update(),
+            pk=team_id,
+            tournament=tournament,
+        )
         for p in [team.player1, team.player2]:
             if p:
-                had_paid = TournamentEntryPayment.objects.filter(
-                    tournament=tournament, user_id=p.user_id
-                ).exists()
-                removed_users.append((p.user, had_paid))
+                removed_users.append(p.user)
         team.delete()
     elif not tournament.is_doubles() and player_id:
         player = get_object_or_404(Player, pk=player_id)
         if not tournament.participants.filter(pk=player_id).exists():
             messages.warning(request, "Участник не найден в турнире.")
             return redirect("tournament_manage", slug=slug)
-        had_paid = TournamentEntryPayment.objects.filter(
-            tournament=tournament, user_id=player.user_id
-        ).exists()
-        removed_users.append((player.user, had_paid))
+        removed_users.append(player.user)
         tournament.participants.remove(player)
     else:
         messages.warning(request, "Укажите участника или команду для удаления.")
         return redirect("tournament_manage", slug=slug)
 
-    for user, had_paid in removed_users:
-        if had_paid and entry_fee and float(entry_fee) > 0:
-            refund_ref = "REF-" + secrets.token_urlsafe(8).upper()[:10]
-            while TournamentEntryRefundRequest.objects.filter(
-                refund_ref=refund_ref
-            ).exists():
-                refund_ref = "REF-" + secrets.token_urlsafe(8).upper()[:10]
-            refund = TournamentEntryRefundRequest.objects.create(
-                tournament=tournament,
-                user=user,
-                amount=entry_fee,
-                refund_ref=refund_ref,
-            )
+    for user in removed_users:
+        close_expected_onsite_payments(
+            tournament, user=user, reason="registration_removed"
+        )
+        cancel_pending_entry_invoice(tournament, user)
+        refund = create_entry_refund_request(tournament, user)
+        if refund is not None:
             _notify_removed_participant_refund(request, user, tournament, refund)
         else:
             _notify_removed_participant_no_refund(request, user, tournament)
@@ -4636,7 +4648,12 @@ def _tournament_does_not_consume_subscription_limit(tournament) -> bool:
     )
 
 
-def _build_tournament_payment_redirect(tournament, *, next_url: str = "", request=None):
+def _build_tournament_payment_redirect(
+    tournament: Tournament,
+    *,
+    next_url: str = "",
+    request: HttpRequest | None = None,
+) -> HttpResponseRedirect:
     """Формирует redirect на оплату вступительного взноса турнира."""
     if request is not None:
         queue_metrika_goal(
@@ -4678,7 +4695,9 @@ def _check_club_fee_access(user, tournament):
     )
 
 
-def _redirect_if_padel_entry_missing(request, err):
+def _redirect_if_padel_entry_missing(
+    request: HttpRequest, err: str | None
+) -> HttpResponseRedirect | None:
     """Если отказ из-за незаданного падела — отправить на страницу уровня.
 
     Args:
@@ -4698,7 +4717,9 @@ def _redirect_if_padel_entry_missing(request, err):
     return None
 
 
-def _check_tournament_registration_eligibility(request, tournament, player):
+def _check_tournament_registration_eligibility(
+    request: HttpRequest, tournament: Tournament, player: Player
+) -> tuple[bool, str | None]:
     """Проверка подписки, категории и лимитов для регистрации. Возвращает (ok, error_message)."""
     user = getattr(request, "user", None)
     if user is None:
@@ -4710,12 +4731,14 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     if not (user.is_staff or user.is_superuser) and not user.email_verified:
         return False, "Подтвердите email для участия в турнире."
 
-    try:
-        sub = user.subscription
-    except Exception:
-        sub = None
-
     is_admin = user.is_superuser or user.is_staff
+
+    if (
+        tournament.gender not in ("mixed", "open")
+        and player.gender != tournament.gender
+    ):
+        gender_text = "мужской" if tournament.gender == "male" else "женский"
+        return False, f"Этот турнир только для {gender_text} категории."
 
     # Проверка категорий применяется ко ВСЕМ, включая администраторов
     allowed_categories = list(
@@ -4734,7 +4757,7 @@ def _check_tournament_registration_eligibility(request, tournament, player):
     if player_skill not in allowed_categories:
         from apps.users.models import SkillLevel
 
-        allowed_labels = [SkillLevel(c).label for c in allowed_categories]
+        allowed_labels = [str(SkillLevel(c).label) for c in allowed_categories]
         player_label = SkillLevel(player_skill).label
         return (
             False,
@@ -4763,40 +4786,21 @@ def _check_tournament_registration_eligibility(request, tournament, player):
         )
         if club_eligibility.mode == RegistrationMode.BLOCKED:
             return False, club_eligibility.message
-        if club_eligibility.mode == RegistrationMode.PAID:
-            return False, REGISTER_PAY_CLUB_ENTRY_FEE_MSG
-        return True, None
-
-    # Однодневные: подписка не обязательна (взнос оплачивается отдельно)
-    if tournament.is_one_day:
-        return True, None
-
-    # Многодневные с взносом: по подписке в рамках лимита — бесплатно; иначе — оплата взноса или оформление подписки
-    if _tournament_requires_entry_payment(tournament):
-        if sub and sub.has_fancoin(TOURNAMENT_REGISTRATION_COST):
-            return True, None
-        if tournament_allows_postpayment_registration(tournament):
-            return True, None
-        return False, REGISTER_PAY_OR_SUBSCRIBE_MSG
-
-    # Многодневные без взноса: нужен активный безлимит или несгораемый остаток регистраций.
-    if not sub or not sub.has_fancoin(TOURNAMENT_REGISTRATION_COST):
-        return (
-            False,
-            "Для участия в многодневных турнирах нужна активная подписка и минимум 3 FT.",
-        )
-
+    try:
+        get_registration_payment_options(tournament, cast(User, user))
+    except RegistrationPaymentError as exc:
+        return False, str(exc)
     return True, None
 
 
-def _check_user_can_register_for_tournament(user, tournament):
+def _check_user_can_register_for_tournament(
+    user: User, tournament: Tournament
+) -> tuple[bool, str | None]:
     """Проверка возможности регистрации пользователя (для партнёра)."""
 
-    class Req:
-        pass
-
-    r = Req()
+    r = HttpRequest()
     r.user = user
+    p: Player | None
     try:
         p = user.player
     except Exception:
@@ -4804,6 +4808,142 @@ def _check_user_can_register_for_tournament(user, tournament):
     if not p:
         return False, "У пользователя нет профиля игрока."
     return _check_tournament_registration_eligibility(r, tournament, p)
+
+
+@transaction.atomic
+def _save_tournament_registration(
+    tournament: Tournament,
+    player: Player,
+    payment_method: str | None,
+    *,
+    partner: Player | None = None,
+    partner_payment_method: str | None = None,
+    team: TournamentTeam | None = None,
+) -> RegistrationPaymentMethod:
+    """Проверить обоих игроков до списаний и атомарно сохранить регистрацию и взносы."""
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+    closed_reason = get_registration_closed_reason(tournament)
+    if closed_reason:
+        raise RegistrationPaymentError(closed_reason)
+    players = [player] if partner is None else [player, partner]
+    lock_registration_payment_users(tournament, [item.user for item in players])
+    locked_players = {
+        item.pk: item
+        for item in Player.objects.select_for_update()
+        .filter(pk__in=[item.pk for item in players])
+        .order_by("pk")
+    }
+    # Пользователи перечитываются после блокировки: старый объект запроса не
+    # должен обходить изменившиеся права, допуск или остатки баланса.
+    from django.contrib.auth import get_user_model
+
+    for item in locked_players.values():
+        item.user = get_user_model().objects.get(pk=item.user_id)
+        if user_is_registered(tournament, item.user):
+            raise RegistrationPaymentError(
+                f"{item} уже зарегистрирован в этом турнире."
+            )
+        ok, error = _check_user_can_register_for_tournament(item.user, tournament)
+        if not ok:
+            raise RegistrationPaymentError(error or "Регистрация недоступна.")
+    player = locked_players[player.pk]
+    partner = locked_players[partner.pk] if partner is not None else None
+    if partner is not None and partner.pk == player.pk:
+        raise RegistrationPaymentError("Нельзя добавить себя в пару.")
+    if (
+        partner is not None
+        and tournament.club_id
+        and not _get_tournament_club_member(partner.user, tournament)
+    ):
+        raise RegistrationPaymentError(
+            "Для клубного турнира можно выбрать партнёра только из активных участников клуба."
+        )
+    if team is not None:
+        team = (
+            TournamentTeam.objects.select_for_update()
+            .filter(pk=team.pk, tournament=tournament, player2__isnull=True)
+            .first()
+        )
+        if team is None:
+            raise RegistrationPaymentError("Команда не найдена или уже укомплектована.")
+    other_player = partner if partner is not None else (team.player1 if team else None)
+    if other_player is not None and tournament.is_mixed_doubles():
+        if not player.gender or not other_player.gender:
+            raise RegistrationPaymentError(
+                "Для участия в микст-турнире необходимо указать пол в профиле (у вас и у партнёра)."
+            )
+        if player.gender == other_player.gender:
+            raise RegistrationPaymentError(
+                "Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола."
+            )
+    method = resolve_registration_payment_method(
+        tournament, player.user, payment_method
+    )
+    partner_method = (
+        resolve_registration_payment_method(
+            tournament, partner.user, partner_payment_method
+        )
+        if partner is not None
+        else None
+    )
+    if method == RegistrationPaymentMethod.ONLINE:
+        return method
+    if partner_method == RegistrationPaymentMethod.ONLINE:
+        raise RegistrationPaymentError(
+            "Партнёру нужно сначала оплатить взнос со своей страницы турнира. "
+            "Или зарегистрируйтесь без партнёра: он сможет присоединиться после оплаты."
+        )
+    apply_registration_payment(tournament, player.user, method)
+    if partner is not None and partner_method is not None:
+        apply_registration_payment(tournament, partner.user, partner_method)
+    if not tournament.is_doubles():
+        tournament.participants.add(player)
+    elif team is not None:
+        team.player2 = player
+        team.save(update_fields=["player2"])
+    else:
+        TournamentTeam.objects.create(
+            tournament=tournament, player1=player, player2=partner
+        )
+    return method
+
+
+def _notify_registration_success(
+    request: HttpRequest, tournament: Tournament, users: list[User]
+) -> None:
+    """Отправить уведомления только после успешного сохранения всей регистрации."""
+    queue_metrika_goal(
+        request, TOURNAMENT_REGISTRATION_SUCCESS, tournament_goal_params(tournament)
+    )
+    try:
+        from apps.core.telegram_notify import notify_tournament_registration
+        from apps.telegram_bot import notifications as tg
+
+        for user in users:
+            notify_tournament_registration(user, tournament)
+            tg.notify_tournament_registered(user, tournament)
+    except Exception:
+        log.exception(
+            "Не удалось отправить уведомление о регистрации в {}", tournament.pk
+        )
+
+
+def _render_registration_payment_choice(
+    request: HttpRequest, tournament: Tournament, *, error: str = ""
+) -> HttpResponse:
+    """Показать способы без бронирования места и сохранить понятную ошибку формы."""
+    context = {
+        "tournament": tournament,
+        "payment_options": get_registration_payment_options(
+            tournament, cast(User, request.user)
+        ),
+        "selected_payment_method": request.POST.get("payment_method", ""),
+        "payment_error": error,
+    }
+    context.update(_get_club_panel_context_for_tournament(request, tournament))
+    return render(
+        request, "tournaments/register.html", context, status=400 if error else 200
+    )
 
 
 def _is_player_registered_in_doubles(tournament, player):
@@ -4871,7 +5011,9 @@ def _remove_solo_teams_for_teamed_players(tournament):
     ).delete()
 
 
-def _get_tournament_club_member(user, tournament) -> ClubMember | None:
+def _get_tournament_club_member(
+    user: AbstractBaseUser | AnonymousUser, tournament: Tournament
+) -> ClubMember | None:
     """Возвращает активное членство пользователя в клубе-организаторе турнира.
 
     Args:
@@ -4897,73 +5039,27 @@ def _get_tournament_club_member(user, tournament) -> ClubMember | None:
 
 @login_required
 @require_filled_profile
-def tournament_register(request, slug):
-    """Register authenticated user to a tournament."""
-
+def tournament_register(request: HttpRequest, slug: str) -> HttpResponse:
+    """Показать выбор взноса на GET и зарегистрировать одиночного игрока на POST."""
     tournament = get_object_or_404(Tournament, slug=slug)
     player = getattr(request.user, "player", None)
     if player is None:
         player = Player.objects.create(user=request.user)
-
-    if tournament.club_id and not tournament.is_open_interclub:
-        if not _get_tournament_club_member(request.user, tournament):
-            messages.error(request, REGISTER_CLUB_MEMBERSHIP_REQUIRED_MSG)
-            return redirect("tournament_detail", slug=tournament.slug)
-
-    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
-        messages.error(
-            request, "Регистрация недоступна: турнир уже завершён или отменён."
-        )
-        return redirect("tournament_detail", slug=tournament.slug)
-
-    if getattr(tournament, "bracket_generated", False):
-        messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")
-        return redirect("tournament_detail", slug=tournament.slug)
-    if getattr(tournament, "postpayment_window_started_at", None):
-        messages.error(
-            request,
-            "Регистрация закрыта: запущено окно постоплаты и формирование сетки.",
-        )
-        return redirect("tournament_detail", slug=tournament.slug)
-
-    if tournament.is_full():
-        messages.error(request, "Регистрация закрыта: все места заняты.")
-        return redirect("tournament_detail", slug=tournament.slug)
-
-    # Парный турнир — отдельный поток регистрации
     if tournament.is_doubles():
         return redirect("tournament_register_doubles", slug=tournament.slug)
-
-    # Check gender compatibility
-    # "open" — любой пол (открытая категория), "mixed" — микст (для парных: М+Ж в команде)
-    if tournament.gender not in ("mixed", "open"):
-        if (tournament.gender == "male" and player.gender != "male") or (
-            tournament.gender == "female" and player.gender != "female"
-        ):
-            gender_text = "мужской" if tournament.gender == "male" else "женский"
-            messages.error(request, f"Этот турнир только для {gender_text} категории.")
-            return redirect("tournament_detail", slug=tournament.slug)
-
-    # Check if player is already registered
     if tournament.participants.filter(id=player.id).exists():
         messages.info(request, "Вы уже зарегистрированы на этот турнир.")
         return redirect("tournament_detail", slug=tournament.slug)
-
-    tournament_member = _get_tournament_club_member(request.user, tournament)
-
-    # SUBSCRIPTION CHECK
-    try:
-        sub = request.user.subscription
-    except Exception:
-        sub = None
-
-    # Проверка всех условий регистрации (включая категории)
+    closed_reason = get_registration_closed_reason(tournament)
+    if closed_reason:
+        messages.error(request, closed_reason)
+        return redirect("tournament_detail", slug=tournament.slug)
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         padel_redirect = _redirect_if_padel_entry_missing(request, err)
         if padel_redirect is not None:
             return padel_redirect
-        messages.error(request, err)
+        messages.error(request, err or "Регистрация недоступна.")
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
             return _build_tournament_payment_redirect(tournament, request=request)
         if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
@@ -4972,71 +5068,32 @@ def tournament_register(request, slug):
             return redirect("pricing")
         return redirect("tournament_detail", slug=tournament.slug)
 
-    is_admin = request.user.is_superuser or request.user.is_staff
-
-    # Однодневный с взносом: все переходят на страницу оплаты
-    if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
-        return _build_tournament_payment_redirect(tournament, request=request)
-    else:
-        # Без взноса: регистрация сразу; лимит подписки не тратим для однодневных
-        if is_admin:
-            messages.success(
-                request, "Регистрация администратора (бесплатно/безлимитно)."
-            )
-        else:
-            if not _tournament_does_not_consume_subscription_limit(tournament):
-                try:
-                    sub = request.user.subscription
-                    if sub and sub.spend_fancoin(
-                        TOURNAMENT_REGISTRATION_COST,
-                        reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
-                        tournament=tournament,
-                    ):
-                        mark_registration_covered(
-                            tournament,
-                            request.user,
-                            TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
-                        )
-                        messages.success(
-                            request,
-                            f"Вы зарегистрированы! Баланс FT: {sub.get_fancoin_balance()}",
-                        )
-                    else:
-                        messages.success(request, "Вы зарегистрированы!")
-                except Exception:
-                    messages.success(request, "Вы зарегистрированы!")
-            else:
-                messages.success(request, "Вы зарегистрированы!")
-
-        if tournament_member:
-            consumed, consume_error = consume_member_tournament_limit(
-                tournament_member,
-                tournament,
-            )
-            if not consumed:
-                messages.error(request, consume_error)
-                return redirect("tournament_detail", slug=tournament.slug)
-            mark_registration_covered(
-                tournament,
-                request.user,
-                TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
-            )
-
-        tournament.participants.add(player)
-        queue_metrika_goal(
-            request,
-            TOURNAMENT_REGISTRATION_SUCCESS,
-            tournament_goal_params(tournament),
+    options = get_registration_payment_options(tournament, cast(User, request.user))
+    if request.method != "POST":
+        if len(options) == 1 and options[0].value == RegistrationPaymentMethod.ONLINE:
+            return _build_tournament_payment_redirect(tournament, request=request)
+        return _render_registration_payment_choice(request, tournament)
+    try:
+        method = _save_tournament_registration(
+            tournament, player, request.POST.get("payment_method")
         )
-        try:
-            from apps.core.telegram_notify import notify_tournament_registration
-            from apps.telegram_bot import notifications as tg
-
-            notify_tournament_registration(request.user, tournament)
-            tg.notify_tournament_registered(request.user, tournament)
-        except Exception:
-            pass
-        return redirect("tournament_detail", slug=tournament.slug)
+    except RegistrationPaymentError as exc:
+        return _render_registration_payment_choice(request, tournament, error=str(exc))
+    if method == RegistrationPaymentMethod.ONLINE:
+        return _build_tournament_payment_redirect(tournament, request=request)
+    _notify_registration_success(request, tournament, [cast(User, request.user)])
+    if method == RegistrationPaymentMethod.ONSITE:
+        messages.success(
+            request, "Вы зарегистрированы. Взнос нужно передать организатору на корте."
+        )
+    elif method == RegistrationPaymentMethod.POSTPAYMENT:
+        messages.success(
+            request,
+            "Вы зарегистрированы. Ссылка на оплату появится после открытия окна постоплаты.",
+        )
+    else:
+        messages.success(request, "Вы зарегистрированы!")
+    return redirect("tournament_detail", slug=tournament.slug)
 
 
 @login_required
@@ -5069,7 +5126,7 @@ def tournament_register_required(request, slug):
 
 @login_required
 @require_filled_profile
-def tournament_register_doubles(request, slug):
+def tournament_register_doubles(request: HttpRequest, slug: str) -> HttpResponse:
     """Регистрация на парный турнир: solo, с партнёром или присоединение к существующей паре."""
 
     tournament = get_object_or_404(Tournament, slug=slug)
@@ -5080,24 +5137,9 @@ def tournament_register_doubles(request, slug):
     if player is None:
         player = Player.objects.create(user=request.user)
 
-    if tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED):
-        messages.error(
-            request, "Регистрация недоступна: турнир уже завершён или отменён."
-        )
-        return redirect("tournament_detail", slug=tournament.slug)
-
-    if tournament.bracket_generated:
-        messages.error(request, "Регистрация закрыта: сетка турнира уже сформирована.")
-        return redirect("tournament_detail", slug=slug)
-    if getattr(tournament, "postpayment_window_started_at", None):
-        messages.error(
-            request,
-            "Регистрация закрыта: запущено окно постоплаты и формирование сетки.",
-        )
-        return redirect("tournament_detail", slug=slug)
-
-    if tournament.is_full():
-        messages.error(request, "Регистрация закрыта: все места заняты.")
+    closed_reason = get_registration_closed_reason(tournament)
+    if closed_reason:
+        messages.error(request, closed_reason)
         return redirect("tournament_detail", slug=slug)
 
     # "open" — любой пол (открытая категория), "mixed" — микст (для парных: М+Ж в команде)
@@ -5118,14 +5160,12 @@ def tournament_register_doubles(request, slug):
             messages.error(request, REGISTER_CLUB_MEMBERSHIP_REQUIRED_MSG)
             return redirect("tournament_detail", slug=tournament.slug)
 
-    tournament_member = _get_tournament_club_member(request.user, tournament)
-
     ok, err = _check_tournament_registration_eligibility(request, tournament, player)
     if not ok:
         padel_redirect = _redirect_if_padel_entry_missing(request, err)
         if padel_redirect is not None:
             return padel_redirect
-        messages.error(request, err)
+        messages.error(request, err or "Регистрация недоступна.")
         if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
             return _build_tournament_payment_redirect(
                 tournament,
@@ -5140,17 +5180,21 @@ def tournament_register_doubles(request, slug):
             return redirect("pricing")
         return redirect("tournament_detail", slug=slug)
 
-    # Однодневный с взносом: без оплаты (по сессии) не показываем форму — редирект на оплату
-    if _tournament_requires_entry_payment(tournament) and tournament.is_one_day:
-        paid_ids = request.session.get("tournament_entry_paid") or []
-        if tournament.id not in paid_ids:
-            return _build_tournament_payment_redirect(
-                tournament,
-                next_url=request.build_absolute_uri(
-                    reverse("tournament_register_doubles", kwargs={"slug": slug})
-                ),
-                request=request,
-            )
+    payment_options = get_registration_payment_options(
+        tournament, cast(User, request.user)
+    )
+    if (
+        request.method == "GET"
+        and len(payment_options) == 1
+        and (payment_options[0].value == RegistrationPaymentMethod.ONLINE)
+    ):
+        return _build_tournament_payment_redirect(
+            tournament,
+            next_url=request.build_absolute_uri(
+                reverse("tournament_register_doubles", kwargs={"slug": slug})
+            ),
+            request=request,
+        )
 
     solo_teams = list(
         tournament.teams.filter(player2__isnull=True).select_related("player1__user")
@@ -5253,57 +5297,33 @@ def tournament_register_doubles(request, slug):
         action = request.POST.get("action")
 
         if action == "solo":
-            if tournament_member:
-                consumed, consume_error = consume_member_tournament_limit(
-                    tournament_member,
-                    tournament,
-                )
-                if not consumed:
-                    messages.error(request, consume_error)
-                    return redirect("tournament_detail", slug=tournament.slug)
-            TournamentTeam.objects.create(tournament=tournament, player1=player)
-            if not _tournament_does_not_consume_subscription_limit(tournament):
-                try:
-                    sub = request.user.subscription
-                    if sub and sub.spend_fancoin(
-                        TOURNAMENT_REGISTRATION_COST,
-                        reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
-                        tournament=tournament,
-                    ):
-                        mark_registration_covered(
-                            tournament,
-                            request.user,
-                            TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
-                        )
-                except Exception:
-                    pass
-            paid_ids = request.session.get("tournament_entry_paid") or []
-            if tournament.id in paid_ids:
-                paid_ids = [i for i in paid_ids if i != tournament.id]
-                request.session["tournament_entry_paid"] = paid_ids
-                request.session.modified = True
             try:
-                from apps.core.telegram_notify import notify_tournament_registration
-                from apps.telegram_bot import notifications as tg
-
-                notify_tournament_registration(request.user, tournament)
-                tg.notify_tournament_registered(request.user, tournament)
-            except Exception:
-                pass
+                method = _save_tournament_registration(
+                    tournament, player, request.POST.get("payment_method")
+                )
+            except RegistrationPaymentError as exc:
+                messages.error(request, str(exc))
+                return redirect("tournament_register_doubles", slug=slug)
+            if method == RegistrationPaymentMethod.ONLINE:
+                return _build_tournament_payment_redirect(
+                    tournament,
+                    next_url=request.build_absolute_uri(
+                        reverse("tournament_register_doubles", kwargs={"slug": slug})
+                    ),
+                    request=request,
+                )
+            _notify_registration_success(
+                request, tournament, [cast(User, request.user)]
+            )
             messages.success(
                 request,
                 "Вы зарегистрированы. Партнёр может присоединиться к вам со своей страницы турнира.",
             )
-            queue_metrika_goal(
-                request,
-                TOURNAMENT_REGISTRATION_SUCCESS,
-                tournament_goal_params(tournament),
-            )
             return redirect("tournament_detail", slug=slug)
 
         if action == "join" and solo_teams:
-            team_id = request.POST.get("team_id")
-            team = next((t for t in solo_teams if t.id == int(team_id or 0)), None)
+            team_id = _parse_int_post(request, "team_id")
+            team = next((t for t in solo_teams if t.id == team_id), None)
             if team:
                 return _do_join_team(request, tournament, player, team)
             messages.error(request, "Команда не найдена.")
@@ -5313,121 +5333,79 @@ def tournament_register_doubles(request, slug):
                 return _do_add_partner(request, tournament, player, partner_id)
             messages.error(request, "Укажите партнёра.")
 
+    partner_search_rows = []
+    for partner in partner_search_results:
+        try:
+            options = get_registration_payment_options(tournament, partner.user)
+            available_options = [
+                option
+                for option in options
+                if option.value != RegistrationPaymentMethod.ONLINE
+            ]
+            error = (
+                ""
+                if available_options
+                else "Партнёру нужно сначала оплатить взнос со своей страницы турнира."
+            )
+        except RegistrationPaymentError as exc:
+            available_options = []
+            error = str(exc)
+        partner_search_rows.append((partner, available_options, error))
     context = {
         "tournament": tournament,
         "solo_teams": solo_teams,
         "partner_search_results": partner_search_results,
+        "partner_search_rows": partner_search_rows,
+        "payment_options": payment_options,
+        "selected_payment_method": request.POST.get("payment_method", ""),
         "persist_messages": True,
     }
     context.update(_get_club_panel_context_for_tournament(request, tournament))
     return render(request, "tournaments/register_doubles.html", context)
 
 
-def _do_join_team(request, tournament, player, team):
-    """Присоединить игрока к существующей команде (solo)."""
-    # Проверка всех условий регистрации (включая категории)
-    ok, err = _check_tournament_registration_eligibility(request, tournament, player)
-    if not ok:
-        padel_redirect = _redirect_if_padel_entry_missing(request, err)
+def _do_join_team(
+    request: HttpRequest, tournament: Tournament, player: Player, team: TournamentTeam
+) -> HttpResponse:
+    """Атомарно присоединить игрока к свободной команде, проверив оплату и закрытие набора."""
+    try:
+        method = _save_tournament_registration(
+            tournament, player, request.POST.get("payment_method"), team=team
+        )
+    except RegistrationPaymentError as exc:
+        padel_redirect = _redirect_if_padel_entry_missing(request, str(exc))
         if padel_redirect is not None:
             return padel_redirect
-        messages.error(request, err)
-        if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
-            return _build_tournament_payment_redirect(
-                tournament,
-                next_url=request.build_absolute_uri(
-                    reverse(
-                        "tournament_register_doubles", kwargs={"slug": tournament.slug}
-                    )
-                ),
-                request=request,
-            )
-        if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
-            return redirect("tournament_register_required", slug=tournament.slug)
-        return redirect("tournament_detail", slug=tournament.slug)
-
-    # Проверка пола для микст-турниров
-    if tournament.is_mixed_doubles():
-        if not player.gender or not team.player1.gender:
-            messages.error(
-                request, "Для участия в микст-турнире необходимо указать пол в профиле."
-            )
-            return redirect("tournament_detail", slug=tournament.slug)
-        if player.gender == team.player1.gender:
-            gender_text = "женщину" if player.gender == "male" else "мужчину"
-            messages.error(
-                request,
-                f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).",
-            )
-            return redirect("tournament_detail", slug=tournament.slug)
-
-    tournament_member = _get_tournament_club_member(request.user, tournament)
-    if tournament_member:
-        consumed, consume_error = consume_member_tournament_limit(
-            tournament_member,
+        messages.error(request, str(exc))
+        return redirect("tournament_register_doubles", slug=tournament.slug)
+    if method == RegistrationPaymentMethod.ONLINE:
+        return _build_tournament_payment_redirect(
             tournament,
+            next_url=request.build_absolute_uri(
+                reverse("tournament_register_doubles", kwargs={"slug": tournament.slug})
+            ),
+            request=request,
         )
-        if not consumed:
-            messages.error(request, consume_error)
-            return redirect("tournament_detail", slug=tournament.slug)
-        mark_registration_covered(
-            tournament,
-            request.user,
-            TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
-        )
-
-    team.player2 = player
-    team.save()
-    if not _tournament_does_not_consume_subscription_limit(tournament):
-        try:
-            sub = request.user.subscription
-            if sub and sub.spend_fancoin(
-                TOURNAMENT_REGISTRATION_COST,
-                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
-                tournament=tournament,
-            ):
-                mark_registration_covered(
-                    tournament,
-                    request.user,
-                    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
-                )
-        except Exception:
-            pass
-    paid_ids = request.session.get("tournament_entry_paid") or []
-    if tournament.id in paid_ids:
-        paid_ids = [i for i in paid_ids if i != tournament.id]
-        request.session["tournament_entry_paid"] = paid_ids
-        request.session.modified = True
     create_notification(
         user=team.player1.user,
         message=f"{player} присоединился к вашей команде в турнире {tournament.name}.",
         url=reverse("tournament_detail", args=[tournament.slug]),
         event_key="tournament.team_joined",
     )
-    try:
-        from apps.core.telegram_notify import notify_tournament_registration
-        from apps.telegram_bot import notifications as tg
-
-        notify_tournament_registration(request.user, tournament)
-        tg.notify_tournament_registered(request.user, tournament)
-    except Exception:
-        pass
+    _notify_registration_success(request, tournament, [cast(User, request.user)])
     messages.success(
         request, f"Вы присоединились к команде с {team.player1}. Регистрация завершена."
-    )
-    queue_metrika_goal(
-        request,
-        TOURNAMENT_REGISTRATION_SUCCESS,
-        tournament_goal_params(tournament),
     )
     return redirect("tournament_detail", slug=tournament.slug)
 
 
-def _do_add_partner(request, tournament, player, partner_id):
+def _do_add_partner(
+    request: HttpRequest, tournament: Tournament, player: Player, partner_id: str
+) -> HttpResponse:
     """Создать команду с указанным партнёром."""
     try:
         partner = Player.objects.get(pk=partner_id)
-    except Player.DoesNotExist:
+    except (Player.DoesNotExist, ValueError, TypeError):
         messages.error(request, "Игрок не найден.")
         return redirect("tournament_register_doubles", slug=tournament.slug)
 
@@ -5448,155 +5426,49 @@ def _do_add_partner(request, tournament, player, partner_id):
         messages.error(request, "Нельзя добавить себя в пару.")
         return redirect("tournament_register_doubles", slug=tournament.slug)
 
-    if _is_player_registered_in_doubles(tournament, partner):
-        messages.error(request, f"{partner} уже зарегистрирован в этом турнире.")
+    try:
+        method = _save_tournament_registration(
+            tournament,
+            player,
+            request.POST.get("payment_method"),
+            partner=partner,
+            partner_payment_method=request.POST.get("partner_payment_method"),
+        )
+    except RegistrationPaymentError as exc:
+        messages.error(request, str(exc))
         return redirect("tournament_register_doubles", slug=tournament.slug)
-
-    # Проверка пола для микст-турниров
-    if tournament.is_mixed_doubles():
-        if not player.gender or not partner.gender:
-            messages.error(
-                request,
-                "Для участия в микст-турнире необходимо указать пол в профиле (у вас и у партнёра).",
-            )
-            return redirect("tournament_register_doubles", slug=tournament.slug)
-        if player.gender == partner.gender:
-            gender_text = "женщину" if player.gender == "male" else "мужчину"
-            messages.error(
-                request,
-                f"Это микст-турнир. В команде должны быть мужчина и женщина. Выберите партнёра противоположного пола ({gender_text}).",
-            )
-            return redirect("tournament_register_doubles", slug=tournament.slug)
-
-    # Проверка всех условий регистрации для текущего игрока (включая категории)
-    ok, err = _check_tournament_registration_eligibility(request, tournament, player)
-    if not ok:
-        padel_redirect = _redirect_if_padel_entry_missing(request, err)
-        if padel_redirect is not None:
-            return padel_redirect
-        messages.error(request, err)
-        if err == REGISTER_PAY_CLUB_ENTRY_FEE_MSG:
-            return _build_tournament_payment_redirect(
-                tournament,
-                next_url=request.build_absolute_uri(
-                    reverse(
-                        "tournament_register_doubles", kwargs={"slug": tournament.slug}
-                    )
-                ),
-                request=request,
-            )
-        if err == REGISTER_PAY_OR_SUBSCRIBE_MSG:
-            return redirect("tournament_register_required", slug=tournament.slug)
-        return redirect("tournament_detail", slug=tournament.slug)
-
-    partner_ok, partner_err = _check_user_can_register_for_tournament(
-        partner.user, tournament
-    )
-    if not partner_ok:
-        messages.error(request, f"Партнёр не может участвовать: {partner_err}")
-        return redirect("tournament_register_doubles", slug=tournament.slug)
-
-    tournament_member = _get_tournament_club_member(request.user, tournament)
-    if tournament_member:
-        consumed, consume_error = consume_member_tournament_limit(
-            tournament_member,
+    if method == RegistrationPaymentMethod.ONLINE:
+        return _build_tournament_payment_redirect(
             tournament,
+            next_url=request.build_absolute_uri(
+                reverse("tournament_register_doubles", kwargs={"slug": tournament.slug})
+            ),
+            request=request,
         )
-        if not consumed:
-            messages.error(request, consume_error)
-            return redirect("tournament_detail", slug=tournament.slug)
-        mark_registration_covered(
-            tournament,
-            request.user,
-            TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
-        )
-
-    partner_tournament_member = _get_tournament_club_member(partner.user, tournament)
-    if partner_tournament_member:
-        partner_consumed, partner_consume_error = consume_member_tournament_limit(
-            partner_tournament_member,
-            tournament,
-        )
-        if not partner_consumed:
-            messages.error(
-                request, f"Партнёр не может участвовать: {partner_consume_error}"
-            )
-            return redirect("tournament_register_doubles", slug=tournament.slug)
-        mark_registration_covered(
-            tournament,
-            partner.user,
-            TournamentRegistrationCoverage.CoverageType.CLUB_PLAN_SLOT,
-        )
-
-    TournamentTeam.objects.create(
-        tournament=tournament, player1=player, player2=partner
-    )
-    if not _tournament_does_not_consume_subscription_limit(tournament):
-        try:
-            sub = request.user.subscription
-            if sub and sub.spend_fancoin(
-                TOURNAMENT_REGISTRATION_COST,
-                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
-                tournament=tournament,
-            ):
-                mark_registration_covered(
-                    tournament,
-                    request.user,
-                    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
-                )
-        except Exception:
-            pass
-        try:
-            psub = partner.user.subscription
-            if psub and psub.spend_fancoin(
-                TOURNAMENT_REGISTRATION_COST,
-                reason=FancoinTransaction.Reason.TOURNAMENT_REGISTRATION,
-                tournament=tournament,
-            ):
-                mark_registration_covered(
-                    tournament,
-                    partner.user,
-                    TournamentRegistrationCoverage.CoverageType.SUBSCRIPTION_SLOT,
-                )
-        except Exception:
-            pass
-    paid_ids = request.session.get("tournament_entry_paid") or []
-    if tournament.id in paid_ids:
-        paid_ids = [i for i in paid_ids if i != tournament.id]
-        request.session["tournament_entry_paid"] = paid_ids
-        request.session.modified = True
     create_notification(
         user=partner.user,
         message=f"{player} добавил вас в команду на турнир {tournament.name}.",
         url=reverse("tournament_detail", args=[tournament.slug]),
         event_key="tournament.partner_added",
     )
-    try:
-        from apps.core.telegram_notify import notify_tournament_registration
-        from apps.telegram_bot import notifications as tg
-
-        notify_tournament_registration(request.user, tournament)
-        notify_tournament_registration(partner.user, tournament)
-        tg.notify_tournament_registered(request.user, tournament)
-        tg.notify_tournament_registered(partner.user, tournament)
-    except Exception:
-        pass
-    messages.success(request, f"Команда зарегистрирована: вы и {partner}.")
-    queue_metrika_goal(
-        request,
-        TOURNAMENT_REGISTRATION_SUCCESS,
-        tournament_goal_params(tournament),
+    _notify_registration_success(
+        request, tournament, [cast(User, request.user), partner.user]
     )
+    messages.success(request, f"Команда зарегистрирована: вы и {partner}.")
     return redirect("tournament_detail", slug=tournament.slug)
 
 
 @login_required
 @require_filled_profile
-def tournament_join_team(request, slug, team_id):
+def tournament_join_team(request: HttpRequest, slug: str, team_id: int) -> HttpResponse:
     """Присоединиться к команде (партнёр без пары)."""
     if request.method != "POST":
         return redirect("tournament_detail", slug=slug)
     tournament = get_object_or_404(Tournament, slug=slug)
+    if not tournament.is_doubles():
+        return HttpResponseBadRequest(
+            "Присоединение к команде доступно только в парном турнире."
+        )
     team = get_object_or_404(
         TournamentTeam, tournament=tournament, pk=team_id, player2__isnull=True
     )

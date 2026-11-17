@@ -3,7 +3,7 @@ Custom User model with phone and email authentication.
 """
 
 from datetime import datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
@@ -17,6 +17,9 @@ from apps.core.contact_utils import (
 )
 from apps.core.sports import Sport
 from config.validators import CompressImageFieldsMixin, validate_image_max_2mb
+
+if TYPE_CHECKING:
+    from apps.subscriptions.models import UserSubscription
 
 
 class UserManager(BaseUserManager):
@@ -50,6 +53,10 @@ class UserManager(BaseUserManager):
 
 class User(AbstractUser):
     """Custom User model with email as username."""
+
+    if TYPE_CHECKING:
+        player: "Player"
+        subscription: UserSubscription
 
     username = None
     email = models.EmailField("Email", unique=True, null=True, blank=True)
@@ -123,6 +130,10 @@ class SkillLevel(models.TextChoices):
 
 class Player(CompressImageFieldsMixin, models.Model):
     """Player profile extending User."""
+
+    if TYPE_CHECKING:
+        id: int
+        user_id: int
 
     user = models.OneToOneField(
         User,

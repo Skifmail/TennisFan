@@ -1,26 +1,31 @@
-"""
-Tournaments admin configuration.
-"""
+"""Настройки админки турниров, участников и финансовой истории."""
 
+from __future__ import annotations
+
+from collections.abc import Callable
 from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
+from django.views.decorators.http import require_POST
 
 from apps.core.geo import city_uses_moscow_geo, geo_areas_client_payload
 from apps.core.sports import Sport
-from apps.users.models import Player, SkillLevel
+from apps.users.models import Player, SkillLevel, User
 from apps.users.skill_levels import skill_with_ntrp
 
+from .entry_payment import RegistrationPaymentError, confirm_onsite_payment
 from .fan import generate_bracket
 from .models import (
     MANUAL_PAIRING_FORMATS_NOTE,
@@ -33,7 +38,10 @@ from .models import (
     SparringDeadlineExtension,
     Tournament,
     TournamentAllowedCategory,
+    TournamentDuration,
     TournamentEntryRefundRequest,
+    TournamentFormat,
+    TournamentOnsitePayment,
     TournamentPhoto,
     TournamentPlayerResult,
     TournamentPostpaymentInvoice,
@@ -56,6 +64,7 @@ from .postpayment import (
     build_participant_payment_statuses,
     finalize_postpayment_window,
     format_postpayment_open_summary,
+    get_pending_postpayment_invoices,
     get_pending_postpayment_users,
     get_postpayment_progress,
     mark_postpayment_call,
@@ -80,7 +89,7 @@ from .tvd import (
 from .tvd import (
     generate_playoffs as tvd_generate_playoffs,
 )
-from .utils import generate_unique_tournament_slug
+from .utils import generate_tournament_with_start_date, generate_unique_tournament_slug
 
 _PAYMENT_STATUS_TONE_STYLES: dict[PaymentStatusTone, str] = {
     "success": "color:#2da44e; font-weight:600;",
@@ -223,9 +232,9 @@ def generate_olympic_bracket_action(modeladmin, request, queryset):
 
 
 def _admin_generate_bracket_after_postpayment(
-    request,
+    request: HttpRequest,
     tournament: Tournament,
-    generate_fn,
+    generate_fn: Callable[[Tournament], tuple[bool, str]],
 ) -> bool:
     """Сформировать сетку с учётом окна постоплаты.
 
@@ -247,20 +256,19 @@ def _admin_generate_bracket_after_postpayment(
         return True
     if tournament.postpayment_window_started_at is not None:
         progress = get_postpayment_progress(tournament)
-        if bool(progress["completed"]):
+        if bool(progress["completed"]) or not pending_users:
             ok, msg = finalize_postpayment_window(tournament)
             if ok:
                 messages.success(request, f"{tournament.name}: {msg}")
             else:
                 messages.warning(request, f"{tournament.name}: {msg}")
             return True
-        if pending_users:
-            messages.info(
-                request,
-                f"{tournament.name}: окно постоплаты открыто, "
-                f"ожидают оплату {len(pending_users)} участников.",
-            )
-            return True
+        messages.info(
+            request,
+            f"{tournament.name}: окно постоплаты открыто, "
+            f"ожидают оплату {len(pending_users)} участников.",
+        )
+        return True
     if tournament.bracket_generated and not tournament_has_generated_matches(
         tournament
     ):
@@ -268,7 +276,7 @@ def _admin_generate_bracket_after_postpayment(
             return True
         tournament.bracket_generated = False
         tournament.save(update_fields=["bracket_generated", "updated_at"])
-    ok, msg = generate_fn(tournament)
+    ok, msg = generate_tournament_with_start_date(tournament, generate_fn)
     if ok:
         messages.success(request, f"{tournament.name}: {msg}")
     else:
@@ -285,13 +293,16 @@ def generate_round_robin_bracket_action(modeladmin, request, queryset):
 
 
 @admin.action(description="Сформировать группы")
-def generate_tvd_groups_action(modeladmin, request, queryset):
-    for t in queryset:
-        ok, msg = tvd_generate_groups(t)
-        if ok:
-            messages.success(request, f"{t.name}: {msg}")
-        else:
-            messages.warning(request, f"{t.name}: {msg}")
+def generate_tvd_groups_action(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[Tournament],
+) -> None:
+    """Сформировать группы, не обходя ожидание постоплаты."""
+    for tournament in queryset.filter(format=TournamentFormat.WEEKEND_DAY):
+        _admin_generate_bracket_after_postpayment(
+            request, tournament, tvd_generate_groups
+        )
 
 
 @admin.action(description="Сформировать плей-офф")
@@ -314,12 +325,16 @@ def finalize_tvd_action(modeladmin, request, queryset):
             messages.warning(request, f"{t.name}: {msg}")
 
 
-@admin.action(description="Дозаполнить итоги (места 5+)")
-def backfill_tvd_standings_action(modeladmin, request, queryset):
-    """Для завершённых турниров: присвоить места 5–8 и 9+ участникам без результата."""
-    from .models import TournamentStatus
-
-    for t in queryset.filter(status=TournamentStatus.COMPLETED):
+@admin.action(description="Дозаполнить итоги групп (места 5+)")
+def backfill_tvd_standings_action(
+    modeladmin: admin.ModelAdmin,
+    request: HttpRequest,
+    queryset: QuerySet[Tournament],
+) -> None:
+    """Дозаполнить итоги только завершённых турниров группового формата."""
+    for t in queryset.filter(
+        format=TournamentFormat.WEEKEND_DAY, status=TournamentStatus.COMPLETED
+    ):
         _assign_tvd_places_5_onwards(t)
         messages.success(request, f"{t.name}: итоги дозаполнены (места 5+).")
 
@@ -353,13 +368,14 @@ class TournamentAdminForm(forms.ModelForm):
     )
 
     class Media:
-        js = ("js/tournament_moscow_geo.js",)
+        js = ("js/tournament_moscow_geo.js", "js/tournament_duration_fields.js")
 
     class Meta:
         model = Tournament
         fields = "__all__"
+        exclude: tuple[str, ...] = ("is_one_day",)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if "format" in self.fields:
             details = mark_safe(
@@ -374,6 +390,13 @@ class TournamentAdminForm(forms.ModelForm):
             self.fields["allowed_categories"].initial = list(
                 self.instance.allowed_categories.values_list("category", flat=True)
             )
+            for field, error in self.instance.get_calendar_errors().items():
+                if field in self.fields:
+                    self.fields[field].help_text = format_html(
+                        "{} Существующее значение: {} При изменении других настроек дата будет сохранена.",
+                        self.fields[field].help_text or "",
+                        error,
+                    )
         self.fields["slug"].help_text = (
             "Можно оставить пустым или ввести вручную. При совпадении с существующим "
             "турниром автоматически добавится суффикс -2, -3 и т.д."
@@ -402,6 +425,18 @@ class TournamentAdminForm(forms.ModelForm):
             self.fields["start_date"].required = False
             self.fields["end_date"].required = False
             self.fields["registration_deadline"].required = False
+        if "start_time" in self.fields:
+            duration = (
+                self.data.get("duration")
+                if self.is_bound
+                else self.initial.get("duration", self.instance.duration)
+            )
+            self.fields["start_time"].required = (
+                duration == TournamentDuration.SINGLE_DAY
+            )
+            self.fields["start_time"].widget = forms.TimeInput(
+                attrs={"type": "time"}, format="%H:%M"
+            )
 
     def clean_allowed_categories(self):
         value = self.cleaned_data.get("allowed_categories") or []
@@ -411,39 +446,44 @@ class TournamentAdminForm(forms.ModelForm):
             raise ValidationError("Можно выбрать не более 5 категорий.")
         return value
 
-    def clean(self):
-        cleaned_data = super().clean()
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean() or {}
         if cleaned_data.get("sport") == Sport.PADEL:
             cleaned_data["variant"] = TournamentVariant.DOUBLES
             self.errors.pop("variant", None)
         variant = cleaned_data.get("variant")
         gender = cleaned_data.get("gender")
-        tournament_format = cleaned_data.get("format")
         # "Микст" доступен только для парных турниров
         if variant == "singles" and gender == "mixed":
             raise ValidationError(
                 "Категория «Микст» доступна только для парных турниров. "
                 "Для одиночных используйте «Любой» (любой пол)."
             )
-        # Многодневный турнир: обязателен вступительный взнос (для регистрации по подписке или по оплате)
-        is_one_day = cleaned_data.get("is_one_day")
+        duration = cleaned_data.get("duration", self.instance.duration)
+        is_one_day = duration == TournamentDuration.SINGLE_DAY
+        if is_one_day and not cleaned_data.get("start_time"):
+            if "start_time" not in self.errors:
+                self.add_error(
+                    "start_time", "Укажите время начала однодневного турнира."
+                )
         entry_fee = cleaned_data.get("entry_fee")
         allow_postpayment = bool(cleaned_data.get("allow_postpayment"))
-        if is_one_day is False and (entry_fee is None or float(entry_fee or 0) <= 0):
-            raise ValidationError(
-                "Для многодневного турнира укажите сумму вступительного взноса (руб). "
-                "По подписке игроки регистрируются бесплатно в рамках лимита; без подписки или при исчерпанном лимите — оплата взноса."
+        if not is_one_day and (entry_fee is None or entry_fee <= 0):
+            self.add_error(
+                "entry_fee",
+                "Для турнира выходного дня или многодневного турнира укажите сумму вступительного взноса (руб). "
+                "По подписке игроки регистрируются бесплатно в рамках лимита; без подписки или при исчерпанном лимите — оплата взноса.",
             )
         if allow_postpayment:
             if is_one_day:
-                raise ValidationError("Постоплата недоступна для однодневных турниров.")
-            if tournament_format == "weekend_day":
-                raise ValidationError(
-                    "Постоплата недоступна для формата «Группы + плей-офф»."
+                self.add_error(
+                    "allow_postpayment",
+                    "Постоплата недоступна для однодневных турниров.",
                 )
-            if entry_fee is None or float(entry_fee or 0) <= 0:
-                raise ValidationError(
-                    "Постоплата доступна только при вступительном взносе больше 0 ₽."
+            if entry_fee is None or entry_fee <= 0:
+                self.add_error(
+                    "allow_postpayment",
+                    "Постоплата доступна только при вступительном взносе больше 0 ₽.",
                 )
         start_after_fill = bool(cleaned_data.get("start_after_fill"))
         bracket_generated = bool(
@@ -451,17 +491,16 @@ class TournamentAdminForm(forms.ModelForm):
             or (self.instance and self.instance.bracket_generated)
         )
         if start_after_fill:
-            cleaned_data["registration_deadline"] = None
-            if not bracket_generated:
+            if not self.instance.pk:
                 # До автозапуска даты не используются.
+                cleaned_data["registration_deadline"] = None
                 cleaned_data["start_date"] = None
                 cleaned_data["end_date"] = None
-            else:
+            elif bracket_generated:
                 # После старта не затираем даты, даже если поле не пришло в POST.
-                if not cleaned_data.get("start_date") and self.instance.start_date:
-                    cleaned_data["start_date"] = self.instance.start_date
-                if not cleaned_data.get("end_date") and self.instance.end_date:
-                    cleaned_data["end_date"] = self.instance.end_date
+                for field in ("start_date", "end_date", "registration_deadline"):
+                    if cleaned_data.get(field) is None:
+                        cleaned_data[field] = getattr(self.instance, field)
             if variant == "doubles":
                 if not cleaned_data.get("max_teams"):
                     raise ValidationError(
@@ -499,8 +538,149 @@ class TournamentEntryRefundRequestAdmin(admin.ModelAdmin):
     list_display = ("refund_ref", "tournament", "user", "amount", "removed_at")
     list_filter = ("tournament", "removed_at")
     search_fields = ("refund_ref", "user__email", "user__last_name", "user__first_name")
-    readonly_fields = ("tournament", "user", "removed_at", "amount", "refund_ref")
+    readonly_fields = (
+        "tournament",
+        "user",
+        "removed_at",
+        "amount",
+        "refund_ref",
+        "onsite_payment",
+    )
     date_hierarchy = "removed_at"
+
+
+@admin.register(TournamentOnsitePayment)
+class TournamentOnsitePaymentAdmin(admin.ModelAdmin):
+    """Неизменяемая финансовая карточка с отдельным подтверждением получения денег."""
+
+    change_form_template = "admin/tournaments/tournamentonsitepayment/change_form.html"
+    list_display = (
+        "tournament",
+        "user",
+        "amount",
+        "status",
+        "received_at",
+        "received_by",
+    )
+    list_filter = ("status", "tournament")
+    search_fields = (
+        "tournament__name",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+    )
+    list_select_related = ("tournament", "user", "received_by")
+    readonly_fields = (
+        "tournament",
+        "user",
+        "amount",
+        "status",
+        "created_at",
+        "received_at",
+        "received_by",
+        "closed_at",
+        "closed_reason",
+    )
+    actions = None
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Создавать ожидание может только проверенная регистрация участника."""
+        return False
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: TournamentOnsitePayment | None = None
+    ) -> bool:
+        """Не удалять ожидания и отметки фактического получения даже суперпользователю."""
+        return False
+
+    def _can_confirm_receipt(
+        self, request: HttpRequest, payment: TournamentOnsitePayment
+    ) -> bool:
+        """Требовать права изменения финансовой карточки и самого турнира одновременно."""
+        return bool(
+            self.has_change_permission(request, payment)
+            and cast(User, request.user).has_perm("tournaments.change_tournament")
+        )
+
+    def get_urls(self) -> list[Any]:
+        """Добавить защищённый admin-маршрут отдельного подтверждения получения."""
+        return [
+            path(
+                "<int:object_id>/confirm-receipt/",
+                self.admin_site.admin_view(self.confirm_receipt_view),
+                name="tournaments_tournamentonsitepayment_confirm_receipt",
+            ),
+        ] + cast(list[Any], super().get_urls())
+
+    @method_decorator(require_POST)
+    def confirm_receipt_view(
+        self, request: HttpRequest, object_id: int
+    ) -> HttpResponse:
+        """Подтвердить получение через POST/CSRF и однократно записать действие в журнал."""
+        payment = get_object_or_404(TournamentOnsitePayment, pk=object_id)
+        if not self._can_confirm_receipt(request, payment):
+            raise PermissionDenied
+        try:
+            with transaction.atomic():
+                confirmed = confirm_onsite_payment(
+                    payment.tournament, payment.pk, received_by=cast(User, request.user)
+                )
+                if confirmed:
+                    self.log_change(
+                        request, payment, "Получение взноса на корте подтверждено."
+                    )
+        except RegistrationPaymentError as exc:
+            self.message_user(request, str(exc), level=messages.ERROR)
+        else:
+            self.message_user(
+                request,
+                (
+                    "Получение взноса подтверждено."
+                    if confirmed
+                    else "Получение уже подтверждено ранее."
+                ),
+                level=messages.SUCCESS if confirmed else messages.INFO,
+            )
+        return HttpResponseRedirect(
+            reverse(
+                "admin:tournaments_tournamentonsitepayment_change", args=[payment.pk]
+            )
+        )
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Показать карточку без редактирования; поддельный POST историю не изменяет."""
+        payment = self.get_object(request, object_id) if object_id is not None else None
+        if request.method == "POST" and payment is not None:
+            if not self.has_change_permission(request, payment):
+                raise PermissionDenied
+            self.message_user(
+                request,
+                "Финансовая история доступна только для чтения.",
+                level=messages.INFO,
+            )
+            return HttpResponseRedirect(
+                reverse(
+                    "admin:tournaments_tournamentonsitepayment_change",
+                    args=[payment.pk],
+                )
+            )
+        context = dict(extra_context or {})
+        if payment is not None:
+            context["can_confirm_receipt"] = (
+                payment.status == TournamentOnsitePayment.Status.EXPECTED
+                and self._can_confirm_receipt(request, payment)
+            )
+            context["confirm_receipt_url"] = reverse(
+                "admin:tournaments_tournamentonsitepayment_confirm_receipt",
+                args=[payment.pk],
+            )
+        return super().changeform_view(request, object_id, form_url, context)
 
 
 @admin.register(TournamentPostpaymentInvoice)
@@ -538,6 +718,52 @@ class TournamentGeoAdminMixin:
     """JSON справочника площадок для скрытия московских полей в админке."""
 
     change_form_template = "admin/tournaments/tournament/change_form.html"
+
+    @admin.display(description="Взносы на корте: история")
+    def onsite_payment_history_display(self, obj: Tournament) -> str:
+        """Сохранить доступ ко всем взносам, в том числе после снятия или удаления игрока."""
+        if not obj.pk:
+            return "—"
+        payments = obj.onsite_payments.select_related("user", "received_by")
+        if not payments.exists():
+            return "Нет оплат на корте."
+        return cast(
+            str,
+            format_html_join(
+                "",
+                '<p><a href="{}">{}</a> — {} ₽ · {}{}</p>',
+                (
+                    (
+                        reverse(
+                            "admin:tournaments_tournamentonsitepayment_change",
+                            args=[payment.pk],
+                        ),
+                        payment.user.get_full_name() or payment.user.email,
+                        payment.amount,
+                        payment.get_status_display(),
+                        (
+                            format_html(
+                                " · получено {} · подтвердил: {}",
+                                timezone.localtime(payment.received_at).strftime(
+                                    "%d.%m.%Y %H:%M"
+                                ),
+                                (
+                                    (
+                                        payment.received_by.get_full_name()
+                                        or payment.received_by.email
+                                    )
+                                    if payment.received_by is not None
+                                    else "—"
+                                ),
+                            )
+                            if payment.received_at is not None
+                            else ""
+                        ),
+                    )
+                    for payment in payments
+                ),
+            ),
+        )
 
     def changeform_view(
         self,
@@ -582,6 +808,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         "geo_area",
         "allowed_skill_levels",
         "format",
+        "duration",
         "variant",
         "gender",
         "status",
@@ -602,6 +829,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         "tournament_type",
         "sport",
         "format",
+        "duration",
         "variant",
         "status",
         "bracket_generated",
@@ -610,6 +838,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     list_editable = ("status",)
     prepopulated_fields = {"slug": ("name",)}
     filter_horizontal = ("participants",)
+    autocomplete_fields = ("court",)
     date_hierarchy = "start_date"
     readonly_fields = (
         "insufficient_participants_notified_at",
@@ -618,13 +847,27 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         "postpayment_window_started_at",
         "postpayment_window_schedule_display",
         "participant_payment_status_display",
+        "onsite_payment_history_display",
     )
     actions = [
         settle_postpayment_fancoin_action,
         generate_fan_bracket_action,
         generate_olympic_bracket_action,
         generate_round_robin_bracket_action,
+        generate_tvd_groups_action,
+        generate_tvd_playoffs_action,
+        finalize_tvd_action,
+        backfill_tvd_standings_action,
     ]
+
+    def get_inlines(
+        self, request: HttpRequest, obj: Tournament | None = None
+    ) -> list[type[admin.options.InlineModelAdmin]]:
+        """Показать группы в общей карточке группового турнира."""
+        inlines = list(super().get_inlines(request, obj))
+        if obj is not None and obj.format == TournamentFormat.WEEKEND_DAY:
+            inlines.append(TVDGroupInline)
+        return inlines
 
     def allowed_skill_levels(self, obj) -> str:
         """Отображение допущенных уровней участников с их числовыми диапазонами."""
@@ -736,7 +979,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         tournament = get_object_or_404(Tournament, pk=object_id)
         user = get_object_or_404(get_user_model(), pk=user_id)
         display_name = user.get_full_name() or user.email or f"ID {user.pk}"
-        admin_confirm_postpayment_participation(tournament, user)
+        admin_confirm_postpayment_participation(tournament, cast(User, user))
         self.message_user(
             request,
             (
@@ -786,7 +1029,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         tournament = get_object_or_404(Tournament, pk=object_id)
         user = get_object_or_404(get_user_model(), pk=user_id)
         display_name = user.get_full_name() or user.email or f"ID {user.pk}"
-        ok, msg = resend_postpayment_payment_link(tournament, user)
+        ok, msg = resend_postpayment_payment_link(tournament, cast(User, user))
         self.message_user(
             request,
             f"«{display_name}»: {msg}",
@@ -1142,10 +1385,9 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         """Показать в админке статус активных окон постоплаты."""
-        pending_qs = TournamentPostpaymentInvoice.objects.filter(
+        pending_qs = get_pending_postpayment_invoices().filter(
             tournament__club__isnull=True,
             tournament__bracket_generated=False,
-            status=TournamentPostpaymentInvoice.Status.PENDING,
         )
         pending_total = pending_qs.count()
         if pending_total:
@@ -1220,7 +1462,16 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             "Базовая информация",
             {"fields": ("name", "slug", "description", "regulation_extra", "image")},
         ),
-        ("Формат турнира", {"fields": ("sport", "format", "variant")}),
+        (
+            "Структура и продолжительность",
+            {
+                "fields": ("sport", "format", "variant", "duration"),
+                "description": (
+                    "Формат определяет сетку, продолжительность — календарь и условия оплаты. "
+                    "Любой формат может быть однодневным, выходного дня или многодневным."
+                ),
+            },
+        ),
         (
             "Постоплата: статус оплаты участников",
             {
@@ -1235,10 +1486,21 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             },
         ),
         (
+            "Оплата на корте: история",
+            {
+                "fields": ("onsite_payment_history_display",),
+                "description": (
+                    "Выбор оплаты не означает получения денег. Откройте карточку взноса "
+                    "для подтверждения фактического получения. Сумма и история не редактируются."
+                ),
+            },
+        ),
+        (
             "Постоплата: настройки окна",
             {
                 "fields": (
                     "allow_postpayment",
+                    "allow_onsite_payment",
                     "postpayment_deadline_hours",
                     "postpayment_window_started_at",
                     "postpayment_window_schedule_display",
@@ -1251,11 +1513,10 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Общие поля (одноэтапная сетка, Олимпийская, Круговой)",
+            "Участники, место и календарь",
             {
                 "fields": (
                     "entry_fee",
-                    "is_one_day",
                     "city",
                     "region",
                     "geo_area",
@@ -1266,6 +1527,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                     "status",
                     "start_after_fill",
                     "start_date",
+                    "start_time",
                     "end_date",
                     "registration_deadline",
                     "min_participants",
@@ -1280,8 +1542,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                     "participants",
                 ),
                 "description": (
-                    "Блок отображается после выбора формата турнира "
-                    "(Одноэтапная сетка, Олимпийская система или Круговой). "
+                    "Общие настройки для всех форматов. "
                     "«Старт после набора» — без дат: уведомление при минимуме, "
                     "автозапуск при максимуме."
                 ),
@@ -1289,7 +1550,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Одноэтапная сетка / Олимпийская / Круговой: очки за раунды и места",
+            "Очки за раунды и места",
             {
                 "fields": (
                     "fan_points_r1",
@@ -1304,6 +1565,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                     "<b>Круговой:</b> очки в общий рейтинг начисляются по итоговому месту после завершения турнира "
                     "(1 место = победитель, 2 = финалист, 3–4 = полуфинал, 5–8 = 2 круг, 9+ = 1 круг). "
                     "Внутри кругового турнира места определяются по победам (1 очко за победу, 0 за поражение), эти значения не редактируются.\n\n"
+                    "<b>Группы + плей-офф:</b> очки начисляются по итоговым местам после плей-офф. "
                     "<b>Значения по умолчанию:</b> 10–25–45–70–100."
                 ),
                 "classes": (
@@ -1314,7 +1576,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             },
         ),
         (
-            "Круговой: формат матча",
+            "Круговой / группы: формат матча",
             {
                 "fields": ("match_format",),
                 "classes": ("format-round-robin-section",),
@@ -1369,7 +1631,7 @@ class TVDGroupInline(admin.TabularInline):
 
 
 class TVDTournamentAdminForm(TournamentAdminForm):
-    """Форма раздела «Группы + плей-офф»: format и is_one_day выставляются автоматически."""
+    """Форма группового формата с независимым выбором продолжительности."""
 
     is_free = forms.BooleanField(
         required=False,
@@ -1379,14 +1641,17 @@ class TVDTournamentAdminForm(TournamentAdminForm):
     )
 
     class Meta(TournamentAdminForm.Meta):
-        exclude = ("format", "is_one_day")
+        exclude: tuple[str, ...] = ("format", "is_one_day")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self.instance.format = TournamentFormat.WEEKEND_DAY
         if self.instance and self.instance.pk and (self.instance.entry_fee or 0) == 0:
             self.fields["is_free"].initial = True
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
+        if self.cleaned_data.get("is_free"):
+            self.cleaned_data["entry_fee"] = 0
         cleaned_data = super().clean()
         is_free = cleaned_data.get("is_free")
         entry_fee = cleaned_data.get("entry_fee")
@@ -1401,33 +1666,54 @@ class TVDTournamentAdminForm(TournamentAdminForm):
 
 @admin.register(TVDTournament)
 class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
-    """Админка для однодневных турниров (proxy над Tournament, format=weekend_day)."""
+    """Отфильтрованный раздел группового формата любой продолжительности."""
 
     form = TVDTournamentAdminForm
-    inlines = [TVDGroupInline]
+    inlines = [TVDGroupInline, TournamentTeamInline, TournamentPhotoInline]
+    participant_payment_status_display = (
+        TournamentAdmin.participant_payment_status_display
+    )
+    postpayment_window_schedule_display = (
+        TournamentAdmin.postpayment_window_schedule_display
+    )
 
     list_display = (
         "name",
         "city",
         "region",
         "geo_area",
+        "duration",
         "variant",
         "status",
         "bracket_generated",
         "start_date",
         "max_participants",
     )
-    list_filter = ("region", "geo_area", "city", "status", "bracket_generated")
+    list_filter = (
+        "region",
+        "geo_area",
+        "city",
+        "duration",
+        "status",
+        "bracket_generated",
+    )
     search_fields = ("name", "description")
     list_editable = ("status",)
     prepopulated_fields = {"slug": ("name",)}
     filter_horizontal = ("participants",)
+    autocomplete_fields = ("court",)
     date_hierarchy = "start_date"
     readonly_fields = (
         "insufficient_participants_notified_at",
+        "min_fill_reached_notified_at",
         "completion_notified_at",
+        "postpayment_window_started_at",
+        "postpayment_window_schedule_display",
+        "participant_payment_status_display",
+        "onsite_payment_history_display",
     )
     actions = [
+        settle_postpayment_fancoin_action,
         generate_tvd_groups_action,
         generate_tvd_playoffs_action,
         finalize_tvd_action,
@@ -1453,6 +1739,7 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                 "fields": (
                     "sport",
                     "variant",
+                    "duration",
                     "is_free",
                     "entry_fee",
                     "city",
@@ -1463,17 +1750,43 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                     "allowed_categories",
                     "tournament_type",
                     "status",
+                    "start_after_fill",
                     "start_date",
+                    "start_time",
                     "end_date",
                     "registration_deadline",
                     "min_participants",
                     "max_participants",
+                    "min_teams",
+                    "max_teams",
+                    "min_fill_reached_notified_at",
                     "insufficient_participants_notified_at",
                     "completion_notified_at",
                     "bracket_generated",
                     "match_days_per_round",
                     "participants",
                 ),
+            },
+        ),
+        (
+            "Оплата и постоплата",
+            {
+                "fields": (
+                    "allow_postpayment",
+                    "allow_onsite_payment",
+                    "postpayment_deadline_hours",
+                    "postpayment_window_started_at",
+                    "postpayment_window_schedule_display",
+                    "participant_payment_status_display",
+                ),
+                "description": "Постоплата доступна для платных турниров, кроме однодневных.",
+            },
+        ),
+        (
+            "Оплата на корте: история",
+            {
+                "fields": ("onsite_payment_history_display",),
+                "description": "Получение подтверждается отдельно в карточке взноса; вся история сохраняется.",
             },
         ),
         (
@@ -1507,12 +1820,10 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             .filter(format="weekend_day", club__isnull=True)
         )
 
-    def save_model(self, request, obj, form, change):
-        from .models import TournamentDuration, TournamentFormat
-
+    def save_model(
+        self, request: HttpRequest, obj: Tournament, form: forms.ModelForm, change: bool
+    ) -> None:
         obj.format = TournamentFormat.WEEKEND_DAY
-        obj.is_one_day = True  # Раздел создаёт однодневные турниры.
-        obj.duration = TournamentDuration.SINGLE_DAY
         if form.cleaned_data.get("is_free"):
             obj.entry_fee = 0
         if change:
@@ -1523,6 +1834,10 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
         for category in selected:
             TournamentAllowedCategory.objects.create(tournament=obj, category=category)
         _schedule_completion_notify_if_status_completed(obj, form, change)
+
+    class Media:
+        css = {"all": ("css/admin_tournament.css",)}
+        js = ("js/admin_tournament.js", "js/city_autocomplete.js")
 
 
 WINNER_SIDE_PLAYER1 = "player1"

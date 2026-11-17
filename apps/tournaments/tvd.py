@@ -19,7 +19,7 @@ from .models import (
     TVDGroupMember,
 )
 from .season_utils import get_current_season
-from .utils import tournament_deadline_schedule_start
+from .utils import tournament_match_deadline_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +155,7 @@ def generate_groups(tournament: Tournament) -> tuple[bool, str]:
     if tournament.bracket_generated:
         return False, "Группы уже сформированы (сетка зафиксирована)."
 
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
 
     if tournament.is_doubles():
         full_teams = list(
@@ -298,12 +296,12 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             )
         }
 
-    for m in members.values():
-        m.wins = 0
-        m.losses = 0
-        m.games_won = 0
-        m.games_lost = 0
-        m.save(update_fields=["wins", "losses", "games_won", "games_lost"])
+    for member in members.values():
+        member.wins = 0
+        member.losses = 0
+        member.games_won = 0
+        member.games_lost = 0
+        member.save(update_fields=["wins", "losses", "games_won", "games_lost"])
 
     if is_doubles:
         matches = Match.objects.filter(
@@ -341,9 +339,9 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             members[t1_id].games_lost += g2
             members[t2_id].games_won += g2
             members[t2_id].games_lost += g1
-        for m in members.values():
-            m.save(update_fields=["wins", "losses", "games_won", "games_lost"])
-        h2h_winner: dict[tuple[int, int], int] = {}
+        for member in members.values():
+            member.save(update_fields=["wins", "losses", "games_won", "games_lost"])
+        h2h_winner: dict[tuple[int | None, int | None], int] = {}
         for m in matches:
             if m.winner_team_id and m.team1_id and m.team2_id:
                 t1, t2 = m.team1_id, m.team2_id
@@ -402,8 +400,8 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             members[p2_id].games_won += g2
             members[p2_id].games_lost += g1
 
-        for m in members.values():
-            m.save(update_fields=["wins", "losses", "games_won", "games_lost"])
+        for member in members.values():
+            member.save(update_fields=["wins", "losses", "games_won", "games_lost"])
 
         h2h_winner = {}
         for m in matches:
@@ -427,8 +425,8 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             return bool((b.player_id or 0) < (a.player_id or 0))
 
         member_list = list(members.values())
-        for m in members.values():
-            m.save(update_fields=["wins", "losses", "games_won", "games_lost"])
+        for member in members.values():
+            member.save(update_fields=["wins", "losses", "games_won", "games_lost"])
 
     n = len(member_list)
     for i in range(n):
@@ -436,9 +434,9 @@ def recalculate_group_standings(group: TVDGroup) -> None:
             if _should_swap(member_list[i], member_list[j]):
                 member_list[i], member_list[j] = member_list[j], member_list[i]
 
-    for place, m in enumerate(member_list, 1):
-        m.final_place = place
-        m.save(update_fields=["final_place"])
+    for place, member in enumerate(member_list, 1):
+        member.final_place = place
+        member.save(update_fields=["final_place"])
 
     all_played = group.matches.filter(
         tvd_stage=TVD_STAGE_GROUP,
@@ -537,21 +535,19 @@ def _collect_place_123(tournament: Tournament) -> dict[str, Any] | None:
     place_2: list[tuple[str, Player | TournamentTeam]] = []
     place_3: list[tuple[str, Player | TournamentTeam, TVDGroupMember]] = []
     for g in groups:
-        for m in g.members.order_by("final_place"):
-            entity = m.team if (is_doubles and m.team_id) else m.player
+        for member in g.members.order_by("final_place"):
+            entity = member.team if (is_doubles and member.team_id) else member.player
             if not entity:
                 continue
-            if m.final_place == 1:
-                place_1.append((g.name, entity, m))
-            elif m.final_place == 2:
+            if member.final_place == 1:
+                place_1.append((g.name, entity, member))
+            elif member.final_place == 2:
                 place_2.append((g.name, entity))
-            elif m.final_place == 3:
-                place_3.append((g.name, entity, m))
+            elif member.final_place == 3:
+                place_3.append((g.name, entity, member))
     if group_count == 5:
         place_1.sort(key=lambda x: (-x[2].wins, -(x[2].games_won - x[2].games_lost)))
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
     return {
         "groups": groups,
         "place_1": place_1,
@@ -578,9 +574,7 @@ def _create_tvd_round_robin(
     if len(entities) < 2:
         return False, "Нужно минимум 2 участника для круговой сетки."
     schedule = _circle_schedule(entities)
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
     is_doubles = isinstance(entities[0], TournamentTeam)
     created = 0
     for round_idx, round_pairs in enumerate(schedule, 1):
@@ -939,22 +933,20 @@ def generate_playoffs(
     place_2: list[tuple[str, Player | TournamentTeam]] = []
     place_3: list[tuple[str, Player | TournamentTeam, TVDGroupMember]] = []
     for g in groups:
-        for m in g.members.order_by("final_place"):
-            entity = m.team if (is_doubles and m.team_id) else m.player
+        for member in g.members.order_by("final_place"):
+            entity = member.team if (is_doubles and member.team_id) else member.player
             if not entity:
                 continue
-            if m.final_place == 1:
-                place_1.append((g.name, entity, m))
-            elif m.final_place == 2:
+            if member.final_place == 1:
+                place_1.append((g.name, entity, member))
+            elif member.final_place == 2:
                 place_2.append((g.name, entity))
-            elif m.final_place == 3:
-                place_3.append((g.name, entity, m))
+            elif member.final_place == 3:
+                place_3.append((g.name, entity, member))
     if group_count == 5:
         place_1.sort(key=lambda x: (-x[2].wins, -(x[2].games_won - x[2].games_lost)))
 
-    start = tournament_deadline_schedule_start(tournament)
-    days = getattr(tournament, "match_days_per_round", 7) or 7
-    delta = timedelta(days=days)
+    start, delta = tournament_match_deadline_schedule(tournament)
 
     # Main bracket first round: pair 1st vs 2nd from different groups
     main_round1_stage = fmt["main_rounds"][0]

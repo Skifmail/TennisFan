@@ -21,6 +21,11 @@ urlpatterns = [
         manual_stage_views.manage_stages,
         name="tournament_manage_stages",
     ),
+    path(
+        "<slug:slug>/manage/onsite-payment/<int:payment_id>/confirm/",
+        views.tournament_manage_confirm_onsite_payment,
+        name="tournament_manage_confirm_onsite_payment",
+    ),
     path("", views.tournament_list, name="tournament_list"),
     path("archive/", views.tournament_archive, name="tournament_archive"),
     re_path(

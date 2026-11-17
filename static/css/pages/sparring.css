@@ -248,15 +248,21 @@
    Справка по спаррингам (модальное окно)
    ========================================================================== */
 
-.sparring-page-header {
+.sparring-page-header__title-row {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--spacing-md);
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
 }
 
-.sparring-page-header__text {
+.sparring-page-header .page-title {
     min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.sparring-page-header .page-subtitle {
+    margin-top: var(--spacing-sm);
 }
 
 .sparring-help__trigger {
@@ -264,18 +270,35 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    margin-top: 0.25rem;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    background: var(--color-bg-elevated);
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    background: transparent;
     color: var(--color-text);
-    font-size: 1.1rem;
+    font-size: var(--font-size-base);
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
     touch-action: manipulation;
+    user-select: none;
+}
+
+/* Видимый значок компактный, область нажатия остаётся 44 × 44 px. */
+.sparring-help__trigger span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-bg-card);
+}
+
+.sparring-help__trigger:active span {
+    background: var(--color-primary-transparent);
 }
 
 .sparring-help__trigger:focus-visible {
@@ -283,14 +306,25 @@
     outline-offset: 2px;
 }
 
-.sparring-help__dialog {
-    border: none;
-    border-radius: var(--radius-lg);
-    padding: 0;
-    width: min(34rem, calc(100vw - 1.5rem));
-    max-height: min(86vh, 42rem);
+html.sparring-help-open,
+.sparring-help-open body {
     overflow: hidden;
-    background: var(--color-bg);
+}
+
+/* reset.css обнуляет стандартные отступы dialog: центрирование задаём явно. */
+.sparring-help__dialog {
+    position: fixed;
+    inset: 0;
+    border: none;
+    border-radius: var(--radius-xl);
+    padding: 0;
+    width: min(34rem, calc(100% - 2rem));
+    max-width: none;
+    max-height: min(680px, calc(100vh - 2rem));
+    max-height: min(680px, calc(100dvh - 2rem));
+    margin: auto;
+    overflow: hidden;
+    background: var(--color-bg-card);
     color: var(--color-text);
     box-shadow: 0 1.5rem 3rem rgb(0 0 0 / 35%);
 }
@@ -302,29 +336,66 @@
 .sparring-help__form {
     display: flex;
     flex-direction: column;
+    min-height: 0;
     max-height: inherit;
 }
 
 .sparring-help__header {
+    display: flex;
+    flex-shrink: 0;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
     padding: var(--spacing-lg);
     border-bottom: 1px solid var(--color-border-light);
+}
+
+.sparring-help__heading {
+    flex: 1;
+    min-width: 0;
 }
 
 .sparring-help__title {
     margin: 0 0 var(--spacing-xs);
     font-size: var(--font-size-lg);
+    line-height: 1.35;
 }
 
 .sparring-help__lead {
     margin: 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    font-size: max(14px, var(--font-size-sm));
+    line-height: 1.45;
+}
+
+.sparring-help__close {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: calc(-1 * var(--spacing-sm)) calc(-1 * var(--spacing-sm)) 0 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.sparring-help__close:active {
+    background: var(--color-primary-transparent);
 }
 
 .sparring-help__body {
+    flex: 1 1 auto;
+    min-height: 0;
     padding: var(--spacing-lg);
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
 }
 
 .sparring-help__steps {
@@ -336,68 +407,123 @@
 }
 
 .sparring-help__step {
-    padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--color-border-light);
     border-radius: var(--radius-md);
     background: var(--color-bg-elevated);
 }
 
-.sparring-help__step strong {
-    display: block;
-    margin-bottom: var(--spacing-xs);
-}
-
-.sparring-help__details {
-    margin-top: var(--spacing-xs);
-}
-
 .sparring-help__details summary {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-height: 48px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    color: var(--color-primary);
-    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    font-size: max(14px, var(--font-size-sm));
     font-weight: 600;
+    line-height: 1.45;
     list-style: none;
+    touch-action: manipulation;
 }
 
 .sparring-help__details summary::-webkit-details-marker {
     display: none;
 }
 
+.sparring-help__details summary::after {
+    content: "";
+    justify-self: center;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border-right: 1.5px solid currentcolor;
+    border-bottom: 1.5px solid currentcolor;
+    transform: rotate(45deg);
+}
+
+.sparring-help__details[open] summary::after {
+    margin-top: 4px;
+    transform: rotate(225deg);
+}
+
+.sparring-help__number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-transparent);
+    color: var(--color-primary);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.sparring-help__label {
+    min-width: 0;
+}
+
+.sparring-help__details summary:active {
+    background: var(--color-primary-transparent);
+}
+
+.sparring-help__close:focus-visible,
+.sparring-help__details summary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
 .sparring-help__details p {
-    margin: var(--spacing-xs) 0 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    line-height: 1.45;
+    margin: 0;
+    padding: 0 var(--spacing-md) var(--spacing-md);
+    color: var(--color-text);
+    font-size: max(14px, var(--font-size-sm));
+    line-height: 1.55;
 }
 
 .sparring-help__note {
     margin: var(--spacing-md) 0 0;
     color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
-    line-height: 1.4;
+    font-size: max(12px, var(--font-size-xs));
+    line-height: 1.5;
 }
 
 .sparring-help__footer {
+    flex-shrink: 0;
     padding: var(--spacing-md) var(--spacing-lg);
     border-top: 1px solid var(--color-border-light);
     text-align: right;
 }
 
-@media (max-width: 640px) {
-    .sparring-help__dialog {
-        width: 100vw;
-        max-width: 100vw;
-        max-height: 100vh;
-        height: 100vh;
-        border-radius: 0;
-        margin: 0;
-    }
+.sparring-help__footer .btn {
+    min-height: 44px;
+    font-size: max(14px, var(--font-size-sm));
+    color: var(--color-primary-dark);
+}
 
+@media (hover: hover) and (pointer: fine) {
+    .sparring-help__trigger:hover span,
+    .sparring-help__close:hover,
+    .sparring-help__details summary:hover {
+        background: var(--color-primary-transparent);
+    }
+}
+
+@media (width <= 640px), (height <= 480px) {
     .sparring-help__header,
     .sparring-help__body,
     .sparring-help__footer {
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
+        padding: var(--spacing-md);
+    }
+}
+
+@media (width <= 640px) {
+    .sparring-help__footer .btn {
+        width: 100%;
     }
 }
 

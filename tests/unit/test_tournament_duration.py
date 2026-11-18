@@ -107,8 +107,8 @@ def test_explicit_duration_takes_priority_over_legacy_creation_flag() -> None:
     assert tournament.allow_postpayment is True
 
 
-def test_partial_duration_save_synchronizes_payment_flag() -> None:
-    """Частичный переход к одному дню сохраняет флаг и отключает постоплату."""
+def test_partial_duration_save_preserves_postpayment_choice() -> None:
+    """Частичный переход к одному дню синхронизирует флаг, не меняя способ оплаты."""
     tournament = make_tournament(entry_fee=1000, allow_postpayment=True)
     tournament.duration = TournamentDuration.SINGLE_DAY
     tournament.save(update_fields=["duration"])
@@ -116,7 +116,7 @@ def test_partial_duration_save_synchronizes_payment_flag() -> None:
 
     assert tournament.duration == TournamentDuration.SINGLE_DAY
     assert tournament.is_one_day is True
-    assert tournament.allow_postpayment is False
+    assert tournament.allow_postpayment is True
 
 
 def test_partial_duration_save_can_switch_back_to_multi_day() -> None:

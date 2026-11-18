@@ -657,11 +657,8 @@ def test_tournament_duration_browser_format_and_duration_are_independent(
                 expect(page.locator("#id_duration")).to_be_visible()
                 expect(page.locator("#id_start_date")).to_be_visible()
                 expect(page.locator("#id_end_date")).to_be_visible()
-                if duration == TournamentDuration.SINGLE_DAY:
-                    expect(page.locator("#id_allow_postpayment")).to_be_disabled()
-                    expect(page.locator("#id_allow_postpayment")).not_to_be_checked()
-                else:
-                    expect(page.locator("#id_allow_postpayment")).to_be_enabled()
+                expect(page.locator("#id_allow_postpayment")).to_be_enabled()
+                page.locator("#id_allow_postpayment").check()
                 if duration == TournamentDuration.MULTI_DAY:
                     expect(page.locator("#id_match_days_per_round")).to_be_visible()
                 else:
@@ -669,6 +666,7 @@ def test_tournament_duration_browser_format_and_duration_are_independent(
                 if kind != "groups":
                     page.locator("#id_format").select_option(tournament_format)
                 expect(page.locator("#id_duration")).to_have_value(duration)
+                expect(page.locator("#id_allow_postpayment")).to_be_checked()
         assert not errors
 
 

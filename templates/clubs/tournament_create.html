@@ -284,7 +284,7 @@
                             {{ form.allow_postpayment }}
                             <span>
                                 <span class="club-tournament-create__toggle-title">{{ form.allow_postpayment.label }}</span>
-                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса.</span>
+                                <span class="club-tournament-create__toggle-help">Разрешить регистрацию без немедленной оплаты взноса. Для однодневного турнира окно заканчивается к объявленному началу игры.</span>
                             </span>
                         </label>
                         {% for error in form.allow_postpayment.errors %}<p class="club-tournament-create__error">{{ error }}</p>{% endfor %}

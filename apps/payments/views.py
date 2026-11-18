@@ -183,7 +183,6 @@ def _tournament_payment_unavailable_reason(
         ends_at = tournament.get_postpayment_window_ends_at()
         if (
             not tournament.allow_postpayment
-            or tournament.is_one_day
             or tournament.bracket_generated
             or started_at is None
             or started_at > now
@@ -205,7 +204,7 @@ def _tournament_payment_unavailable_reason(
         ):
             return "Срок этого счёта истёк или счёт уже закрыт."
         return None
-    if tournament.allow_postpayment and not tournament.is_one_day:
+    if tournament.allow_postpayment:
         return (
             "Постоплата доступна только по счёту после открытия её окна. "
             "До этого платить не нужно."

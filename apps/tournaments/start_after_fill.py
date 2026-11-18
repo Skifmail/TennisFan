@@ -11,6 +11,7 @@ from typing import Literal
 
 from django.db import transaction
 from django.utils import timezone
+from loguru import logger as postpayment_log
 
 from apps.tournaments.models import Tournament, TournamentStatus
 
@@ -112,13 +113,20 @@ def _auto_start_tournament(tournament_id: int) -> ProgressResult:
             return "postpayment_opened"
         if locked.allow_postpayment:
             from apps.tournaments.postpayment import (
+                PostpaymentWindowError,
                 get_pending_postpayment_users,
                 open_postpayment_window,
             )
 
             pending_users = get_pending_postpayment_users(locked)
             if pending_users:
-                open_postpayment_window(locked)
+                try:
+                    open_postpayment_window(locked)
+                except PostpaymentWindowError as exc:
+                    postpayment_log.warning(
+                        "Не открыто окно постоплаты турнира {}: {}", locked.pk, exc
+                    )
+                    return "start_failed"
                 locked.refresh_from_db()
                 still_pending = get_pending_postpayment_users(locked)
                 if still_pending:

@@ -276,8 +276,9 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=False,
         help_text=(
             "Разрешить регистрацию без немедленной оплаты вступительного взноса. "
-            "После дедлайна регистрации участникам без оплаты отправляется ссылка; "
-            "срок оплаты задаётся полем «Длительность окна постоплаты» ниже."
+            "При запуске окна участникам без оплаты отправляется ссылка. "
+            "Срок задаётся длительностью окна, но у однодневного турнира "
+            "заканчивается не позже объявленного времени начала игры."
         ),
     )
     allow_onsite_payment: models.BooleanField[bool, bool] = models.BooleanField(
@@ -295,8 +296,9 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         help_text=(
             "Сколько часов есть на оплату после старта окна. "
             "По умолчанию 12; можно увеличить (например, до 24). "
-            "При изменении сроки у активных инвойсов пересчитываются "
-            "от момента старта окна."
+            "У однодневного турнира окно ограничено временем начала игры. "
+            "При изменении длительности или календаря сроки активных счетов "
+            "пересчитываются от прежнего открытия окна."
         ),
     )
     postpayment_window_started_at = models.DateTimeField(
@@ -305,7 +307,8 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         blank=True,
         help_text=(
             "Фактическое время открытия окна (заполняется автоматически). "
-            "Конец окна = старт + длительность в часах."
+            "Конец окна = открытие + длительность в часах, "
+            "но у однодневного турнира не позже объявленного старта игры."
         ),
     )
 
@@ -327,7 +330,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         default=TournamentDuration.MULTI_DAY,
         help_text=(
             "Не зависит от формата сетки. Однодневный — все матчи в дату начала, "
-            "взнос для всех с учётом скидок, без постоплаты. Выходного дня — "
+            "рублёвый взнос с учётом скидок, постоплата до начала игры. Выходного дня — "
             "до двух дней подряд. Многодневный — дедлайны по числу дней на раунд."
         ),
     )
@@ -643,7 +646,9 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         """
         if self.status != TournamentStatus.UPCOMING or self.bracket_generated:
             return False
-        if self.start_after_fill or self.start_date is None:
+        if (
+            self.start_after_fill and self.postpayment_window_started_at is None
+        ) or self.start_date is None:
             return True
         # Старые формы сохраняли технический диапазон «начало плюс год».
         # Обычные объявленные даты видны уже во время набора.
@@ -702,18 +707,25 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         """
         return max(1, int(self.postpayment_deadline_hours or 12))
 
-    def get_postpayment_window_ends_at(self):
+    def get_postpayment_window_ends_at(
+        self, *, started_at: datetime | None = None
+    ) -> datetime | None:
         """Вернуть момент окончания окна постоплаты.
 
-        Returns:
-            datetime | None: ``старт + длительность`` или ``None``, если окно не открыто.
+        Перед открытием можно передать его планируемый момент без сохранения.
+        У однодневного турнира срок ограничен объявленным временем игры;
+        без полного календаря или открытия действительного срока нет.
         """
-        from datetime import timedelta
-
-        started = self.postpayment_window_started_at
+        started = started_at or self.postpayment_window_started_at
         if started is None:
             return None
-        return started + timedelta(hours=self.get_postpayment_deadline_hours())
+        ends_at = started + timedelta(hours=self.get_postpayment_deadline_hours())
+        if self.duration == TournamentDuration.SINGLE_DAY:
+            game_starts_at = self.get_start_datetime()
+            if game_starts_at is None:
+                return None
+            ends_at = min(ends_at, game_starts_at)
+        return ends_at
 
     def resolve_geography(self) -> None:
         """Определить регион и район/город, если они не заданы вручную.
@@ -840,6 +852,7 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         if errors:
             raise ValidationError(errors)
 
+    @transaction.atomic
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Согласовать продолжительность и оплату, сохранив старые интеграции."""
         update_fields = kwargs.get("update_fields")
@@ -852,7 +865,6 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             if fields is not None:
                 fields.add("variant")
 
-        old_deadline_hours: int | None = None
         old_status: str | None = None
         previous: dict[str, Any] | None = None
         if self.pk:
@@ -866,12 +878,12 @@ class Tournament(CompressImageFieldsMixin, models.Model):
                     "is_one_day",
                     "entry_fee",
                     "start_date",
+                    "start_time",
                     "end_date",
                 )
                 .first()
             )
             if previous is not None:
-                old_deadline_hours = previous["postpayment_deadline_hours"]
                 old_status = previous["status"]
 
         if fields is None or fields & {"duration", "is_one_day"}:
@@ -909,14 +921,11 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             "entry_fee",
             "allow_postpayment",
         }:
-            duration = self.duration
             entry_fee = self.entry_fee
             if fields is not None and previous is not None:
-                if "duration" not in fields:
-                    duration = previous["duration"]
                 if "entry_fee" not in fields:
                     entry_fee = previous["entry_fee"]
-            if duration == TournamentDuration.SINGLE_DAY or (entry_fee or 0) <= 0:
+            if (entry_fee or 0) <= 0:
                 self.allow_postpayment = False
                 if fields is not None:
                     fields.add("allow_postpayment")
@@ -954,16 +963,37 @@ class Tournament(CompressImageFieldsMixin, models.Model):
             kwargs["update_fields"] = fields
         super().save(*args, **kwargs)
 
-        # Продление/сокращение окна постоплаты должно обновлять due_at инвойсов.
-        if (
-            old_deadline_hours is not None
-            and int(old_deadline_hours) != int(self.postpayment_deadline_hours or 12)
-            and self.postpayment_window_started_at is not None
-            and self.allow_postpayment
-        ):
-            from .postpayment import sync_postpayment_invoices_deadline
+        # Учитываем только сохранённые поля; синхронизация перечитает их из БД.
+        if previous is not None:
+            changed_deadline_fields = {
+                field
+                for field in (
+                    "postpayment_deadline_hours",
+                    "duration",
+                    "start_date",
+                    "start_time",
+                )
+                if (fields is None or field in fields)
+                and getattr(self, field) != previous[field]
+            }
+            saved_duration = (
+                self.duration
+                if fields is None or "duration" in fields
+                else previous["duration"]
+            )
+            single_day_calendar_changed = TournamentDuration.SINGLE_DAY in (
+                previous["duration"],
+                saved_duration,
+            ) and bool(
+                changed_deadline_fields & {"duration", "start_date", "start_time"}
+            )
+            if (
+                "postpayment_deadline_hours" in changed_deadline_fields
+                or single_day_calendar_changed
+            ):
+                from .postpayment import sync_postpayment_invoices_deadline
 
-            sync_postpayment_invoices_deadline(self)
+                sync_postpayment_invoices_deadline(self)
 
         # Отменён → снова активный: сбросить «фантомные» покрытия FT и списать заново.
         if (

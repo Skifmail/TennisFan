@@ -60,6 +60,7 @@ from .postpayment import (
     ADMIN_RESENDABLE_PAYMENT_STATUSES,
     ParticipantPaymentStatus,
     PaymentStatusTone,
+    PostpaymentWindowError,
     admin_confirm_postpayment_participation,
     build_participant_payment_statuses,
     finalize_postpayment_window,
@@ -158,7 +159,9 @@ def accept_proposal_action(modeladmin, request, queryset):
         )
 
 
-def _report_postpayment_window_opened(request, tournament: Tournament) -> None:
+def _report_postpayment_window_opened(
+    request: HttpRequest, tournament: Tournament
+) -> None:
     """Показать администратору итог открытия окна постоплаты.
 
     Args:
@@ -168,7 +171,11 @@ def _report_postpayment_window_opened(request, tournament: Tournament) -> None:
     Returns:
         None: Сообщение добавляется во flash messages.
     """
-    invoice_count, fancoin_settled = open_postpayment_window(tournament)
+    try:
+        invoice_count, fancoin_settled = open_postpayment_window(tournament)
+    except PostpaymentWindowError as exc:
+        messages.error(request, f"{tournament.name}: {exc}")
+        return
     summary = format_postpayment_open_summary(tournament, invoice_count)
     if fancoin_settled:
         messages.success(
@@ -475,11 +482,6 @@ class TournamentAdminForm(forms.ModelForm):
                 "По подписке игроки регистрируются бесплатно в рамках лимита; без подписки или при исчерпанном лимите — оплата взноса.",
             )
         if allow_postpayment:
-            if is_one_day:
-                self.add_error(
-                    "allow_postpayment",
-                    "Постоплата недоступна для однодневных турниров.",
-                )
             if entry_fee is None or entry_fee <= 0:
                 self.add_error(
                     "allow_postpayment",

@@ -730,7 +730,8 @@ class ClubTournamentCreateForm(forms.ModelForm):
         ]
         self.fields["postpayment_deadline_hours"].required = False
         self.fields["postpayment_deadline_hours"].help_text = (
-            "Сколько часов на оплату после открытия окна постоплаты (по умолчанию 12)."
+            "Сколько часов на оплату после открытия окна постоплаты (по умолчанию 12). "
+            "У однодневного турнира срок заканчивается не позже объявленного времени игры."
         )
         self.fields["start_date"].help_text = (
             "Чтобы продлить регистрацию, сдвиньте и дату начала: "
@@ -1004,11 +1005,6 @@ class ClubTournamentCreateForm(forms.ModelForm):
                 "Для турнира выходного дня или многодневного турнира укажите вступительный взнос больше 0 ₽.",
             )
         if allow_postpayment:
-            if is_one_day:
-                self.add_error(
-                    "allow_postpayment",
-                    "Постоплата недоступна для однодневных турниров.",
-                )
             if float(entry_fee or 0) <= 0:
                 self.add_error(
                     "allow_postpayment",

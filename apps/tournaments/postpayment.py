@@ -1,4 +1,4 @@
-"""Сервис постоплаты для турниров, проводимых дольше одного дня."""
+"""Регистрация с постоплатой, ограниченное окно оплаты и формирование сетки."""
 
 from __future__ import annotations
 
@@ -23,11 +23,13 @@ from .cancel import cancel_tournament
 from .entry_payment import (
     active_onsite_payments,
     get_paid_entry_user_ids,
+    get_tournament_entry_amount,
     has_onsite_payment,
     has_received_entry_payment,
 )
 from .models import (
     Tournament,
+    TournamentDuration,
     TournamentOnsitePayment,
     TournamentPostpaymentCallLog,
     TournamentPostpaymentInvoice,
@@ -41,6 +43,11 @@ if TYPE_CHECKING:
 PaymentStatusTone = Literal["success", "warning", "danger", "neutral"]
 
 logger = logging.getLogger(__name__)
+
+
+class PostpaymentWindowError(ValueError):
+    """Недопустимый запуск окна оплаты без действующего календаря или набора."""
+
 
 _SUBSCRIPTION_SLOT_COVERAGE = cast(
     TournamentRegistrationCoverage.CoverageType,
@@ -197,7 +204,6 @@ def tournament_allows_postpayment_registration(tournament: Tournament) -> bool:
     """
     return bool(
         tournament.allow_postpayment
-        and not tournament.is_one_day
         and not tournament.bracket_generated
         and tournament.postpayment_window_started_at is None
     )
@@ -698,13 +704,12 @@ def _payment_url(tournament: Tournament, invoice_id: int) -> str:
     return f"{_site_base_url()}{path}"
 
 
+@transaction.atomic
 def sync_postpayment_invoices_deadline(tournament: Tournament) -> int:
-    """Пересчитать срок оплаты инвойсов после изменения длительности окна.
+    """Пересчитать сроки действующих счетов по сохранённым настройкам окна и игры.
 
-    ``postpayment_deadline_hours`` на турнире — только настройка; фактический
-    срок хранится в ``TournamentPostpaymentInvoice.due_at`` и задаётся при
-    открытии окна. Без синхронизации продление 12→24 ч в админке не влияет
-    на уже созданные инвойсы.
+    Суммы, оплаченные и отменённые счета остаются неизменными. Несохранённые
+    поля переданного объекта не влияют на расчёт; закрытый набор не открывается.
 
     Args:
         tournament (Tournament): Турнир с открытым окном постоплаты.
@@ -712,11 +717,16 @@ def sync_postpayment_invoices_deadline(tournament: Tournament) -> int:
     Returns:
         int: Число обновлённых инвойсов.
     """
-    started_at = tournament.postpayment_window_started_at
-    if started_at is None or not tournament.allow_postpayment:
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+    if (
+        not tournament.allow_postpayment
+        or tournament.bracket_generated
+        or tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED)
+    ):
         return 0
-    hours = tournament.get_postpayment_deadline_hours()
-    new_due_at = started_at + timedelta(hours=hours)
+    new_due_at = tournament.get_postpayment_window_ends_at()
+    if new_due_at is None:
+        return 0
     now = timezone.now()
     updated = int(
         get_pending_postpayment_invoices(tournament).update(due_at=new_due_at)
@@ -748,7 +758,7 @@ def sync_postpayment_invoices_deadline(tournament: Tournament) -> int:
             "(deadline_hours=%s, due_at=%s)",
             updated,
             tournament.slug,
-            hours,
+            tournament.get_postpayment_deadline_hours(),
             new_due_at,
         )
     return updated
@@ -1124,18 +1134,51 @@ def open_postpayment_window(tournament: Tournament) -> tuple[int, int]:
     """Запустить окно постоплаты и создать инвойсы.
 
     Перед созданием инвойсов пытается списать FT у участников, у которых
-    появился баланс после регистрации с постоплатой.
+    появился баланс после регистрации с постоплатой, если формат оплаты
+    это допускает. Однодневный взнос остаётся рублёвым со скидками.
 
     Args:
         tournament (Tournament): Турнир, для которого запускается постоплата.
 
     Returns:
         tuple[int, int]: (созданные инвойсы, участники с новым покрытием FT).
+
+    Raises:
+        PostpaymentWindowError: Набор закрыт или время однодневной игры уже наступило.
     """
     tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
     if tournament.postpayment_window_started_at is not None:
         return 0, 0
+    if (
+        not tournament.allow_postpayment
+        or tournament.bracket_generated
+        or tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED)
+        or tournament_has_generated_matches(tournament)
+    ):
+        raise PostpaymentWindowError(
+            "Окно постоплаты недоступно: набор закрыт или постоплата отключена."
+        )
     pending_users = get_pending_postpayment_users(tournament)
+    if not pending_users:
+        return 0, 0
+    now = timezone.now()
+    if (
+        tournament.duration == TournamentDuration.SINGLE_DAY
+        and tournament.start_after_fill
+        and tournament.start_date is None
+    ):
+        # Как при генерации после набора: назначаем лишь отсутствующий день игры.
+        tournament.start_date = timezone.localdate(now)
+        tournament.save(update_fields=["start_date", "updated_at"])
+    due_at = tournament.get_postpayment_window_ends_at(started_at=now)
+    if due_at is None:
+        raise PostpaymentWindowError(
+            "Укажите дату и время начала однодневного турнира перед открытием постоплаты."
+        )
+    if due_at <= now:
+        raise PostpaymentWindowError(
+            "Окно постоплаты нельзя открыть: объявленное время начала игры уже наступило."
+        )
     fancoin_settled = 0
     if pending_users:
         fancoin_settled = try_settle_pending_users_with_fancoin(
@@ -1144,15 +1187,17 @@ def open_postpayment_window(tournament: Tournament) -> tuple[int, int]:
     pending_users = get_pending_postpayment_users(tournament)
     if not pending_users:
         return 0, fancoin_settled
-    now = timezone.now()
-    due_at = now + timedelta(hours=tournament.get_postpayment_deadline_hours())
     created_count = 0
     for user in pending_users:
         invoice, created = TournamentPostpaymentInvoice.objects.get_or_create(
             tournament=tournament,
             user=user,
             defaults={
-                "amount": Decimal(tournament.entry_fee or 0),
+                "amount": (
+                    get_tournament_entry_amount(tournament, user)
+                    if tournament.duration == TournamentDuration.SINGLE_DAY
+                    else Decimal(tournament.entry_fee or 0)
+                ),
                 "due_at": due_at,
                 "status": TournamentPostpaymentInvoice.Status.PENDING,
             },

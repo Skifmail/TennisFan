@@ -2081,7 +2081,13 @@ def tournament_manage_generate_bracket(request: HttpRequest, slug: str) -> HttpR
         and tournament.postpayment_window_started_at is None
         and pending_users
     ):
-        invoice_count, fancoin_settled = open_postpayment_window(tournament)
+        from .postpayment import PostpaymentWindowError
+
+        try:
+            invoice_count, fancoin_settled = open_postpayment_window(tournament)
+        except PostpaymentWindowError as exc:
+            messages.error(request, str(exc))
+            return redirect("tournament_manage", slug=slug)
         summary = format_postpayment_open_summary(tournament, invoice_count)
         if fancoin_settled:
             messages.success(

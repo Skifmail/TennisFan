@@ -8,6 +8,7 @@ from datetime import timedelta
 from typing import cast
 
 from django.utils import timezone
+from loguru import logger as postpayment_log
 
 from apps.core.sports import Sport
 from apps.users.models import Player
@@ -21,7 +22,11 @@ from .models import (
     TournamentStatus,
     TournamentTeam,
 )
-from .postpayment import get_pending_postpayment_users, open_postpayment_window
+from .postpayment import (
+    PostpaymentWindowError,
+    get_pending_postpayment_users,
+    open_postpayment_window,
+)
 from .season_utils import get_current_season, get_season_display
 from .utils import tournament_match_deadline_schedule
 
@@ -247,7 +252,13 @@ def check_and_generate_past_deadline_brackets() -> int:
         if t.allow_postpayment:
             pending_users = get_pending_postpayment_users(t)
             if pending_users:
-                open_postpayment_window(t)
+                try:
+                    open_postpayment_window(t)
+                except PostpaymentWindowError as exc:
+                    postpayment_log.warning(
+                        "Не открыто окно постоплаты турнира {}: {}", t.pk, exc
+                    )
+                    continue
                 logger.info(
                     "Opened postpayment window for %s with %s pending users",
                     t.slug,

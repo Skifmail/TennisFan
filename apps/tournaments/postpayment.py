@@ -104,6 +104,8 @@ class ParticipantPaymentStatus:
     phone: str = ""
     called_at: datetime | None = None
     link_resent_at: datetime | None = None
+    pending_invoice_id: int | None = None
+    expected_onsite_id: int | None = None
     onsite_payment_id: int | None = None
 
 
@@ -1006,7 +1008,7 @@ def build_participant_payment_statuses(
             details = "; ".join(details_parts) if details_parts else "—"
         elif user.pk in entry_paid_ids:
             status = "Оплачен взнос (₽)"
-            details = "Запись TournamentEntryPayment"
+            details = "Оплата онлайн подтверждена"
         elif onsite_payment is not None:
             details_parts = [f"Сумма: {onsite_payment.amount} ₽"]
             if onsite_payment.status == TournamentOnsitePayment.Status.RECEIVED:
@@ -1088,6 +1090,23 @@ def build_participant_payment_statuses(
                 called_at=call_times.get(user.pk),
                 link_resent_at=(
                     invoice.payment_link_resent_at if invoice is not None else None
+                ),
+                pending_invoice_id=(
+                    invoice.pk
+                    if invoice
+                    and invoice.status == TournamentPostpaymentInvoice.Status.PENDING
+                    and not coverage
+                    and user.pk not in paid_user_ids
+                    and not onsite_payment
+                    else None
+                ),
+                expected_onsite_id=(
+                    onsite_payment.pk
+                    if onsite_payment
+                    and onsite_payment.status == TournamentOnsitePayment.Status.EXPECTED
+                    and not coverage
+                    and user.pk not in paid_user_ids
+                    else None
                 ),
                 onsite_payment_id=(
                     onsite_payment.pk if onsite_payment is not None else None

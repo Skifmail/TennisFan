@@ -825,6 +825,45 @@ def login_view(request):
     )
 
 
+def _viewer_can_see_player_contacts(viewer: Any, player: Player) -> bool:
+    """Разрешить внешние контакты владельцу, персоналу и участникам общего матча.
+
+    Контакты игрока не должны быть обходным путём для связи до создания матча,
+    поэтому посторонним зрителям профиля они не показываются.
+    """
+    if not getattr(viewer, "is_authenticated", False):
+        return False
+    if viewer == player.user or getattr(viewer, "is_staff", False):
+        return True
+    viewer_player = getattr(viewer, "player", None)
+    if viewer_player is None:
+        return False
+    from apps.tournaments.models import Match
+
+    viewer_side = (
+        Q(player1=viewer_player)
+        | Q(player2=viewer_player)
+        | Q(team1__player1=viewer_player)
+        | Q(team1__player2=viewer_player)
+        | Q(team2__player1=viewer_player)
+        | Q(team2__player2=viewer_player)
+    )
+    player_side = (
+        Q(player1=player)
+        | Q(player2=player)
+        | Q(team1__player1=player)
+        | Q(team1__player2=player)
+        | Q(team2__player1=player)
+        | Q(team2__player2=player)
+    )
+    return (
+        Match.objects.filter(viewer_side)
+        .filter(player_side)
+        .exclude(status=Match.MatchStatus.CANCELLED)
+        .exists()
+    )
+
+
 @login_required_with_message(
     "Профиль игрока доступен только для зарегистрированных пользователей."
 )
@@ -1216,6 +1255,9 @@ def profile(request, pk):
         "player_skills_data": player_skills_data,
         "is_profile_owner": is_profile_owner,
         "can_view_profile_stats": can_view_profile_stats,
+        "can_view_player_contacts": _viewer_can_see_player_contacts(
+            request.user, player
+        ),
         "subscription_autopay_card": subscription_autopay_card,
         "is_rating_visible": is_rating_visible,
         "current_sport": profile_sport,

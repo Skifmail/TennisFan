@@ -141,16 +141,21 @@
                             <p class="sparring-response__state">
                                 {% if response.status == 'pending' and req.status == 'active' %}
                                 <span class="sparring-response__status sparring-response__status--pending">Ожидает вашего подтверждения</span>
+                                {% if req.confirmation_hours_left %}
+                                <span class="sparring-response__deadline">Осталось {{ req.confirmation_hours_left }} ч. Если не подтвердить, матч создастся автоматически.</span>
+                                {% endif %}
                                 {% elif response.status == 'accepted' %}
-                                <span class="sparring-response__status sparring-response__status--accepted">Отклик принят</span>
+                                <span class="sparring-response__status sparring-response__status--accepted">Отклик принят, матч создан</span>
                                 {% elif response.status == 'rejected' %}
                                 <span class="sparring-response__status sparring-response__status--rejected">Отклик отклонён</span>
+                                {% elif response.status == 'expired' %}
+                                <span class="sparring-response__status sparring-response__status--rejected">Срок отклика истёк</span>
                                 {% else %}
                                 <span class="sparring-response__status sparring-response__status--rejected">Заявка закрыта</span>
                                 {% endif %}
                             </p>
 
-                            {% if response.status != 'rejected' %}
+                            {% if response.status == 'accepted' %}
                             {% with links=response.contact_links %}
                             {% if links %}
                             <ul class="sparring-response__contacts" aria-label="Контакты игрока">
@@ -161,12 +166,20 @@
                             {% else %}
                             <p class="sparring-response__no-contacts">Игрок не указал внешние контакты. Кнопка «Написать в чат» откроет личный чат.</p>
                             {% endif %}
+                            {% endwith %}
+                            {% elif response.status == 'pending' and req.status == 'active' %}
+                            <p class="sparring-response__no-contacts">Контакты откроются после создания матча и создания матча. До этого связь возможна только в личном чате на платформе.</p>
+                            {% endif %}
 
                             <div class="sparring-response__actions">
                                 {% if response.status == 'pending' and req.status == 'active' %}
                                 <form action="{% url 'sparring_confirm_response' response_id=response.pk %}" method="post" class="sparring-response__confirm" onsubmit="return confirm('Подтвердить отклик и создать матч? Заявка будет закрыта.');">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-primary btn-sm">Подтвердить</button>
+                                </form>
+                                <form action="{% url 'sparring_reject_response' response_id=response.pk %}" method="post" class="sparring-response__reject" onsubmit="return confirm('Отклонить отклик? Заявка останется открытой для других игроков.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline btn-sm text-error">Отклонить</button>
                                 </form>
                                 {% endif %}
                                 {% include 'includes/direct_message_button.html' with target_player=response.respondent compact=True button_label='Написать в чат' %}
@@ -179,12 +192,6 @@
                                 {% endwith %}
                                 {% endif %}
                             </div>
-                            {% endwith %}
-                            {% else %}
-                            <div class="sparring-response__actions">
-                                <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
-                            </div>
-                            {% endif %}
                         </article>
                         {% endfor %}
                     </div>

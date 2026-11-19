@@ -776,7 +776,7 @@ def _handle_sparring_callback(
     - sparring_my_requests, sparring_my_responses, sparring_responses_to_me
     - sparring_del_req_<id>, sparring_cancel_resp_<id>
     - sparring_req_<id>, sparring_cand_<id>, sparring_profile_<id>
-    - contact_{response_id}, confirm_match_{response_id}
+    - contact_{response_id}, confirm_match_{response_id}, reject_match_{response_id}
     - team_sparring_generate_{request_id}
     """
     from apps.sparring.doubles_services import confirm_team_sparring_series
@@ -797,6 +797,7 @@ def _handle_sparring_callback(
     is_sparring = (
         callback_data.startswith("contact_")
         or callback_data.startswith("confirm_match_")
+        or callback_data.startswith("reject_match_")
         or callback_data.startswith("sparring_invite_accept_")
         or callback_data.startswith("sparring_")
         or callback_data.startswith("team_sparring_generate_")
@@ -1155,7 +1156,7 @@ def _handle_sparring_callback(
             ]
         )
         keyboard.append(
-            [{"text": "💬 Связаться", "callback_data": f"contact_{response.pk}"}]
+            [{"text": "❌ Отклонить", "callback_data": f"reject_match_{response.pk}"}]
         )
         reply_markup = {"inline_keyboard": keyboard}
         _send_to_user_required(chat_id, text, reply_markup=reply_markup)
@@ -1186,7 +1187,7 @@ def _handle_sparring_callback(
                     "callback_data": f"confirm_match_{response.pk}",
                 }
             ],
-            [{"text": "💬 Связаться", "callback_data": f"contact_{response.pk}"}],
+            [{"text": "❌ Отклонить", "callback_data": f"reject_match_{response.pk}"}],
         ]
         reply_markup = {"inline_keyboard": keyboard}
         edited = message_id and bot.edit_message_text(
@@ -1197,18 +1198,14 @@ def _handle_sparring_callback(
         _answer_callback(cq_id, "Профиль")
         return True
 
-    # ——— contact_ и confirm_match_ (ниже — существующая логика) ———
-    if not callback_data.startswith("contact_") and not callback_data.startswith(
-        "confirm_match_"
-    ):
+    # ——— contact_, confirm_match_ и reject_match_ (ниже — существующая логика) ———
+    action_prefixes = ("contact_", "confirm_match_", "reject_match_")
+    if not callback_data.startswith(action_prefixes):
         return False
 
+    prefix = next(value for value in action_prefixes if callback_data.startswith(value))
     try:
-        response_id = int(
-            callback_data[len("contact_") :]
-            if callback_data.startswith("contact_")
-            else callback_data[len("confirm_match_") :]
-        )
+        response_id = int(callback_data[len(prefix) :])
     except (ValueError, TypeError):
         _answer_callback(cq_id, "Неверные данные.", show_alert=True)
         return True
@@ -1228,6 +1225,13 @@ def _handle_sparring_callback(
 
     # Обработка "Получить контакт" / "Связаться"
     if callback_data.startswith("contact_"):
+        if response.status != SparringResponse.ResponseStatus.ACCEPTED:
+            _answer_callback(
+                cq_id,
+                "Контакты откроются после подтверждения отклика и создания матча.",
+                show_alert=True,
+            )
+            return True
         respondent = response.respondent
         contact_method = response.contact_method
         contact_info = ""
@@ -1263,6 +1267,32 @@ def _handle_sparring_callback(
             _answer_callback(cq_id, "Контакт отправлен.")
         else:
             _answer_callback(cq_id, "Контакт не указан.", show_alert=True)
+        return True
+
+    # Обработка "Отклонить отклик"
+    if callback_data.startswith("reject_match_"):
+        if response.status != SparringResponse.ResponseStatus.PENDING:
+            _answer_callback(cq_id, "Этот отклик уже обработан.", show_alert=True)
+            return True
+        if response.sparring_request.status != SparringRequest.Status.ACTIVE:
+            _answer_callback(cq_id, "Заявка уже закрыта.", show_alert=True)
+            return True
+
+        from apps.sparring.services import reject_sparring_response
+
+        try:
+            reject_sparring_response(response.pk, user.pk)
+        except ValueError as exc:
+            _answer_callback(cq_id, str(exc), show_alert=True)
+            return True
+        if message_id:
+            _edit_message_remove_reply_markup(chat_id, message_id)
+        _send_to_user_required(
+            chat_id,
+            "❌ <b>Отклик отклонён.</b>\n\n"
+            "Заявка осталась открытой: можно дождаться других откликов.",
+        )
+        _answer_callback(cq_id, "Отклик отклонён")
         return True
 
     # Обработка "Подтвердить игру"

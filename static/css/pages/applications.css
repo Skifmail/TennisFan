@@ -124,6 +124,14 @@
     color: var(--color-text-muted);
 }
 
+.sparring-response__deadline {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
+
 /* Две фирменные кнопки в ряд; телефон остаётся читаемым и на узком экране. */
 .sparring-response__contacts {
     display: grid;

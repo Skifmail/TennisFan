@@ -69,9 +69,9 @@
                             {% if user.is_authenticated and user.player.pk == req.player_id %}
                             <a href="{% url 'sparring_edit' req.pk %}" class="btn btn-outline btn-sm sparring-card__btn">Редактировать</a>
                             <a href="{% url 'sparring_my_requests' %}" class="btn btn-outline btn-sm sparring-card__btn">Мои заявки</a>
-                            {% elif entry.can_view_author_contacts or has_sparring_access %}
-                            <button type="button" class="btn btn-primary btn-sm sparring-card__btn sparring-respond-btn" data-respond-url="{% url 'sparring_respond' req.pk %}" aria-describedby="sparring-contact-status-{{ req.pk }}" data-id="{{ req.pk }}"{% if entry.can_view_author_contacts %} disabled{% endif %}>
-                                {% if entry.viewer_response.status == 'accepted' %}Отклик принят{% elif entry.can_view_author_contacts %}Отклик отправлен{% elif entry.viewer_response.status == 'rejected' %}Откликнуться снова{% else %}Откликнуться{% endif %}
+                            {% elif entry.can_view_author_contacts or entry.has_pending_response or has_sparring_access %}
+                            <button type="button" class="btn btn-primary btn-sm sparring-card__btn sparring-respond-btn" data-respond-url="{% url 'sparring_respond' req.pk %}" aria-describedby="sparring-contact-status-{{ req.pk }}" data-id="{{ req.pk }}"{% if entry.can_view_author_contacts or entry.has_pending_response %} disabled{% endif %}>
+                                {% if entry.viewer_response.status == 'accepted' %}Матч создан{% elif entry.has_pending_response %}Отклик отправлен{% elif entry.viewer_response.status == 'rejected' or entry.viewer_response.status == 'expired' %}Откликнуться снова{% else %}Откликнуться{% endif %}
                             </button>
                             {% else %}
                             <a href="{% url 'pricing' %}" class="btn btn-outline btn-sm sparring-card__btn sparring-btn--locked" title="Оформите подписку, чтобы откликаться на заявки">Нужна подписка</a>
@@ -81,7 +81,7 @@
                 </div>
                 {% if not user.is_authenticated or user.player.pk != req.player_id %}
                 <div class="sparring-card__contact-panel">
-                    <p class="sparring-card__contact-status" id="sparring-contact-status-{{ req.pk }}" role="status" aria-atomic="true">{% if entry.viewer_response.status == 'accepted' %}Ваш отклик принят.{% elif entry.can_view_author_contacts %}Вы откликнулись на спарринг.{% elif entry.viewer_response.status == 'rejected' %}Ваш отклик отклонён. Чтобы увидеть контакты автора, откликнитесь ещё раз.{% else %}Чтобы увидеть контакты автора, откликнитесь на спарринг.{% endif %}</p>
+                    <p class="sparring-card__contact-status" id="sparring-contact-status-{{ req.pk }}" role="status" aria-atomic="true">{% if entry.viewer_response.status == 'accepted' %}Ваш отклик принят, матч создан. Контакты автора открыты.{% elif entry.has_pending_response %}Отклик отправлен. Контакты автора откроются после создания матча.{% if req.confirmation_hours_left %} Автор должен ответить в течение {{ req.confirmation_hours_left }} ч, иначе матч создастся автоматически.{% endif %}{% elif entry.viewer_response.status == 'rejected' %}Ваш отклик отклонён. Чтобы откликнуться снова, нажмите кнопку.{% elif entry.viewer_response.status == 'expired' %}Срок отклика истёк. Откликнитесь снова, чтобы участвовать.{% else %}Чтобы увидеть контакты автора, нужно создать матч: отправьте отклик и дождитесь подтверждения.{% endif %}</p>
                     <div class="sparring-card__author-contacts" data-author-contacts>{% if entry.can_view_author_contacts %}{% include 'sparring/_author_contacts.html' with contacts=entry.author_contacts only %}{% endif %}</div>
                 </div>
                 {% endif %}

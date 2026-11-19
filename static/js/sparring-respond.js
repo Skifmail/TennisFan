@@ -12,10 +12,9 @@
 
     async function respond(button) {
         const card = button.closest('.sparring-card');
-        const contacts = card && card.querySelector('[data-author-contacts]');
         const status = card && card.querySelector('.sparring-card__contact-status');
         const url = button.dataset.respondUrl;
-        if (!contacts || !status || !url || button.disabled) return;
+        if (!status || !url || button.disabled) return;
 
         const caption = button.textContent;
         let saved = false;
@@ -52,16 +51,7 @@
 
             saved = true;
             button.textContent = 'Отклик отправлен';
-            // Сервер рендерит общий шаблон с автоэкранированием только после сохранения отклика.
-            if (typeof data.contacts_html === 'string' && data.contacts_html.trim()) {
-                contacts.innerHTML = data.contacts_html;
-            } else {
-                const hint = document.createElement('p');
-                hint.className = 'sparring-card__contacts-hint';
-                hint.textContent = 'Отклик сохранён, но контакты не загрузились. Обновите страницу.';
-                contacts.replaceChildren(hint);
-            }
-            status.textContent = typeof data.message === 'string' ? data.message : 'Отклик отправлен. Автор заявки получит уведомление.';
+            status.textContent = typeof data.message === 'string' ? data.message : 'Отклик отправлен. Контакты откроются после создания матча.';
         } catch (_) {
             status.textContent = 'Ошибка сети. Проверьте подключение и попробуйте ещё раз.';
         } finally {

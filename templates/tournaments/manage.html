@@ -85,33 +85,103 @@
 
     {% include "tournaments/includes/organizer_guide.html" %}
     {% include "tournaments/_postpayment_status_banner.html" %}
-    {% if onsite_payments %}
-    <section class="card manage-card mb-4" aria-labelledby="onsite-payments-title">
-        <div class="card-body">
-            <h2 id="onsite-payments-title" class="section-title mb-3">Взносы на корте</h2>
-            <p class="text-secondary mb-3">Выбор оплаты на корте — не факт оплаты. Подтверждайте получение только после передачи денег. История отменённых ожиданий и полученных взносов сохраняется.</p>
-            <div class="d-flex flex-column gap-3">
-                {% for payment in onsite_payments %}
-                <div class="p-3" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow-wrap: anywhere;">
-                    <strong>{{ payment.user.get_full_name|default:payment.user.email }}</strong> — {{ payment.amount }} ₽
-                    <p class="mb-2">{{ payment.get_status_display }}</p>
-                    {% if payment.received_at %}
-                    <p class="text-secondary mb-0">Получено {{ payment.received_at|date:"d.m.Y H:i" }}{% if payment.received_by %}, подтвердил: {{ payment.received_by.get_full_name|default:payment.received_by.email }}{% endif %}.{% if payment.refund_request %} Создана заявка на ручной возврат — деньги не отмечены возвращёнными.{% endif %}</p>
-                    {% elif payment.status == 'expected' and tournament.status != 'cancelled' %}
-                    <form method="post" action="{% url 'tournament_manage_confirm_onsite_payment' slug=tournament.slug payment_id=payment.pk %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-outline">Деньги получены: {{ payment.amount }} ₽</button>
-                    </form>
-                    {% else %}
-                    <p class="text-secondary mb-0">Ожидание закрыто {{ payment.closed_at|date:"d.m.Y H:i" }}.</p>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
+    {% if payment_rows or onsite_payments %}
+    <section class="card manage-card mb-4 payments-card" aria-labelledby="payments-heading"><div class="card-body">
+        <h2 id="payments-heading" class="section-title mb-3">Оплата участников</h2>
+        <p class="payments-card__lead">Найдите игрока и проверьте его статус. Подтверждайте взнос после получения денег.</p>
+        {% if payment_rows %}
+        <div class="payments-filters" role="group" aria-label="Фильтр по статусу оплаты">
+            <button type="button" class="payments-chip payments-chip--all is-active" data-payment-filter="all" aria-pressed="true">
+                Все <span class="payments-chip__count">{{ payment_summary.total }}</span>
+            </button>
+            {% if payment_summary.success %}
+            <button type="button" class="payments-chip payments-chip--success" data-payment-filter="success" aria-pressed="false">
+                <span class="payments-chip__dot" aria-hidden="true"></span>
+                Оплатили <span class="payments-chip__count">{{ payment_summary.success }}</span>
+            </button>
+            {% endif %}
+            {% if payment_summary.warning %}
+            <button type="button" class="payments-chip payments-chip--warning" data-payment-filter="warning" aria-pressed="false">
+                <span class="payments-chip__dot" aria-hidden="true"></span>
+                Ожидают <span class="payments-chip__count">{{ payment_summary.warning }}</span>
+            </button>
+            {% endif %}
+            {% if payment_summary.danger %}
+            <button type="button" class="payments-chip payments-chip--danger" data-payment-filter="danger" aria-pressed="false">
+                <span class="payments-chip__dot" aria-hidden="true"></span>
+                Не оплатили <span class="payments-chip__count">{{ payment_summary.danger }}</span>
+            </button>
+            {% endif %}
+            {% if payment_summary.neutral %}
+            <button type="button" class="payments-chip payments-chip--neutral" data-payment-filter="neutral" aria-pressed="false">
+                <span class="payments-chip__dot" aria-hidden="true"></span>
+                Без статуса <span class="payments-chip__count">{{ payment_summary.neutral }}</span>
+            </button>
+            {% endif %}
         </div>
-    </section>
+        <div class="payments-table-wrap">
+            <table class="payments-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Участник</th>
+                        <th scope="col">Статус</th>
+                        <th scope="col">Детали</th>
+                        <th scope="col" class="payments-cell--actions" aria-label="Действия"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in payment_rows %}
+                    <tr class="payments-row payments-row--{{ row.status_tone }}" data-tone="{{ row.status_tone }}">
+                        <td class="payments-cell payments-cell--player">
+                            <span class="payments-player__name">{{ row.display_name }}</span>
+                        </td>
+                        <td class="payments-cell payments-cell--status">
+                            <span class="payments-status payments-status--{{ row.status_tone }}">
+                                <span class="payments-status__dot" aria-hidden="true"></span>{{ row.status }}
+                            </span>
+                        </td>
+                        <td class="payments-cell payments-cell--details">{{ row.details }}</td>
+                        <td class="payments-cell payments-cell--actions">
+                            {% if tournament.status != 'cancelled' %}
+                                {% if row.expected_onsite_id %}
+                                <form method="post" action="{% url 'tournament_manage_confirm_onsite_payment' slug=tournament.slug payment_id=row.expected_onsite_id %}">{% csrf_token %}
+                                    <button class="btn btn-sm btn-outline payments-action" type="submit">Деньги получены</button>
+                                </form>
+                                {% elif row.pending_invoice_id and tournament.allow_onsite_payment and tournament.status != 'completed' %}
+                                <details class="payments-accept">
+                                    <summary class="payments-accept__summary">Принять на корте</summary>
+                                    <div class="payments-accept__body">
+                                        <p class="payments-accept__hint">Счёт по ссылке закроется.</p>
+                                        <form method="post" action="{% url 'tournament_manage_receive_postpayment' slug=tournament.slug invoice_id=row.pending_invoice_id %}">{% csrf_token %}
+                                            <button class="btn btn-sm btn-primary payments-action" type="submit">Подтвердить получение</button>
+                                        </form>
+                                    </div>
+                                </details>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="payments-empty" data-payment-empty hidden>В этой категории никого нет.</p>
+        {% endif %}
+        {% if onsite_payments %}
+        <details class="payments-history">
+            <summary class="payments-history__summary">История взносов на корте <span class="payments-history__count">{{ onsite_payments|length }}</span></summary>
+            <ul class="payments-history__list">
+                {% for payment in onsite_payments %}
+                <li class="payments-history__item">
+                    <span class="payments-history__name">{{ payment.user.get_full_name|default:payment.user.email }}</span>
+                    <span class="payments-history__meta">{{ payment.amount }} ₽ · {{ payment.get_status_display }}{% if payment.received_at %} · получено {{ payment.received_at|date:"d.m.Y H:i" }}{% endif %}{% if payment.received_by %} · подтвердил {{ payment.received_by.get_full_name|default:payment.received_by.email }}{% endif %}{% if payment.closed_at %} · закрыт {{ payment.closed_at|date:"d.m.Y H:i" }}{% endif %}{% if payment.refund_request %} · заявка на ручной возврат{% endif %}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </div></section>
     {% endif %}
-
 
     <!-- Секция 1: Статус и действия -->
     {% if can_generate_primary_structure or can_manage_manual_pairs or can_generate_groups or can_generate_playoffs or can_finalize or can_edit_tournament or can_cancel_tournament %}
@@ -719,6 +789,7 @@
         color: #000;
     }
 </style>
+{% endblock %}
 {% block extra_js %}
 <script src="{% static 'js/help-dialog.js' %}" defer></script>
 <script defer src="{% static 'js/export-download.js' %}"></script>
@@ -842,6 +913,40 @@
                 e.preventDefault();
                 alert('Выберите участника из списка по результатам поиска.');
             }
+        });
+    });
+})();
+</script>
+<script>
+(function() {
+    var filters = Array.prototype.slice.call(document.querySelectorAll('[data-payment-filter]'));
+    if (!filters.length) return;
+    if (window.__paymentsFilterInit) return;
+    window.__paymentsFilterInit = true;
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.payments-row'));
+    var empty = document.querySelector('[data-payment-empty]');
+    if (!rows.length) return;
+
+    function apply(tone) {
+        var visible = 0;
+        rows.forEach(function(row) {
+            var match = tone === 'all' || row.getAttribute('data-tone') === tone;
+            row.hidden = !match;
+            if (match) visible += 1;
+        });
+        if (empty) empty.hidden = visible > 0;
+        filters.forEach(function(btn) {
+            var active = btn.getAttribute('data-payment-filter') === tone;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+    }
+
+    filters.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tone = btn.getAttribute('data-payment-filter');
+            if (btn.classList.contains('is-active') && tone !== 'all') tone = 'all';
+            apply(tone);
         });
     });
 })();
@@ -1071,5 +1176,4 @@
 })();
 </script>
 
-{% endblock %}
 {% endblock %}

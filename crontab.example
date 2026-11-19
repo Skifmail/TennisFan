@@ -26,8 +26,20 @@
 #                   если соперник не подтвердил/не отклонил в течение 6 ч — результат принимается.
 #                   Команда: auto_accept_stale_proposals
 #
-#   0 9 * * *     — раз в день в 09:00: напоминания о дедлайне матча за 2 и 1 день в Telegram и в ЛК.
+#   0 9 * * *     — раз в день в 09:00: напоминания о дедлайне турнирного матча за 2 и 1 день в Telegram и в ЛК.
 #                   Команда: send_deadline_reminders
+#
+#   5 9 * * *     — раз в день в 09:05: напоминания участникам спарринга за 3 дня, за 1 день,
+#                   в день дедлайна и на следующий день. Дубли исключены.
+#                   Команда: send_sparring_result_reminders
+#
+#   */15 * * * *  — каждые 15 мин: авто-принятие отклика, если автор не подтвердил его за 48 ч,
+#                   и пометка истёкших откликов.
+#                   Команда: process_sparring_responses
+#
+#   30 9 * * *    — раз в день в 09:30: отмена спаррингов без результата через 3 дня после дедлайна
+#                   без изменения рейтинга.
+#                   Команда: sparring_process_overdue_matches
 #
 #   0 8 * * *     — раз в день в 08:00: уведомления участникам о начале турнира (start_date = сегодня).
 #                   В бот и в ЛК. Команда: send_tournament_start_reminders
@@ -51,6 +63,11 @@
 #   python manage.py olympic_process_overdue_matches
 #   python manage.py auto_accept_stale_proposals
 #   python manage.py send_deadline_reminders
+#   python manage.py send_sparring_result_reminders
+#   python manage.py process_sparring_responses
+#   python manage.py sparring_process_overdue_matches --dry-run
+#   python manage.py close_stale_sparring_requests --dry-run
+#   python manage.py close_stale_sparring_requests --auto-accept
 #   python manage.py send_tournament_start_reminders
 #   python manage.py send_subscription_expiry_reminders
 #   python manage.py sync_private_chat_access

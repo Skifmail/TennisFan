@@ -1,4 +1,4 @@
-"""Браузерная проверка контактов автора в карточке до и после собственного отклика."""
+"""Браузерная проверка закрытых контактов автора до создания матча."""
 
 from __future__ import annotations
 
@@ -42,10 +42,10 @@ def _serve_static(route: Route) -> None:
 
 
 @pytest.mark.parametrize("worst_case", [False, True], ids=["normal", "long-values"])
-def test_feed_reply_reveals_author_contacts_inline_and_preserves_them_on_reload(
+def test_feed_reply_keeps_author_contacts_hidden_until_match(
     client: Client, worst_case: bool
 ) -> None:
-    """Карточка обновляется без модалки, контакты компактны, а чат остаётся отдельным.
+    """Карточка не раскрывает контакты после отклика и сохраняет их закрытыми.
 
     Args:
         client: Клиент изолированной тестовой базы.
@@ -73,7 +73,7 @@ def test_feed_reply_reveals_author_contacts_inline_and_preserves_them_on_reload(
     Player.objects.filter(pk=max_author.pk).update(max_contact="+79990000004")
     for author, status in (
         (phone_author, "pending"),
-        (empty_author, "accepted"),
+        (empty_author, "pending"),
         (max_author, "pending"),
     ):
         request = SparringRequest.objects.create(
@@ -165,7 +165,7 @@ def test_feed_reply_reveals_author_contacts_inline_and_preserves_them_on_reload(
             card = page.locator(f"#sparring-{scenario.sparring.pk}")
             expect(card.locator(".sparring-contact")).to_have_count(0)
             expect(card.locator(".sparring-card__contact-status")).to_have_text(
-                "Чтобы увидеть контакты автора, откликнитесь на спарринг."
+                "Чтобы увидеть контакты автора, нужно создать матч: отправьте отклик и дождитесь подтверждения."
             )
             expect(card).to_contain_text("Есть отклики")
             card.screenshot(
@@ -173,19 +173,17 @@ def test_feed_reply_reveals_author_contacts_inline_and_preserves_them_on_reload(
             )
             respond = card.locator(".sparring-respond-btn")
             respond.click()
-            expect(card.locator(".sparring-contact")).to_have_count(4)
+            expect(card.locator(".sparring-contact")).to_have_count(0)
             expect(respond).to_be_disabled()
             expect(respond).to_have_text("Отклик отправлен")
             expect(card.locator(".sparring-card__contact-status")).to_contain_text(
                 "Отклик успешно отправлен"
             )
-            expect(card.locator(".sparring-contact__label")).to_have_text(
-                ["Telegram", "WhatsApp", "MAX", "Позвонить"]
-            )
-            expect(card.locator(".sparring-contact__value")).to_have_text(
-                ["8 (999) 123-45-67"]
+            expect(card.locator(".sparring-card__contact-status")).to_contain_text(
+                "Контакты откроются после создания матча"
             )
             assert "@author_player" not in card.inner_text()
+            assert "8 (999) 123-45-67" not in card.inner_text()
             expect(page.locator("#sparring-respond-modal")).to_have_count(0)
             assert reply_count == 1
 
@@ -255,28 +253,21 @@ def test_feed_reply_reveals_author_contacts_inline_and_preserves_them_on_reload(
                     path=f"/tmp/opencode/sparring-author-contacts-{label}-390.png"
                 )
 
-            for url in (
-                "https://t.me/author_player",
-                "https://wa.me/79999876543",
-                "https://max.ru/u/author_player",
-            ):
-                with page.expect_popup() as opened:
-                    card.locator(f'.sparring-contact[href="{url}"]').click()
-                popup = opened.value
-                popup.wait_for_url(url)
-                popup.close()
             page.bring_to_front()
             page.reload()
-            expect(card.locator(".sparring-contact")).to_have_count(4)
+            expect(card.locator(".sparring-contact")).to_have_count(0)
             expect(respond).to_be_disabled()
             expect(card.locator(".sparring-card__contact-status")).to_have_text(
-                "Вы откликнулись на спарринг."
+                "Отклик отправлен. Контакты автора откроются после подтверждения "
+                "матча. Автор должен ответить в течение 48 ч, иначе матч создастся "
+                "автоматически."
             )
+            assert "author_player" not in page.content()
             assert reply_count == 1
-            contact = card.locator(".sparring-contact").first
-            contact.focus()
-            expect(contact).to_be_focused()
-            assert contact.evaluate(
+            profile_link = card.get_by_role("link", name="Профиль игрока", exact=True)
+            profile_link.focus()
+            expect(profile_link).to_be_focused()
+            assert profile_link.evaluate(
                 "element => getComputedStyle(element).outlineStyle === 'solid'"
             )
             assert not errors, errors
@@ -347,7 +338,8 @@ def test_failed_reply_keeps_contacts_private_and_restores_the_reply_button(
             respond = card.locator(".sparring-respond-btn")
             respond.click()
             expect(card.locator(".sparring-card__contact-status")).not_to_have_text(
-                "Чтобы увидеть контакты автора, откликнитесь на спарринг."
+                "Чтобы увидеть контакты автора, нужно создать матч: отправьте отклик "
+                "и дождитесь подтверждения."
             )
             expect(respond).to_be_enabled()
             expect(respond).to_have_text("Откликнуться")

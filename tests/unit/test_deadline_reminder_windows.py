@@ -97,7 +97,20 @@ class DeadlineReminderWindowTestCase(TestCase):
 
 
 class SparringDeadlineReminderTestCase(TestCase):
-    """Напоминания о дедлайне приходят и по спаррингам (без турнира)."""
+    """Спарринговые напоминания ведёт отдельная команда с защитой от дублей."""
+
+    def test_tournament_reminder_skips_sparring_match(self) -> None:
+        p1 = make_player(email_suffix="spar-skip-p1")
+        p2 = make_player(email_suffix="spar-skip-p2")
+        match = Match.objects.create(
+            match_type=Match.MatchType.SPARRING,
+            player1=p1,
+            player2=p2,
+            status=Match.MatchStatus.SCHEDULED,
+            deadline=_end_of_day_in(1),
+        )
+        self.assertNotIn(match, matches_with_deadline_in_days(1))
+        self.assertNotIn(match, matches_with_deadline_in_days(2))
 
     def test_sparring_match_gets_reminder_email(self) -> None:
         p1 = make_player(email_suffix="spar-remind-p1")
@@ -111,7 +124,7 @@ class SparringDeadlineReminderTestCase(TestCase):
         )
         mail.outbox.clear()
 
-        call_command("send_deadline_reminders")
+        call_command("send_sparring_result_reminders")
 
         reminder_mails = [
             m for m in mail.outbox if "до дедлайна матча" in m.subject.lower()
@@ -121,6 +134,10 @@ class SparringDeadlineReminderTestCase(TestCase):
         self.assertEqual(recipients, {p1.user.email, p2.user.email})
         body = reminder_mails[0].alternatives[0][0]
         self.assertIn("40", body)
+
+        mail.outbox.clear()
+        call_command("send_sparring_result_reminders")
+        self.assertEqual(mail.outbox, [])
 
 
 @override_settings(

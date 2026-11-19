@@ -606,6 +606,21 @@ CRONJOBS = [
     ("0 3 1 5,10 *", "django.core.management.call_command", ["reset_season_points"]),
     ("0 9 * * *", "django.core.management.call_command", ["send_deadline_reminders"]),
     (
+        "5 9 * * *",
+        "django.core.management.call_command",
+        ["send_sparring_result_reminders"],
+    ),
+    (
+        "*/15 * * * *",
+        "django.core.management.call_command",
+        ["process_sparring_responses"],
+    ),
+    (
+        "30 9 * * *",
+        "django.core.management.call_command",
+        ["sparring_process_overdue_matches"],
+    ),
+    (
         "0 8 * * *",
         "django.core.management.call_command",
         ["send_tournament_start_reminders"],

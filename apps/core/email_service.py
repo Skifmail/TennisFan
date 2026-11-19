@@ -1329,7 +1329,7 @@ def send_sparring_response_email(
             "respondent_matches": respondent.matches_played,
             "respondent_wins": respondent.matches_won,
             "contact_method": response.get_contact_method_display(),
-            "contacts": response.contact_links(),
+            "confirmation_hours": request.confirmation_hours_left,
             "request": request,
             "request_description": request.description,
             "request_facts": [fact for fact in request_facts if fact[1]],

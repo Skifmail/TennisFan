@@ -77,6 +77,7 @@ from .entry_payment import (
     get_registration_closed_reason,
     get_registration_payment_options,
     lock_registration_payment_users,
+    receive_postpayment_on_court,
     resolve_registration_payment_method,
     user_is_registered,
 )
@@ -140,6 +141,7 @@ from .platform_home import (
     order_with_cancelled_last,
 )
 from .postpayment import (
+    build_participant_payment_statuses,
     finalize_postpayment_window,
     format_postpayment_open_summary,
     get_pending_postpayment_invoices,
@@ -2009,6 +2011,19 @@ def tournament_manage(
     context["onsite_payments"] = list(
         tournament.onsite_payments.select_related("user", "received_by")
     )
+    payment_rows = (
+        build_participant_payment_statuses(tournament)
+        if tournament.entry_fee or context["onsite_payments"]
+        else []
+    )
+    context["payment_rows"] = payment_rows
+    context["payment_summary"] = {
+        "total": len(payment_rows),
+        "success": sum(1 for row in payment_rows if row.status_tone == "success"),
+        "warning": sum(1 for row in payment_rows if row.status_tone == "warning"),
+        "danger": sum(1 for row in payment_rows if row.status_tone == "danger"),
+        "neutral": sum(1 for row in payment_rows if row.status_tone == "neutral"),
+    }
     if tournament.club_id:
         context["club"] = tournament.club
         context["is_club_panel"] = True
@@ -2042,6 +2057,26 @@ def tournament_manage_confirm_onsite_payment(
                 else "Получение этого взноса уже подтверждено."
             ),
         )
+    return redirect("tournament_manage", slug=slug)
+
+
+@login_required
+@require_POST
+def tournament_manage_receive_postpayment(
+    request: HttpRequest, slug: str, invoice_id: int
+) -> HttpResponse:
+    """Зарегистрировать фактическую передачу взноса вместо оплаты по ссылке."""
+    tournament = get_object_or_404(Tournament, slug=slug)
+    if not _can_manage_tournament(request, tournament):
+        return HttpResponseForbidden("Нет доступа к управлению этим турниром.")
+    try:
+        receive_postpayment_on_court(
+            tournament, invoice_id, received_by=cast(User, request.user)
+        )
+    except RegistrationPaymentError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Взнос получен на корте. Счёт постоплаты закрыт.")
     return redirect("tournament_manage", slug=slug)
 
 

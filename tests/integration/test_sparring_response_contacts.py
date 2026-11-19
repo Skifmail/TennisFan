@@ -85,8 +85,8 @@ class SparringResponseContactsTestCase(TestCase):
                 )
         return response
 
-    def test_email_contains_contacts_when_bot_is_disabled(self) -> None:
-        """Письмо автору уходит с контактами даже без настроенного бота."""
+    def test_email_does_not_contain_contacts_before_match(self) -> None:
+        """Письмо автору рассказывает об отклике, но не раскрывает контакты до матча."""
         self._respond()
 
         self.assertEqual(len(mail.outbox), 1)
@@ -97,10 +97,10 @@ class SparringResponseContactsTestCase(TestCase):
         html = message.alternatives[0][0]
         assert isinstance(html, str)
         self.assertIn("Леонид Ермолаев", html)
-        self.assertIn("https://t.me/leonid", html)
-        self.assertIn("https://wa.me/79990000003", html)
-        self.assertIn("https://max.ru/u/leonid", html)
-        self.assertIn("+79990000002", html)
+        self.assertNotIn("https://t.me/leonid", html)
+        self.assertNotIn("https://wa.me/79990000003", html)
+        self.assertNotIn("https://max.ru/u/leonid", html)
+        self.assertNotIn("+79990000002", html)
         self.assertIn("Любитель", html)
         expected_age = timezone.now().year - 1994
         self.assertIn(f"<span>Возраст:</span> {expected_age} ", html)
@@ -109,22 +109,24 @@ class SparringResponseContactsTestCase(TestCase):
         self.assertIn("20–40 лет", html)
         self.assertIn("Корт Орион", html)
         self.assertIn(reverse("sparring_my_requests"), html)
+        self.assertIn("Контакты игрока откроются после создания", html)
         self.assertEqual(Notification.objects.filter(user=self.author.user).count(), 1)
 
-    def test_plain_email_contains_contact_urls_without_css(self) -> None:
-        """Текстовая версия письма содержит ссылки, а не CSS из HTML-шаблона."""
+    def test_plain_email_does_not_contain_contact_urls(self) -> None:
+        """Текстовая версия письма не содержит ссылок на мессенджеры и телефон."""
         self._respond()
 
         body = mail.outbox[0].body
-        self.assertIn("https://t.me/leonid", body)
-        self.assertIn("https://wa.me/79990000003", body)
-        self.assertIn("+79990000002", body)
+        self.assertNotIn("https://t.me/leonid", body)
+        self.assertNotIn("https://wa.me/79990000003", body)
+        self.assertNotIn("+79990000002", body)
+        self.assertIn("Контакты игрока откроются после создания", body)
         self.assertIn("Ищу партнёра на вечер", body)
         self.assertIn(f"Возраст: {timezone.now().year - 1994} ", body)
         self.assertNotIn("font-family", body)
 
-    def test_email_without_contacts_points_to_platform_chat(self) -> None:
-        """Обе версии письма без контактов подсказывают актуальную кнопку чата."""
+    def test_email_without_contacts_still_explains_match_flow(self) -> None:
+        """Обе версии письма не обещают контакты до подтверждения матча."""
         Player.objects.filter(pk=self.respondent.pk).update(
             telegram="", whatsapp="", max_contact=""
         )
@@ -139,9 +141,10 @@ class SparringResponseContactsTestCase(TestCase):
         assert isinstance(html, str)
         for channel, content in (("text", message.body), ("html", html)):
             with self.subTest(channel=channel):
-                self.assertIn("Игрок не указал внешние контакты", content)
-                self.assertIn("«Написать в чат»", content)
-                self.assertNotIn("«Написать»", content)
+                self.assertIn("Контакты игрока откроются после", content)
+                self.assertIn("48 ч", content)
+                self.assertNotIn("https://t.me/", content)
+                self.assertNotIn("tel:+7", content)
 
     def test_email_waits_for_successful_commit(self) -> None:
         """Письмо не отправляется, пока создание отклика не зафиксировано."""
@@ -284,8 +287,8 @@ class SparringResponseContactsTestCase(TestCase):
         self.assertNotIn(self.sparring.description, html)
         self.assertIn("&lt;img", html)
 
-    def test_telegram_contains_contacts_without_generic_email_duplicate(self) -> None:
-        """Бот получает ссылки и телефон, а HTML-письмо уходит только один раз."""
+    def test_telegram_does_not_contain_contacts_before_match(self) -> None:
+        """Бот не раскрывает контакты, но даёт подтвердить или отклонить отклик."""
         with self.captureOnCommitCallbacks(execute=True):
             with (
                 patch(
@@ -303,31 +306,47 @@ class SparringResponseContactsTestCase(TestCase):
 
         send.assert_called_once()
         text = send.call_args.args[1]
-        self.assertIn("https://t.me/leonid", text)
-        self.assertIn("https://wa.me/79990000003", text)
-        self.assertIn("+79990000002", text)
+        self.assertNotIn("https://t.me/leonid", text)
+        self.assertNotIn("https://wa.me/79990000003", text)
+        self.assertNotIn("+79990000002", text)
+        self.assertIn("Контакты игрока откроются после создания", text)
+        self.assertIn("48 часов", text)
+        keyboard = send.call_args.kwargs["reply_markup"]["inline_keyboard"]
+        callbacks = [button["callback_data"] for row in keyboard for button in row]
+        self.assertIn(f"confirm_match_{self.sparring.responses.get().pk}", callbacks)
+        self.assertIn(f"reject_match_{self.sparring.responses.get().pk}", callbacks)
         self.assertTrue(send.call_args.kwargs["skip_email"])
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_my_requests_page_shows_contact_links_and_write_button(self) -> None:
-        """Карточка разделяет внешние контакты, звонок и кнопку «Написать в чат»."""
+    def test_my_requests_page_hides_contacts_until_accepted(self) -> None:
+        """Пока отклик ждёт решения, карточка не показывает внешние контакты."""
         self._respond()
 
         self.client.force_login(self.author.user)
         page = self.client.get(reverse("sparring_my_requests"), secure=True)
 
         self.assertEqual(page.status_code, 200)
-        self.assertContains(page, "https://t.me/leonid")
-        self.assertContains(page, "tel:+79990000002")
+        self.assertNotContains(page, "https://t.me/leonid")
+        self.assertNotContains(page, "tel:+79990000002")
         self.assertContains(page, "Написать в чат")
         self.assertContains(
             page,
             f'action="{reverse("chat:direct_start", args=[self.respondent.pk])}"',
         )
-        self.assertContains(page, 'class="sparring-contact__value"', count=1)
-        self.assertNotContains(page, "@leonid")
-        self.assertNotContains(page, "Написать в Telegram")
         self.assertContains(page, "Ожидает вашего подтверждения")
+        self.assertContains(page, "Контакты откроются после создания матча")
+        self.assertContains(
+            page,
+            reverse(
+                "sparring_confirm_response", args=[self.sparring.responses.get().pk]
+            ),
+        )
+        self.assertContains(
+            page,
+            reverse(
+                "sparring_reject_response", args=[self.sparring.responses.get().pk]
+            ),
+        )
         self.assertNotContains(page, 'id="sparring-contact-modal"')
 
     def test_card_with_messengers_starts_platform_chat_with_the_respondent(

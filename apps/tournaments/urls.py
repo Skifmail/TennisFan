@@ -26,6 +26,11 @@ urlpatterns = [
         views.tournament_manage_confirm_onsite_payment,
         name="tournament_manage_confirm_onsite_payment",
     ),
+    path(
+        "<slug:slug>/manage/postpayment/<int:invoice_id>/receive/",
+        views.tournament_manage_receive_postpayment,
+        name="tournament_manage_receive_postpayment",
+    ),
     path("", views.tournament_list, name="tournament_list"),
     path("archive/", views.tournament_archive, name="tournament_archive"),
     re_path(

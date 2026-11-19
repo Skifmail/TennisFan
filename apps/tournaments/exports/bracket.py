@@ -136,9 +136,7 @@ def build_bracket_layout(tournament: Tournament) -> BracketLayout:
 
     if has_manual_stages(tournament):
         tables, boards = _manual_stage_layout(tournament, doubles)
-        footnote = (
-            "Круговой отбор; ручной посев в основную и утешительную олимпийские сетки."
-        )
+        footnote = ""
         kind = "manual_stages"
     elif tournament.format == TournamentFormat.ROUND_ROBIN:
         boards = ()
@@ -156,7 +154,9 @@ def build_bracket_layout(tournament: Tournament) -> BracketLayout:
     return BracketLayout(
         kind=kind,
         headline=tournament.name,
-        format_label=tournament.get_format_display(),
+        format_label="Ручной формат"
+        if tournament.uses_manual_pairing()
+        else tournament.get_format_display(),
         meta=_meta(tournament),
         generated=generated,
         status_note=_status_note(tournament, generated),
@@ -182,7 +182,10 @@ def _manual_stage_layout(
     boards: list[BracketBoard] = []
     for stage in tournament.manual_stages.all():
         matches = list(stage.matches.order_by("round_index", "round_order"))
-        if stage.kind == ManualTournamentStage.Kind.QUALIFIER:
+        if stage.kind in (
+            ManualTournamentStage.Kind.QUALIFIER,
+            ManualTournamentStage.Kind.ROUND,
+        ):
             entities: list[Player | TournamentTeam] = [
                 member
                 for token in stage.member_tokens
@@ -196,11 +199,11 @@ def _manual_stage_layout(
             )
             entities, matrix = order_matrix_by_standings(entities, matrix, standings)
             by_id = {(row["team"] or row["player"]).pk: row for row in standings}
-            tables.append(_chess_from_matrix(stage.name, entities, matrix, by_id))
+            tables.append(_chess_from_matrix(str(stage), entities, matrix, by_id))
         else:
             boards.append(
                 BracketBoard(
-                    stage.name, _paginate(_rounds_from_matches(matches, doubles))
+                    str(stage), _paginate(_rounds_from_matches(matches, doubles))
                 )
             )
     return tuple(tables), tuple(boards)
@@ -716,7 +719,12 @@ def _meta(tournament: Tournament) -> tuple[tuple[str, str], ...]:
     if tournament.court_id and tournament.court is not None:
         place = f"{place}, {tournament.court.name}"
     return (
-        ("Формат", tournament.get_format_display()),
+        (
+            "Формат",
+            "Ручной формат"
+            if tournament.uses_manual_pairing()
+            else tournament.get_format_display(),
+        ),
         ("Вариант", tournament.get_variant_display()),
         ("Даты", dates),
         ("Место", place),

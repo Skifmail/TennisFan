@@ -414,6 +414,8 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     Размер сетки = 2^ceil(log2(N)), BYE до степени двойки.
     Все матчи всех раундов создаются сразу, связываются через next_match.
     """
+    if tournament.uses_manual_pairing():
+        return False, "Запустите ручной турнир из управления турниром."
     if not _is_fan(tournament):
         return False, "Турнир не в формате FAN."
     if tournament.bracket_generated:

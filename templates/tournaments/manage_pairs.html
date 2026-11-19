@@ -83,9 +83,9 @@
 
     {% if state.is_started and not state.rounds and not state.is_complete %}
     <section class="pairs-card mb-4">
-        <h2 class="pairs-card__title">Нужен отбор перед олимпийскими сетками?</h2>
-        <p>В ручном управлении можно провести один или несколько круговых отборов, затем составить основную и утешительную олимпийские сетки.</p>
-        <a class="btn btn-outline-primary" href="{% url 'tournament_manage_stages' slug=tournament.slug %}">Круговой отбор → две сетки</a>
+        <h2 class="pairs-card__title">Этапы турнира</h2>
+        <p>Выберите состав и формат первого этапа. Следующие этапы можно добавить по ходу турнира.</p>
+        <a class="btn btn-outline-primary" href="{% url 'tournament_manage_stages' slug=tournament.slug %}">Добавить этап</a>
     </section>
     {% endif %}
     {% if state.is_started and not state.is_complete %}

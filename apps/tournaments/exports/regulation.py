@@ -293,9 +293,18 @@ def _system_section(tournament: Tournament) -> Section:
         str(tournament.format),
         _lines("Порядок розыгрыша определяется организатором."),
     )
-    from apps.tournaments.manual_stages import has_manual_stages
+    from apps.tournaments.manual_stages import CUSTOM_KINDS, has_manual_stages
 
-    if has_manual_stages(tournament):
+    if (
+        tournament.uses_manual_pairing()
+        and not tournament.manual_stages.exclude(kind__in=CUSTOM_KINDS).exists()
+    ):
+        rules = _lines(
+            "Организатор выбирает туры, формат каждой сетки и состав участников.",
+            "В одном туре могут одновременно проходить несколько сеток с разными участниками.",
+            "Организатор определяет, какие сетки разыгрывают итоговые места. Сезонные очки начисляются после публикации общего зачёта.",
+        )
+    elif has_manual_stages(tournament):
         rules = _lines(
             "Организатор вручную распределяет участников в круговые отборы; в каждом все играют со всеми.",
             "После завершения отбора организатор определяет состав и посев основной и утешительной олимпийских сеток.",
@@ -305,7 +314,12 @@ def _system_section(tournament: Tournament) -> Section:
             "Сезонные очки за итоговое место начисляются один раз после завершения обеих сеток.",
         )
     rows = [
-        InfoRow("Система", tournament.get_format_display()),
+        InfoRow(
+            "Система",
+            "Ручной формат"
+            if tournament.uses_manual_pairing()
+            else tournament.get_format_display(),
+        ),
         InfoRow("Вариант", tournament.get_variant_display()),
     ]
     match_format = (tournament.match_format or "").strip()

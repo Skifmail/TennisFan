@@ -134,10 +134,12 @@
                     <span class="tournament-meta-label">Продолжительность</span>
                     <span class="tournament-meta-value">{{ tournament.get_duration_display }}</span>
                 </div>
+                {% if tournament.duration != 'single' %}
                 <div class="tournament-meta-row">
                     <span class="tournament-meta-label">Дней на раунд</span>
                     <span class="tournament-meta-value">{{ tournament.match_days_per_round }}</span>
                 </div>
+                {% endif %}
             </div>
 
             <div class="tournament-meta-group">
@@ -147,6 +149,9 @@
                     <span class="tournament-meta-value">
                         {% if tournament.entry_fee and tournament.entry_fee > 0 %}
                             {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
+                            {% if tournament.court_has_extra_fee %}
+                                <span class="text-secondary" style="display:block;font-size:0.85em;">Корт на матчи оплачивается отдельно</span>
+                            {% endif %}
                         {% else %}
                             Бесплатно
                         {% endif %}
@@ -257,21 +262,7 @@
     </div>
     {% endif %}
 
-    {% if tournament.start_date_is_pending or tournament.status == 'upcoming' %}
-    <div class="card mb-4">
-        <div class="card-body">
-            <h3 class="section-title mb-2">Как проходит турнир</h3>
-            <ol class="tournament-howto text-secondary mb-2" style="padding-left: 1.25rem; max-width: 70ch;">
-                <li>Подайте заявку на турнир подходящего уровня.</li>
-                <li>Турнир начнётся, когда соберётся необходимое количество участников.</li>
-                <li>После старта вы увидите соперников и их контакты в личном кабинете.</li>
-                <li>Договоритесь с соперником о месте и времени матча.</li>
-                <li>Внесите результат на сайте. Он будет учтён в рейтинге.</li>
-            </ol>
-            <p class="text-secondary mb-0">На каждый раунд отводится {{ tournament.match_days_per_round }} {{ tournament.match_days_per_round|ru_pluralize:"день,дня,дней" }}.</p>
-        </div>
-    </div>
-    {% endif %}
+    {% include "tournaments/includes/tournament_howto.html" %}
 
     {% if user.is_authenticated %}
         {% if user_is_registered %}

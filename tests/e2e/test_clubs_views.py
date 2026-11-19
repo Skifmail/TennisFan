@@ -551,9 +551,9 @@ class ClubTournamentManagementViewsTestCase(TestCase):
             secure=True,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Полностью ручное управление")
+        self.assertContains(response, 'value="manual"')
         self.assertContains(
-            response, "В остальных форматах пары строятся автоматически"
+            response, "Выберите «Ручной формат»"
         )
 
     def test_club_tournament_list_filters_by_padel(self) -> None:

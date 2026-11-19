@@ -95,6 +95,8 @@ def generate_bracket(tournament: Tournament) -> tuple[bool, str]:
     Нет продвижения по раундам — проблема «двойного bye» к круговому формату не относится.
     Поддерживает одиночные и парные турниры.
     """
+    if tournament.uses_manual_pairing():
+        return False, "Запустите ручной турнир из управления турниром."
     if not _is_round_robin(tournament):
         return False, "Турнир не в круговом формате."
     if tournament.bracket_generated:

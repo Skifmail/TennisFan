@@ -15,8 +15,10 @@ from apps.tournaments.manual_pairing import (
     start_manual_tournament,
 )
 from apps.tournaments.manual_stages import (
+    add_stage,
     create_qualifiers,
     create_two_knockouts,
+    finish_stages,
     handle_result,
 )
 from apps.tournaments.models import (
@@ -85,6 +87,127 @@ class ManualStagesTests(TestCase):
         ):
             if match.status not in ("completed", "walkover"):
                 self._complete(match)
+
+    def test_custom_stages_mix_players_and_finish_explicitly(self) -> None:
+        """Две группы дают общий финал, за места играют также проигравшие."""
+        for name, tokens in (("А", self.tokens[:4]), ("Б", self.tokens[4:])):
+            add_stage(self.tournament, name, "custom_round", tokens)
+        for match in self.tournament.matches.all():
+            self._complete(match)
+        selected = self.tokens[:3] + self.tokens[4:6]
+        add_stage(self.tournament, "Финал", "custom_places", selected)
+        stage = self.tournament.manual_stages.get(name="Финал")
+        for ri in range(1, 4):
+            for match in stage.matches.filter(round_index=ri):
+                self._complete(match)
+        self.tournament.refresh_from_db()
+        self.assertEqual(self.tournament.status, TournamentStatus.ACTIVE)
+        finish_stages(self.tournament, str(stage.pk))
+        self.assertEqual(
+            sorted(self.tournament.fan_results.values_list("place", flat=True)),
+            [1, 2, 3, 4, 5],
+        )
+
+    def test_combined_places_for_gold_bronze_and_other_players(self) -> None:
+        """Золото и бронза из разных сеток; остальные места берутся из отбора."""
+        url = reverse("tournament_manage_stages", args=[self.tournament.slug])
+
+        def grid(tour: str, name: str, tokens: list[str]) -> ManualTournamentStage:
+            response = self.client.post(
+                url,
+                {
+                    "action": "add_stage",
+                    "name": name,
+                    "tour_name": tour,
+                    "kind": "custom_round",
+                    "members": tokens,
+                },
+            )
+            self.assertRedirects(response, url)
+            stage = self.tournament.manual_stages.get(name=name, tour_name=tour)
+            for match in stage.matches.all():
+                self._complete(match)
+            return stage
+
+        qualifier = grid("Отбор", "А", self.tokens[:6])
+        gold = grid("Финальный тур", "А", self.tokens[:2])
+        bronze = grid("Финальный тур", "Матч за бронзу", self.tokens[2:4])
+        page = self.client.get(url)
+        self.assertEqual(
+            [(name, len(grids)) for name, grids in page.context["manual_tours"]],
+            [("Отбор", 1), ("Финальный тур", 2)],
+        )
+        sources = {
+            f"place_from_{gold.pk}": "1",
+            f"place_from_{bronze.pk}": "3",
+            f"place_from_{qualifier.pk}": "5",
+        }
+        self.assertEqual(
+            self.client.post(
+                url,
+                {"action": "publish_places", **sources, f"place_from_{bronze.pk}": "2"},
+            ).status_code,
+            400,
+        )
+        preview = self.client.post(url, {"action": "preview_places", **sources})
+        self.assertContains(preview, "Предпросмотр общего зачёта")
+        self.assertEqual(len(preview.context["omitted"]), 2)
+        self.assertFalse(self.tournament.fan_results.exists())
+        self.assertEqual(
+            self.client.post(url, {"action": "publish_places", **sources}).status_code,
+            400,
+        )
+        sources["signature"] = preview.context["placement_signature"]
+        response = self.client.post(url, {"action": "publish_places", **sources})
+        self.assertRedirects(response, url)
+        results = self.tournament.fan_results
+        self.assertEqual(results.count(), 6)
+        for stage, start in ((gold, 1), (bronze, 3)):
+            match = stage.matches.get()
+            self.assertEqual(results.get(player=match.winner).place, start)
+            self.assertEqual(results.get(player=match.player2).place, start + 1)
+        self.assertEqual(
+            results.get(player=bronze.matches.get().winner).fan_points,
+            self.tournament.fan_points_sf,
+        )
+        self.assertEqual(
+            self.client.post(url, {"action": "publish_places", **sources}).status_code,
+            400,
+        )
+        self.assertEqual(results.count(), 6)
+        public_page = self.client.get(
+            reverse("tournament_detail", args=[self.tournament.slug])
+        )
+        self.assertContains(public_page, "Итоговые места")
+        self.assertContains(public_page, "Финальный тур")
+
+    def test_add_stage_from_management_and_lock_used_results(self) -> None:
+        """Организатор начинает с сетки и выбирает победителей для кругового финала."""
+        url = reverse("tournament_manage_stages", args=[self.tournament.slug])
+        data = {
+            "action": "add_stage",
+            "kind": "custom_knockout",
+            "name": "Основной тур",
+            "members": self.tokens[:4],
+            **{f"position_{token}": i for i, token in enumerate(self.tokens[:4], 1)},
+        }
+        self.assertRedirects(self.client.post(url, data), url)
+        self.assertEqual(
+            self.client.post(url, dict(data, name="Повтор")).status_code, 400
+        )
+        self._play_branch("custom_knockout")
+        stage = self.tournament.manual_stages.get()
+        final = stage.matches.get(next_match=None)
+        members = [f"p:{final.player1_id}", f"p:{final.player2_id}"]
+        add_stage(self.tournament, "Финал", "custom_round", members)
+        stage = self.tournament.manual_stages.get(name="Финал")
+        self._complete(stage.matches.get())
+        self.assertRedirects(
+            self.client.post(url, {"action": "finish_stages", "final_stage": stage.pk}),
+            url,
+        )
+        self.assertEqual(self.tournament.fan_results.count(), 2)
+        self.assertEqual(self.client.post(url, data).status_code, 400)
 
     def test_qualifiers_play_all_pairs_once_and_keep_original_format(self) -> None:
         """В каждом отборе есть все пары, соперники из разных отборов не встречаются."""
@@ -325,6 +448,8 @@ class ManualStagesTests(TestCase):
             reverse("tournament_detail", args=[self.tournament.slug])
         )
         self.assertContains(response, "Отбор A")
+        self.assertContains(response, "Ручной формат")
+        self.assertNotContains(response, "#tournament-rules/fan")
         self.assertNotContains(response, 'name="winner_id"')
         self.assertTemplateUsed(response, "tournaments/detail.html")
 

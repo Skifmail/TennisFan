@@ -76,9 +76,8 @@ class TournamentFormat(models.TextChoices):
 
 
 MANUAL_PAIRING_FORMATS_NOTE = (
-    "Полностью ручное управление (составление пар вручную) доступно только "
-    "для форматов «Олимпийский (до 1 поражения)» и «Круговой». "
-    "В остальных форматах пары строятся автоматически."
+    "Выберите «Ручной формат», чтобы после старта самостоятельно добавлять этапы, "
+    "выбирать участников и задавать порядок пар."
 )
 
 
@@ -262,6 +261,14 @@ class Tournament(CompressImageFieldsMixin, models.Model):
     # Subscription & Entry Fee fields
     entry_fee = models.DecimalField(
         "Вступительный взнос (руб)", max_digits=10, decimal_places=2, default=0
+    )
+    court_has_extra_fee = models.BooleanField(
+        "Корт оплачивается отдельно",
+        default=True,
+        help_text=(
+            "Показывает предупреждение рядом со вступительным взносом. "
+            "Снимите галочку, если аренда корта включена во взнос."
+        ),
     )
     is_one_day = models.BooleanField(
         "Однодневный турнир",
@@ -2541,6 +2548,9 @@ class ManualTournamentStage(models.Model):
     """Этап свободного ручного сценария без изменения формата турнира."""
 
     class Kind(models.TextChoices):
+        ROUND = "custom_round", "Круговой"
+        KNOCKOUT = "custom_knockout", "Олимпийский на выбывание"
+        PLACES = "custom_places", "Олимпийский за все места"
         QUALIFIER = "qualifier", "Круговой отбор"
         MAIN = "main", "Основная олимпийская сетка"
         CONSOLATION = "consolation", "Утешительная олимпийская сетка"
@@ -2549,6 +2559,7 @@ class ManualTournamentStage(models.Model):
         Tournament, on_delete=models.CASCADE, related_name="manual_stages"
     )
     name = models.CharField("Название", max_length=80)
+    tour_name = models.CharField("Тур", max_length=80, blank=True, default="")
     kind = models.CharField("Тип этапа", max_length=16, choices=Kind.choices)
     order = models.PositiveSmallIntegerField("Порядок", default=1)
     member_tokens = models.JSONField("Участники в порядке посева", default=list)
@@ -2557,13 +2568,12 @@ class ManualTournamentStage(models.Model):
         ordering = ["order", "pk"]
         constraints = [
             models.UniqueConstraint(
-                fields=["tournament", "name"], name="unique_manual_stage_name"
+                fields=["tournament", "tour_name", "name"], name="unique_manual_grid_in_tour"
             )
         ]
 
     def __str__(self) -> str:
-        name: str = self.name
-        return name
+        return f"{self.tour_name} · {self.name}" if self.tour_name else str(self.name)
 
 
 class TournamentPlayerResult(models.Model):

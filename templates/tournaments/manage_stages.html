@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/pages/tournament-stage-builder.css' %}">{% endblock %}
 {% block title %}Ручные этапы: {{ tournament.name }}{% endblock %}
 {% block content %}
 <div class="container pairs-page" style="padding-top: var(--spacing-2xl);">
@@ -7,14 +9,59 @@
         <a href="{% url 'tournament_detail' slug=tournament.slug %}">Публичная страница</a>
     </nav>
     <header class="pairs-hero"><div>
-        <p class="pairs-hero__eyebrow">{{ tournament.get_format_display }} · ручное управление</p>
-        <h1 class="pairs-hero__title">Круговой отбор → две олимпийские сетки</h1>
+        <p class="pairs-hero__eyebrow">Ручное управление</p>
+        <h1 class="pairs-hero__title">Этапы турнира</h1>
         <p>{{ tournament.name }}</p>
-        <p>Задайте состав отборов, внесите результаты и распределите участников в две сетки. Формат турнира сохранится.</p>
+        <p>Начните с отбора, основного тура или сразу с финала. В одном туре можно провести несколько сеток.</p>
     </div></header>
     {% if stage_error %}<div class="alert alert-error" role="alert">{{ stage_error }}</div>{% endif %}
+    {% if can_create_stages or custom_stages and not stages_closed %}
+    <section class="pairs-card mb-4">
+        <h2 class="h4">Добавить этап</h2>
+        <form method="post" class="stage-builder" data-stage-builder>{% csrf_token %}
+            <input type="hidden" name="action" value="add_stage">
+            <div class="stage-builder__fields">
+                <label>Тур<input class="form-control" name="tour_name" list="tour-options" required maxlength="80" placeholder="Выберите тур или введите свой" value="{{ tour_name }}"><datalist id="tour-options">{% for name in tour_options %}<option value="{{ name }}"></option>{% endfor %}</datalist></label>
+                <label>Название сетки<input class="form-control" name="name" maxlength="80" required placeholder="Например, Группа А" value="{{ stage_name }}"></label>
+                <label>Формат сетки<select name="kind" class="form-select">{% for kind in stage_kinds %}<option value="{{ kind.value }}" {% if selected_kind == kind.value %}selected{% endif %}>{{ kind.label }}</option>{% endfor %}</select></label>
+            </div>
+            <p data-format-hint class="text-secondary"></p>
+            <fieldset><legend>Состав и посев</legend>
+                <p class="text-secondary">Отметьте минимум двоих. Можно объединить игроков из разных завершённых этапов. В олимпийской сетке измените номера посева, чтобы задать порядок пар.</p>
+                <p aria-live="polite" data-selection></p>
+                <div class="stage-builder__roster">{% for row in stage_rows %}
+                    <div class="stage-builder__member"><label><input type="checkbox" name="members" {% if row.busy %}disabled{% endif %} value="{{ row.entity.token }}" {% if row.selected %}checked{% endif %}> {{ row.entity.name }}{% if row.busy %}<small class="stage-builder__note">Играет в этапе «{{ row.busy }}»</small>{% elif row.previous %}<small class="stage-builder__note">{{ row.previous }}</small>{% endif %}</label>
+                    <input data-seed class="form-control" aria-label="Посев: {{ row.entity.name }}" name="position_{{ row.entity.token }}" type="number" min="1" max="{{ stage_rows|length }}" value="{{ row.position }}"></div>
+                {% endfor %}</div>
+            </fieldset>
+            <button class="btn btn-primary" type="submit">Создать сетку и матчи</button>
+        </form>
+    </section>
+    {% endif %}
+    {% if custom_stages and all_stages_done and not stages_closed %}
+    <section class="pairs-card mb-4"><h2 class="h4">Подвести итоги</h2>
+        <p>Укажите, с какого места в общем зачёте начинается каждая итоговая сетка. Например, для финала — 1, для матча за бронзу — 3. Остальные поля можно оставить пустыми.</p>
+        <form method="post" action="#placement-preview" class="stage-builder" data-placement-form>{% csrf_token %}
+            <input type="hidden" name="action" value="preview_places">
+            {% for tour, grids in manual_tours %}<fieldset><legend>{{ tour|default:"Сетки турнира" }}</legend>
+                {% for item in grids %}<label class="stage-builder__range"><span>{{ item.stage.name }}</span><span>С места <input class="form-control" type="number" min="1" name="place_from_{{ item.stage.pk }}" value="{{ item.place_from }}" aria-label="Начальное место: {{ tour }} {{ item.stage.name }}"></span></label>{% endfor %}
+            </fieldset>{% endfor %}
+            <p class="text-secondary">Если игрок выступал в нескольких выбранных сетках, он получит место один раз — в верхнем диапазоне. Участники с равным результатом в сетке делят место.</p>
+            <button class="btn btn-outline-primary" type="submit">Проверить общий зачёт</button>
+        </form>
+        {% if placement_preview %}<section id="placement-preview"><h3>Предпросмотр общего зачёта</h3>
+            <table class="table"><thead><tr><th>Место</th><th>Участник</th></tr></thead><tbody>{% for place, name in placement_preview %}<tr><td>{{ place }}</td><td>{{ name }}</td></tr>{% endfor %}</tbody></table>
+            {% if omitted %}<p>Без итогового места и сезонных очков: {{ omitted|join:", " }}.</p>{% endif %}
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="publish_places"><input type="hidden" name="signature" value="{{ placement_signature }}">
+                {% for id, value in sources.items %}<input type="hidden" name="place_from_{{ id }}" value="{{ value }}">{% endfor %}
+                <button class="btn btn-primary" type="submit">Опубликовать этот зачёт и завершить турнир</button>
+            </form>
+        </section>{% endif %}
+    </section>
+    {% endif %}
     {% if can_create_stages %}
-    <section class="pairs-card mb-4"><h2 class="h4">1. Круговой отбор</h2>
+    <details class="pairs-card mb-4"><summary>Круговой отбор и две олимпийские сетки · готовая схема с автозавершением</summary>
+        <p>После двух финалов турнир завершится автоматически. Если возможен дополнительный тур, используйте форму «Добавить этап» выше.</p>
         <p>В каждом отборе все играют со всеми. Можно оставить один общий отбор или распределить участников по нескольким. В каждом должно быть минимум двое.</p>
         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="qualifiers">
             <div class="table-responsive"><table class="table"><thead><tr><th scope="col">Участник</th><th scope="col">Отбор</th></tr></thead><tbody>
@@ -26,7 +73,7 @@
             <p>После сохранения состав отборов фиксируется, а матчи создаются сразу.</p>
             <button class="btn btn-primary" type="submit">Сохранить отборы и создать матчи</button>
         </form>
-    </section>
+    </details>
     {% elif not has_stages %}
     <div class="alert">В этом турнире уже созданы обычные матчи. Свободный сценарий выбирается до первого сохранения пар.</div>
     {% endif %}
@@ -48,8 +95,9 @@
             <button class="btn btn-primary" type="submit">Создать обе олимпийские сетки</button>
         </form>
     </section>
-    {% elif has_stages and not qualifiers_done %}<p class="alert">Завершите все матчи кругового отбора — затем здесь появится составление двух сеток.</p>{% endif %}
+    {% elif has_stages and not custom_stages and not qualifiers_done %}<p class="alert">Завершите все матчи кругового отбора — затем здесь появится составление двух сеток.</p>{% endif %}
     {% if stages_closed %}<p class="alert">{{ tournament.get_status_display }}. Редактирование закрыто.</p>{% endif %}
     {% include 'tournaments/_manual_stages.html' %}
 </div>
+<script defer src="{% static 'js/tournament_stage_builder.js' %}"></script>
 {% endblock %}

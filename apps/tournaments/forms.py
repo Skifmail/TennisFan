@@ -8,7 +8,38 @@ from django import forms
 
 from config.validators import validate_image_max_2mb
 
-from .models import Tournament, TournamentDuration
+from .models import PairingMode, Tournament, TournamentDuration, TournamentFormat
+
+
+class TournamentFormatForm(forms.ModelForm):
+    """Дать организатору выбор ручного сценария непосредственно в поле формата."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        field = self.fields.get("format")
+        if field is not None:
+            field.choices = [
+                *field.choices,
+                ("manual", "Ручной формат — этапы задаёт организатор"),
+            ]
+            if self.instance.uses_manual_pairing():
+                self.initial["format"] = "manual"
+            if self.instance.bracket_generated:
+                field.disabled = True
+
+    def clean_format(self) -> str:
+        """Сохранить режим и базовую сетку для существующей логики матчей."""
+        value = self.cleaned_data["format"]
+        if value == "manual":
+            original = self.instance.format
+            self.instance.pairing_mode = PairingMode.MANUAL
+            return (
+                original
+                if original == TournamentFormat.ROUND_ROBIN
+                else TournamentFormat.SINGLE_ELIMINATION
+            )
+        self.instance.pairing_mode = PairingMode.AUTO
+        return value
 
 
 class TournamentRegistrationWindowForm(forms.Form):

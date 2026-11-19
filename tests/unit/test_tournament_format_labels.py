@@ -35,19 +35,8 @@ class TournamentFormatLabelTests(SimpleTestCase):
         self.assertEqual(RULES_SECTION_TITLES["rules_tvd"], "Группы + плей-офф")
 
     def test_manual_pairing_note_names_supported_formats(self) -> None:
-        """Пометка перечисляет форматы с ручным управлением и предупреждает об остальных."""
-        self.assertIn(
-            f"«{TournamentFormat.SINGLE_ELIMINATION.label}»",
-            MANUAL_PAIRING_FORMATS_NOTE,
-        )
-        self.assertIn(
-            f"«{TournamentFormat.ROUND_ROBIN.label}»",
-            MANUAL_PAIRING_FORMATS_NOTE,
-        )
-        self.assertIn(
-            "В остальных форматах пары строятся автоматически",
-            MANUAL_PAIRING_FORMATS_NOTE,
-        )
+        """Подсказка объясняет, как выбрать ручной формат при создании."""
+        self.assertIn("Выберите «Ручной формат»", MANUAL_PAIRING_FORMATS_NOTE)
 
     def test_admin_format_help_shows_manual_pairing_note(self) -> None:
         """Пометка видна staff-админу в форме создания турнира."""

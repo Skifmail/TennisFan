@@ -344,32 +344,42 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
             ]
         return standings
     # FAN
-    fan_results = {}
-    for r in tournament.fan_results.select_related("player__user"):
-        fan_results[r.player_id] = r
+    fan_results: dict[int, TournamentPlayerResult] = {
+        result.player_id: result for result in tournament.fan_results.all()
+    }
+    final_places: dict[int, int | None] = {}
+    if tournament.status == TournamentStatus.COMPLETED:
+        places_by_round: dict[str, int] = {
+            TournamentPlayerResult.RoundEliminated.WINNER: 1,
+            TournamentPlayerResult.RoundEliminated.FINAL: 2,
+        }
+        final_places = {
+            player_id: result.place or places_by_round.get(result.round_eliminated)
+            for player_id, result in fan_results.items()
+        }
+        if 1 not in final_places.values():
+            final_places.clear()
+
+    def standing_order(player: Player) -> tuple[bool, int, int, float]:
+        """Сортировать по результату финала, сезонным очкам и рейтингу."""
+        result = fan_results.get(player.pk)
+        place = final_places.get(player.pk)
+        points = result.fan_points if result else 0
+        return (place is None, place or 0, -points, -player.total_points)
+
     if tournament.is_doubles():
         teams = list(
             tournament.teams.filter(player2__isnull=False).select_related(
                 "player1__user", "player2__user"
             )
         )
-        teams_sorted = sorted(
-            teams,
-            key=lambda t: (
-                -(
-                    fan_results.get(t.player1_id).fan_points
-                    if fan_results.get(t.player1_id)
-                    else 0
-                ),
-                -t.player1.total_points,
-            ),
-        )
+        teams_sorted = sorted(teams, key=lambda team: standing_order(team.player1))
         standings = []
-        for i, team in enumerate(teams_sorted, 1):
+        for team in teams_sorted:
             fr = fan_results.get(team.player1_id)
             standings.append(
                 {
-                    "place": i,
+                    "place": final_places.get(team.player1_id),
                     "player": team.player1,
                     "team": team,
                     "fan_points": fr.fan_points if fr else 0,
@@ -382,19 +392,13 @@ def _build_bracket_standings(tournament, is_fan, is_olympic):
         participants = list(
             tournament.participants.select_related("user").order_by("-total_points")
         )
-        participants_sorted = sorted(
-            participants,
-            key=lambda p: (
-                -(fan_results.get(p.id).fan_points if fan_results.get(p.id) else 0),
-                -p.total_points,
-            ),
-        )
+        participants_sorted = sorted(participants, key=standing_order)
         standings = []
-        for i, p in enumerate(participants_sorted, 1):
+        for p in participants_sorted:
             fr = fan_results.get(p.id)
             standings.append(
                 {
-                    "place": i,
+                    "place": final_places.get(p.id),
                     "player": p,
                     "team": None,
                     "fan_points": fr.fan_points if fr else 0,
@@ -3981,32 +3985,12 @@ def tournament_tables_detail(request, slug):
             }
             for r in results_by_place
         ]
+    elif is_fan:
+        standings = _build_bracket_standings(tournament, is_fan, is_olympic)
     else:
-        fan_results = {}
-        if is_fan:
-            for r in tournament.fan_results.select_related("player__user"):
-                fan_results[r.player_id] = r
-        participants_sorted = sorted(
-            participants,
-            key=lambda p: (
-                -(fan_results.get(p.id).fan_points if fan_results.get(p.id) else 0),
-                -p.total_points,
-            ),
-        )
-        standings = []
-        for i, p in enumerate(participants_sorted, 1):
-            fr = fan_results.get(p.id)
-            standings.append(
-                {
-                    "place": i,
-                    "player": p,
-                    "fan_result": fr,
-                    "fan_points": fr.fan_points if fr else 0,
-                    "round_eliminated": (
-                        fr.get_round_eliminated_display() if fr else "—"
-                    ),
-                }
-            )
+        standings = [
+            {"place": i, "player": player} for i, player in enumerate(participants, 1)
+        ]
 
     # Матчи по раундам
     matches = tournament.matches.order_by(

@@ -11,7 +11,8 @@ import pytest
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.http import QueryDict
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.clubs.forms import ClubTournamentCreateForm
@@ -78,6 +79,42 @@ def test_duration_is_preserved_for_every_format(
     assert tournament.duration == duration
     assert tournament.is_one_day is (duration == TournamentDuration.SINGLE_DAY)
     assert tournament.format == tournament_format
+
+
+@pytest.mark.parametrize(
+    "tournament_format",
+    [TournamentFormat.SINGLE_ELIMINATION, TournamentFormat.WEEKEND_DAY],
+)
+@pytest.mark.parametrize("duration", TournamentDuration.values)
+def test_public_tournament_instructions_follow_duration(
+    client: Client, tournament_format: str, duration: str
+) -> None:
+    """Обе версии карточки показывают порядок проведения по продолжительности."""
+    tournament = make_tournament(
+        format=tournament_format,
+        duration=duration,
+        start_date=timezone.localdate() + timedelta(days=7),
+        status=TournamentStatus.UPCOMING,
+        match_days_per_round=7,
+    )
+
+    response = client.get(
+        reverse("tournament_detail", args=[tournament.slug]), secure=True
+    )
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert content.count("Как проходит турнир") == 1
+    is_single_day = duration == TournamentDuration.SINGLE_DAY
+    assert ("Все матчи пройдут в один день" in content) is is_single_day
+    assert ("Договоритесь с соперником" in content) is not is_single_day
+    assert ("На каждый раунд отводится 7 дней" in content) is not is_single_day
+    round_days_label = (
+        "Дней на раунд"
+        if tournament_format == TournamentFormat.WEEKEND_DAY
+        else "7 дн. на раунд"
+    )
+    assert (round_days_label in content) is not is_single_day
 
 
 @pytest.mark.parametrize("tournament_format", TournamentFormat.values)
@@ -272,6 +309,23 @@ def test_group_standings_backfill_preserves_other_formats(
     )
 
 
+@pytest.mark.parametrize("in_club", [False, True])
+def test_manual_format_saved_at_creation(in_club: bool) -> None:
+    """Ручной формат сохраняется до запуска в обеих формах создания."""
+    data = _form_data(format="manual")
+    form = (
+        ClubTournamentCreateForm(data=data, club=make_club())
+        if in_club
+        else TournamentAdminForm(data=data)
+    )
+    assert form.is_valid(), form.errors
+    tournament = form.save()
+    tournament.refresh_from_db()
+    assert tournament.uses_manual_pairing()
+    assert not tournament.bracket_generated
+    assert not tournament.matches.exists()
+
+
 def test_single_day_admin_form_is_valid_without_legacy_checkbox() -> None:
     """Однодневный бесплатный турнир выбирается одним выпадающим списком."""
     form = TournamentAdminForm(
@@ -324,6 +378,47 @@ def test_free_group_shortcut_uses_the_same_one_day_rules() -> None:
     )
     assert form.is_valid(), form.errors
     assert form.cleaned_data["entry_fee"] == 0
+
+
+@pytest.mark.parametrize(
+    "group_admin", [False, True], ids=["main-admin", "groups-admin"]
+)
+def test_court_fee_checkbox_controls_public_notice(
+    client: Client, group_admin: bool
+) -> None:
+    """Галочка из обеих админок управляет предупреждением рядом со взносом."""
+    model_admin = (
+        TVDTournamentAdmin(TVDTournament, admin.site)
+        if group_admin
+        else TournamentAdmin(Tournament, admin.site)
+    )
+    request = RequestFactory().get("/admin/")
+    request.user = make_user(is_staff=True, is_superuser=True)
+    data = _form_data(court_has_extra_fee="on")
+    form = model_admin.get_form(request)(data=data)
+    assert form.is_valid(), form.errors
+    tournament = form.save(commit=False)
+    model_admin.save_model(request, tournament, form, change=False)
+    tournament.refresh_from_db()
+    assert tournament.court_has_extra_fee is True
+
+    url = reverse("tournament_detail", args=[tournament.slug])
+    notice = "Корт на матчи оплачивается отдельно"
+    response = client.get(url, secure=True)
+    assert response.status_code == 200
+    assert notice in response.content.decode()
+
+    del data["court_has_extra_fee"]
+    form = model_admin.get_form(request, tournament)(data=data, instance=tournament)
+    assert form.is_valid(), form.errors
+    tournament = form.save(commit=False)
+    model_admin.save_model(request, tournament, form, change=True)
+    tournament.refresh_from_db()
+    assert tournament.court_has_extra_fee is False
+    assert tournament.entry_fee == 1000
+    response = client.get(url, secure=True)
+    assert response.status_code == 200
+    assert notice not in response.content.decode()
 
 
 @pytest.mark.parametrize(

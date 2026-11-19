@@ -1,0 +1,26 @@
+{% load skill_tags %}
+
+{% if tournament.start_date_is_pending or tournament.status == 'upcoming' %}
+<div class="card mb-4">
+    <div class="card-body">
+        <h3 class="section-title mb-2">Как проходит турнир</h3>
+        {% if tournament.duration == 'single' %}
+        <ol class="tournament-howto text-secondary mb-0" style="padding-left: 1.25rem; max-width: 70ch;">
+            <li>Зарегистрируйтесь на турнир.</li>
+            <li>Приезжайте к началу турнира на указанную площадку.</li>
+            <li>Следуйте порядку матчей, который сообщит организатор.</li>
+            <li>Все матчи пройдут в один день. Результаты появятся на странице турнира.</li>
+        </ol>
+        {% else %}
+        <ol class="tournament-howto text-secondary mb-2" style="padding-left: 1.25rem; max-width: 70ch;">
+            <li>Подайте заявку на турнир подходящего уровня.</li>
+            <li>Турнир начнётся, когда соберётся необходимое количество участников.</li>
+            <li>После старта вы увидите соперников и их контакты в личном кабинете.</li>
+            <li>Договоритесь с соперником о месте и времени матча.</li>
+            <li>Внесите результат на сайте. Он будет учтён в рейтинге.</li>
+        </ol>
+        <p class="text-secondary mb-0">На каждый раунд отводится {{ tournament.match_days_per_round }} {{ tournament.match_days_per_round|ru_pluralize:"день,дня,дней" }}.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

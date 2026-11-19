@@ -1,0 +1,1 @@
+{% if status == 'completed' and place == 1 %}🥇{% elif status == 'completed' and place == 2 %}🥈{% elif status == 'completed' and place == 3 %}🥉{% else %}{{ place|default_if_none:"—" }}{% endif %}

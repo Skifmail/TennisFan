@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 
 from apps.core.geo import city_uses_moscow_geo, geo_areas_client_payload
 from apps.core.sports import Sport
+from apps.tournaments.forms import TournamentFormatForm
 from apps.users.models import Player, SkillLevel, User
 from apps.users.skill_levels import skill_with_ntrp
 
@@ -363,7 +364,7 @@ class TournamentPhotoInline(admin.TabularInline):
     fields = ("image", "caption")
 
 
-class TournamentAdminForm(forms.ModelForm):
+class TournamentAdminForm(TournamentFormatForm):
     """Форма турнира с полем «Допустимые категории» в виде чекбоксов (1–5)."""
 
     allowed_categories = forms.MultipleChoiceField(
@@ -1519,6 +1520,7 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
             {
                 "fields": (
                     "entry_fee",
+                    "court_has_extra_fee",
                     "city",
                     "region",
                     "geo_area",
@@ -1729,9 +1731,9 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                 "fields": ("name", "slug", "description", "regulation_extra", "image"),
                 "description": (
                     "В этом разделе формат фиксирован: группы + плей-офф. "
-                    "Пары здесь всегда строятся автоматически. Полностью ручное "
-                    "управление доступно только в форматах «Олимпийский (до 1 "
-                    "поражения)» и «Круговой» при обычном создании турнира."
+                    "Пары здесь строятся автоматически. Для свободного сценария "
+                    "откройте раздел «Турниры» и выберите "
+                    "«Ручной формат»."
                 ),
             },
         ),
@@ -1744,6 +1746,7 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
                     "duration",
                     "is_free",
                     "entry_fee",
+                    "court_has_extra_fee",
                     "city",
                     "region",
                     "geo_area",

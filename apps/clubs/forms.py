@@ -26,6 +26,7 @@ from apps.core.geo import (
 from apps.core.models import GeoArea, UserTelegramLink
 from apps.core.sports import Sport, VenueSport, sport_code
 from apps.courts.models import Court
+from apps.tournaments.forms import TournamentFormatForm
 from apps.tournaments.models import (
     MatchFormat,
     Tournament,
@@ -560,7 +561,7 @@ class ClubMemberBalanceAdjustForm(forms.Form):
         return cleaned_data
 
 
-class ClubTournamentCreateForm(forms.ModelForm):
+class ClubTournamentCreateForm(TournamentFormatForm):
     """Создание турнира клуба по модели Tournament с логикой глобальной платформы."""
 
     allowed_categories = forms.MultipleChoiceField(

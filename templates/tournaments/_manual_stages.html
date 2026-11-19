@@ -1,6 +1,13 @@
-{% for item in manual_stage_views %}
+{% for tour, grids in manual_tours %}
+{% if tour %}<h2 class="section-title mb-3">{{ tour }}</h2>{% endif %}
+{% for item in grids %}
 <section class="pairs-card mb-4" aria-labelledby="stage-{{ item.stage.pk }}">
     <h2 id="stage-{{ item.stage.pk }}" class="h4">{{ item.stage.name }}</h2>
+    <p class="text-secondary">{{ item.stage.get_kind_display }}</p>
+    {% if item.ranked %}
+    <table class="table"><thead><tr><th>Место в этапе</th><th>Участник</th></tr></thead><tbody>
+    {% for place, name in item.ranked %}<tr><td>{{ place }}</td><td>{{ name }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}
     {% if item.standings %}
     <div class="table-responsive">
         <table class="table"><thead><tr><th scope="col">Место</th><th scope="col">Участник</th><th scope="col">Матчи</th><th scope="col">Победы</th><th scope="col">Сеты</th><th scope="col">Геймы</th></tr></thead>
@@ -31,4 +38,5 @@
     </article>
     {% endfor %}
 </section>
+{% endfor %}
 {% endfor %}

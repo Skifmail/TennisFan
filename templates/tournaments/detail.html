@@ -179,7 +179,9 @@
                     <p class="tournament-detail-header__label">Формат</p>
                     <div class="tournament-detail-header__chips tournament-detail-header__chips--primary">
                         <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_variant_display }}</span>
-                        {% if tournament.format == 'single_elimination' %}
+                        {% if tournament.uses_manual_pairing %}
+                        <span class="tournament-card__chip tournament-card__chip--format">Ручной формат</span>
+                        {% elif tournament.format == 'single_elimination' %}
                         <span class="tournament-card__chip tournament-card__chip--format" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
                         {% elif tournament.format == 'olympic_consolation' %}
                         <span class="tournament-card__chip tournament-card__chip--format">Олимпийская система</span>
@@ -289,7 +291,9 @@
                         <div class="tournament-meta-row">
                             <span class="tournament-meta-label">Формат</span>
                             <span class="tournament-meta-value">
-                                {% if tournament.format == 'single_elimination' %}
+                                {% if tournament.uses_manual_pairing %}
+                                Ручной формат · порядок матчей определяет организатор
+                                {% elif tournament.format == 'single_elimination' %}
                                 <a href="{% url 'rules' %}#tournament-rules/fan" class="tournament-meta-link">
                                     {{ tournament.get_format_display }}
                                 </a>
@@ -338,11 +342,10 @@
                                 {% if tournament.start_date_is_pending %}
                                     Старт после набора
                                     {% if tournament.is_one_day %}· однодневный{% else %}· многодневный{% endif %}
-                                    {% if tournament.match_days_per_round %} · {{ tournament.match_days_per_round }} дн. на раунд{% endif %}
                                 {% else %}
                                     {{ tournament.get_duration_display }}
-                                    {% if tournament.match_days_per_round %} · {{ tournament.match_days_per_round }} дн. на раунд{% endif %}
                                 {% endif %}
+                                {% if tournament.duration != 'single' and tournament.match_days_per_round %} · {{ tournament.match_days_per_round }} дн. на раунд{% endif %}
                             </span>
                         </div>
                     </div>
@@ -354,7 +357,7 @@
                             <span class="tournament-meta-value">
                                 {% if tournament.entry_fee and tournament.entry_fee > 0 %}
                                     {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
-                                    <span class="text-secondary" style="display:block;font-size:0.85em;">Оплата при записи; корт на матчи оплачивается отдельно</span>
+                                    <span class="text-secondary" style="display:block;font-size:0.85em;">Оплата при записи{% if tournament.court_has_extra_fee %}. Корт на матчи оплачивается отдельно{% endif %}</span>
                                 {% else %}
                                     Бесплатно
                                 {% endif %}
@@ -503,21 +506,7 @@
     </div>
     {% endif %}
 
-    {% if tournament.start_date_is_pending or tournament.status == 'upcoming' %}
-    <div class="card mb-4">
-        <div class="card-body">
-            <h3 class="section-title mb-2">Как проходит турнир</h3>
-            <ol class="tournament-howto text-secondary mb-2" style="padding-left: 1.25rem; max-width: 70ch;">
-                <li>Подайте заявку на турнир подходящего уровня.</li>
-                <li>Турнир начнётся, когда соберётся необходимое количество участников.</li>
-                <li>После старта вы увидите соперников и их контакты в личном кабинете.</li>
-                <li>Договоритесь с соперником о месте и времени матча.</li>
-                <li>Внесите результат на сайте. Он будет учтён в рейтинге.</li>
-            </ol>
-            <p class="text-secondary mb-0">На каждый раунд отводится {{ tournament.match_days_per_round }} {{ tournament.match_days_per_round|ru_pluralize:"день,дня,дней" }}.</p>
-        </div>
-    </div>
-    {% endif %}
+    {% include "tournaments/includes/tournament_howto.html" %}
 
     {# Кнопка регистрации #}
     {% if user.is_authenticated %}
@@ -747,12 +736,12 @@
     {% endif %}
 
     {% if has_stages %}
-    <h2 class="section-title mb-3">Круговой отбор и олимпийские сетки</h2>
+    <h2 class="section-title mb-3">Этапы турнира</h2>
     {% include 'tournaments/_manual_stages.html' %}
     {% if tournament.status == 'completed' %}
     <section class="card mb-4"><div class="card-body"><h2>Итоговые места</h2>
         <div class="table-responsive"><table class="table"><thead><tr><th scope="col">Место</th><th scope="col">Игрок</th><th scope="col">Очки</th></tr></thead><tbody>
-            {% for result in tournament.fan_results.all %}<tr><td>{{ result.place }}</td><td>{{ result.player.get_display_name }}</td><td>{{ result.fan_points }}</td></tr>{% endfor %}
+            {% for result in tournament.fan_results.all|dictsort:"place" %}<tr><td>{{ result.place }}</td><td>{{ result.player.get_display_name }}</td><td>{{ result.fan_points }}</td></tr>{% endfor %}
         </tbody></table></div>
     </div></section>
     {% endif %}
@@ -854,7 +843,7 @@
     </div>
     {% endif %}
 
-    {% if standings and not is_round_robin %}
+    {% if standings and not is_round_robin and tournament.status != 'upcoming' %}
     <h2 class="section-title mb-3">Турнирная таблица</h2>
     <div class="card mb-4">
         <div class="card-body p-0">
@@ -872,9 +861,9 @@
                     </thead>
                     <tbody>
                         {% for s in standings %}
-                        <tr class="{% if s.place <= 3 %}standings-row-top-3{% endif %}">
+                        <tr class="{% if tournament.status == 'completed' and s.place and s.place <= 3 %}standings-row-top-3{% endif %}">
                             <td class="standings-table__place-cell">
-                                {% if s.place == 1 %}🥇{% elif s.place == 2 %}🥈{% elif s.place == 3 %}🥉{% else %}{{ s.place }}{% endif %}
+                                {% include "tournaments/includes/standings_place.html" with place=s.place status=tournament.status only %}
                             </td>
                             <td>
                                 {% if s.team %}

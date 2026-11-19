@@ -187,9 +187,9 @@
                     </thead>
                     <tbody>
                         {% for s in standings %}
-                        <tr class="{% if s.place <= 3 %}top-place{% endif %}">
+                        <tr class="{% if tournament.status == 'completed' and s.place and s.place <= 3 %}top-place{% endif %}">
                             <td class="place-cell">
-                                {% if s.place == 1 %}🥇{% elif s.place == 2 %}🥈{% elif s.place == 3 %}🥉{% else %}{{ s.place }}{% endif %}
+                                {% include "tournaments/includes/standings_place.html" with place=s.place status=tournament.status only %}
                             </td>
                             <td>
                                 {% if s.team %}

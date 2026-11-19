@@ -1,8 +1,13 @@
-{% if tournament.allow_postpayment %}
+{% if tournament.entry_fee > 0 %}
+{% if tournament.allow_onsite_payment %}
+<span class="{{ class_name|default:'badge badge-soft' }}">Оплата на корте</span>
+{% endif %}
+{% if tournament.postpayment_available %}
 <span
     class="{% if class_name %}{{ class_name }}{% else %}badge badge-soft{% endif %}"
     title="Постоплата: можно зарегистрироваться без немедленной оплаты. После открытия окна срок — до {{ tournament.get_postpayment_deadline_hours }} ч.{% if tournament.is_one_day %}, но не позже объявленного времени начала игры{% endif %}."
 >
     ПОСТОПЛАТА
 </span>
+{% endif %}
 {% endif %}

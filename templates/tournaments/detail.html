@@ -179,26 +179,11 @@
                     <p class="tournament-detail-header__label">Формат</p>
                     <div class="tournament-detail-header__chips tournament-detail-header__chips--primary">
                         <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_variant_display }}</span>
-                        {% if tournament.uses_manual_pairing %}
-                        <span class="tournament-card__chip tournament-card__chip--format">Ручной формат</span>
-                        {% elif tournament.format == 'single_elimination' %}
-                        <span class="tournament-card__chip tournament-card__chip--format" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
-                        {% elif tournament.format == 'olympic_consolation' %}
-                        <span class="tournament-card__chip tournament-card__chip--format">Олимпийская система</span>
-                        {% elif tournament.format == 'round_robin' %}
-                        <span class="tournament-card__chip tournament-card__chip--format">Круговой</span>
-                        {% if tournament.match_format %}
+                        <span class="tournament-card__chip tournament-card__chip--format">{{ tournament.public_format_label }}</span>
+                        {% if tournament.format == 'round_robin' and tournament.match_format and not tournament.uses_manual_pairing %}
                         <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_match_format_display }}</span>
                         {% endif %}
-                        {% elif tournament.format == 'weekend_day' %}
-                        <span class="tournament-card__chip tournament-card__chip--format" title="Групповой этап, затем плей-офф и утешительная сетка">ГРУППЫ</span>
-                        {% endif %}
-                        {% if tournament.allow_postpayment %}
-                        <span
-                            class="tournament-card__chip tournament-card__chip--format"
-                            title="Постоплата: можно зарегистрироваться без немедленной оплаты. После открытия окна срок — до {{ tournament.get_postpayment_deadline_hours }} ч.{% if tournament.is_one_day %}, но не позже объявленного времени начала игры{% endif %}."
-                        >ПОСТОПЛАТА</span>
-                        {% endif %}
+                        {% include 'includes/postpayment_badge.html' with tournament=tournament class_name='tournament-card__chip tournament-card__chip--format' %}
                         {% if tournament.status == 'active' %}
                         <span class="tournament-card__chip tournament-card__chip--fee">{{ tournament.get_status_display }}</span>
                         {% elif tournament.status == 'cancelled' %}
@@ -299,7 +284,7 @@
                                 </a>
                                 {% elif tournament.format == 'olympic_consolation' %}
                                 <a href="{% url 'rules' %}#tournament-rules/olympic" class="tournament-meta-link">
-                                    Олимпийская система
+                                    {{ tournament.public_format_label }}
                                 </a>
                                 {% elif tournament.format == 'round_robin' %}
                                 <a href="{% url 'rules' %}#tournament-rules/round-robin" class="tournament-meta-link">
@@ -357,7 +342,7 @@
                             <span class="tournament-meta-value">
                                 {% if tournament.entry_fee and tournament.entry_fee > 0 %}
                                     {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
-                                    <span class="text-secondary" style="display:block;font-size:0.85em;">Оплата при записи{% if tournament.court_has_extra_fee %}. Корт на матчи оплачивается отдельно{% endif %}</span>
+                                    {% include 'tournaments/includes/entry_fee_note.html' %}
                                 {% else %}
                                     Бесплатно
                                 {% endif %}

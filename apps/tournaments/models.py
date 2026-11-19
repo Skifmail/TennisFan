@@ -612,6 +612,22 @@ class Tournament(CompressImageFieldsMixin, models.Model):
         """
         return getattr(self, "pairing_mode", PairingMode.AUTO) == PairingMode.MANUAL
 
+    @property
+    def public_format_label(self) -> str:
+        """Вернуть выбранный организатором формат для публичной страницы."""
+        return (
+            "Ручной формат"
+            if self.uses_manual_pairing()
+            else str(self.get_format_display())
+        )
+
+    @property
+    def postpayment_available(self) -> bool:
+        """Проверить доступность постоплаты по правилам регистрации."""
+        from .postpayment import tournament_allows_postpayment_registration
+
+        return tournament_allows_postpayment_registration(self)
+
     def manual_pairing_has_started(self) -> bool:
         """Проверить, запущен ли турнир в ручном режиме.
 

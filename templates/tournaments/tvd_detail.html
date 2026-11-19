@@ -42,7 +42,8 @@
             <p class="tournament-detail-header__label">Формат</p>
             <div class="tournament-detail-header__chips tournament-detail-header__chips--primary">
                 <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_variant_display }}</span>
-                <span class="tournament-card__chip tournament-card__chip--format">ГРУППЫ</span>
+                <span class="tournament-card__chip tournament-card__chip--format">{{ tournament.public_format_label }}</span>
+                {% include 'includes/postpayment_badge.html' with tournament=tournament class_name='tournament-card__chip tournament-card__chip--format' %}
                 <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_duration_display }}</span>
                 {% if tournament.status == 'cancelled' %}
                 <span class="tournament-card__chip tournament-detail-header__chip--danger">{{ tournament.get_status_display }}</span>
@@ -149,9 +150,7 @@
                     <span class="tournament-meta-value">
                         {% if tournament.entry_fee and tournament.entry_fee > 0 %}
                             {{ tournament.entry_fee|floatformat:0|intcomma }} ₽
-                            {% if tournament.court_has_extra_fee %}
-                                <span class="text-secondary" style="display:block;font-size:0.85em;">Корт на матчи оплачивается отдельно</span>
-                            {% endif %}
+                            {% include 'tournaments/includes/entry_fee_note.html' %}
                         {% else %}
                             Бесплатно
                         {% endif %}

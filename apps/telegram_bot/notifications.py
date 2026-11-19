@@ -1424,8 +1424,9 @@ def notify_subscription_expiring(
 def notify_sparring_response(sparring_response: SparringResponse) -> None:
     """Уведомить автора о новом отклике, сохранив Telegram вместе с откликом.
 
-    Письмо с данными игрока и контактами отправляется после успешного коммита,
+    Письмо с данными игрока отправляется после успешного коммита,
     независимо от наличия Telegram-бота. Повторный email-дубль не создаётся.
+    Контакты откликнувшегося не раскрываются до подтверждения матча.
     """
     request = sparring_response.sparring_request
     respondent = sparring_response.respondent
@@ -1495,21 +1496,12 @@ def notify_sparring_response(sparring_response: SparringResponse) -> None:
             f"<b>Статистика:</b> {respondent.matches_won}/{respondent.matches_played} побед ({win_rate:.0f}%)"
         )
 
-    contact_links = sparring_response.contact_links()
-    if contact_links:
-        lines.append("")
-        lines.append("<b>Контакты:</b>")
-        for contact in contact_links:
-            label = html.escape(str(contact.get("label") or ""))
-            value = html.escape(str(contact.get("value") or ""))
-            url = str(contact.get("url") or "")
-            if url and not url.startswith("tel:"):
-                lines.append(
-                    f'• {label}: <a href="{html.escape(url, quote=True)}">{value}</a>'
-                )
-            else:
-                lines.append(f"• {label}: {value}")
-
+    lines.append("")
+    lines.append(
+        "Подтвердите отклик в течение 48 часов. Если не ответить, матч создастся "
+        "автоматически по первому ожидающему отклику."
+    )
+    lines.append("Контакты игрока откроются после создания матча.")
     lines.append("")
     lines.append("Выберите действие:")
 
@@ -1530,21 +1522,14 @@ def notify_sparring_response(sparring_response: SparringResponse) -> None:
             }
         ],
     ]
-    contact_method = sparring_response.contact_method
-    has_contact = (
-        (contact_method == "telegram" and respondent.telegram)
-        or (contact_method == "whatsapp" and respondent.whatsapp)
-        or (contact_method == "max" and respondent.max_contact)
+    keyboard.append(
+        [
+            {
+                "text": "❌ Отклонить",
+                "callback_data": f"reject_match_{sparring_response.pk}",
+            }
+        ]
     )
-    if has_contact:
-        keyboard.append(
-            [
-                {
-                    "text": "💬 Связаться",
-                    "callback_data": f"contact_{sparring_response.pk}",
-                }
-            ]
-        )
 
     reply_markup = {"inline_keyboard": keyboard}
 

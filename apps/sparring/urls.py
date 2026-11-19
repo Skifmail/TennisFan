@@ -38,6 +38,11 @@ urlpatterns = [
         views.sparring_confirm_response,
         name="sparring_confirm_response",
     ),
+    path(
+        "response/<int:response_id>/reject/",
+        views.sparring_reject_response,
+        name="sparring_reject_response",
+    ),
     # Парный спарринг 2×2 — редиректы на объединённые страницы
     path(
         "doubles/",

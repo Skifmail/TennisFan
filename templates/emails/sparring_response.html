@@ -177,7 +177,9 @@
                 <p class="greeting">Здравствуйте, {{ user_name }}!</p>
                 <p class="intro">
                     <strong>{{ respondent_name }}</strong> откликнулся на вашу заявку
-                    на спарринг. Контакты игрока — ниже, можно писать сразу.
+                    на спарринг. Подтвердите отклик в разделе «Мои заявки»{% if confirmation_hours %} в течение {{ confirmation_hours }} ч{% endif %}.
+                    Если не ответить, матч создастся автоматически по первому ожидающему отклику.
+                    Контакты игрока откроются после создания матча.
                 </p>
 
                 <p class="section-title">Откликнувшийся игрок</p>
@@ -195,27 +197,15 @@
                     </p>
                 </div>
 
-                <p class="section-title">Контакты</p>
-                {% if contacts %}
-                {% if contact_method %}
-                <p class="contact-method">Игрок выбрал способ связи: <strong>{{ contact_method }}</strong></p>
-                {% endif %}
-                <ul class="contacts">
-                    {% for contact in contacts %}
-                    <li>
-                        {% if contact.url %}
-                        <a href="{{ contact.url }}" class="contact"{% if contact.external %} target="_blank" rel="noopener"{% endif %}>{{ contact.label }} <span>{{ contact.value }}</span></a>
-                        {% else %}
-                        <span class="contact">{{ contact.label }} <span>{{ contact.value }}</span></span>
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <p class="contact-method">
-                    Игрок не указал внешние контакты. Откройте «Мои заявки» и нажмите «Написать в чат» для личного чата.
-                </p>
-                {% endif %}
+                <div class="request">
+                    <p class="title">Контакты откроются после создания матча</p>
+                    <p class="facts">
+                        Подтвердите отклик в «Моих заявках»{% if confirmation_hours %} в течение {{ confirmation_hours }} ч{% endif %}.
+                        Если не ответить, матч создастся автоматически.
+                        Внешние контакты игрока станут доступны только после создания матча.
+                        До этого можно написать в личном чате на сайте.
+                    </p>
+                </div>
 
                 <div class="request">
                     <p class="title">Ваша заявка</p>

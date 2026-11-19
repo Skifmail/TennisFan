@@ -2,6 +2,7 @@
 Sparring models.
 """
 
+import math
 from typing import TypedDict, cast
 
 from django.db import models
@@ -106,6 +107,26 @@ class SparringRequest(models.Model):
     status = models.CharField(
         "Статус", max_length=20, choices=Status.choices, default=Status.ACTIVE
     )
+    confirmation_deadline = models.DateTimeField(
+        "Подтвердить отклики до",
+        null=True,
+        blank=True,
+        help_text="Если автор не обработает отклик до этого времени, матч создастся автоматически.",
+    )
+    auto_accept = models.BooleanField(
+        "Автоматически создавать матч",
+        default=True,
+        help_text="Принять первый подходящий отклик, если автор не ответил до дедлайна.",
+    )
+    match = models.ForeignKey(
+        "tournaments.Match",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sparring_single_request",
+        verbose_name="Созданный матч",
+    )
+    matched_at = models.DateTimeField("Матч создан", null=True, blank=True)
 
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
@@ -114,6 +135,9 @@ class SparringRequest(models.Model):
         verbose_name = "Заявка на спарринг"
         verbose_name_plural = "Заявки на спарринг"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "confirmation_deadline"]),
+        ]
 
     def __str__(self) -> str:
         return f"Спарринг: {self.player} в {self.city}"
@@ -123,10 +147,35 @@ class SparringRequest(models.Model):
         return bool(self.responses.exists())
 
     def contact_links(self) -> list["SparringContact"]:
-        """Собрать контакты автора для зрителя, уже отправившего собственный отклик."""
+        """Собрать контакты автора для откликнувшегося после создания матча."""
         from .contacts import build_sparring_contacts
 
         return build_sparring_contacts(self.player)
+
+    @property
+    def confirmation_hours_left(self) -> int | None:
+        """Сколько часов осталось автору (округление вверх)."""
+        if not self.confirmation_deadline or self.match_id:
+            return None
+        from django.utils import timezone
+
+        seconds = (self.confirmation_deadline - timezone.now()).total_seconds()
+        if seconds <= 0:
+            return 0
+        return max(1, math.ceil(seconds / 3600))
+
+    def refresh_confirmation_deadline(self) -> None:
+        """Пересчитать дедлайн по самому раннему ожидающему отклику."""
+        from django.db.models import Min
+
+        if self.match_id or self.status != self.Status.ACTIVE:
+            self.confirmation_deadline = None
+            return
+        earliest = self.responses.filter(
+            status=SparringResponse.ResponseStatus.PENDING,
+            expires_at__isnull=False,
+        ).aggregate(value=Min("expires_at"))["value"]
+        self.confirmation_deadline = earliest
 
 
 class SparringContact(TypedDict):
@@ -151,6 +200,7 @@ class SparringResponse(models.Model):
         PENDING = "pending", "Ожидает рассмотрения"
         ACCEPTED = "accepted", "Принят"
         REJECTED = "rejected", "Отклонен"
+        EXPIRED = "expired", "Истёк"
 
     sparring_request = models.ForeignKey(
         SparringRequest,
@@ -175,6 +225,13 @@ class SparringResponse(models.Model):
         choices=ResponseStatus.choices,
         default=ResponseStatus.PENDING,
     )
+    expires_at = models.DateTimeField(
+        "Действует до",
+        null=True,
+        blank=True,
+        help_text="После этого времени отклик перестаёт блокировать автора заявки.",
+    )
+    accepted_at = models.DateTimeField("Принят", null=True, blank=True)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
@@ -277,6 +334,48 @@ class SparringInvitation(models.Model):
 
     def __str__(self) -> str:
         return f"{self.inviter} → {self.invitee} ({self.get_status_display()})"
+
+
+class SparringReminderStage(models.TextChoices):
+    """Этапы напоминаний участникам спаррингового матча."""
+
+    D3 = "d3", "За 3 дня до дедлайна"
+    D1 = "d1", "За 1 день до дедлайна"
+    D0 = "d0", "В день дедлайна"
+    OVERDUE1 = "overdue1", "Через день после дедлайна"
+    OVERDUE3 = "overdue3", "Через три дня после дедлайна"
+
+
+class SparringMatchReminder(models.Model):
+    """Отметка об уже отправленном напоминании по этапу матча."""
+
+    match = models.ForeignKey(
+        "tournaments.Match",
+        on_delete=models.CASCADE,
+        related_name="sparring_reminders",
+        verbose_name="Матч",
+    )
+    stage = models.CharField(
+        "Этап", max_length=20, choices=SparringReminderStage.choices
+    )
+    sent_at = models.DateTimeField("Отправлено", auto_now_add=True)
+
+    class Meta:
+        db_table = "sparring_match_reminder"
+        verbose_name = "Напоминание о спарринге"
+        verbose_name_plural = "Напоминания о спаррингах"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["match", "stage"],
+                name="sparring_unique_reminder_stage_per_match",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["match", "stage"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.match} — {self.get_stage_display()}"
 
 
 # ---------------------------------------------------------------------------

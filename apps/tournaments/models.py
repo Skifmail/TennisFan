@@ -1769,6 +1769,7 @@ class Match(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        unique=True,
         related_name="matches",
         verbose_name="Отклик на спарринг",
         help_text="Связь с откликом на спарринг, если матч создан из спарринга",
@@ -2584,7 +2585,8 @@ class ManualTournamentStage(models.Model):
         ordering = ["order", "pk"]
         constraints = [
             models.UniqueConstraint(
-                fields=["tournament", "tour_name", "name"], name="unique_manual_grid_in_tour"
+                fields=["tournament", "tour_name", "name"],
+                name="unique_manual_grid_in_tour",
             )
         ]
 

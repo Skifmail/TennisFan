@@ -98,8 +98,20 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
         desired_partner_age_min=20,
         desired_partner_age_max=40,
     )
-    SparringResponse.objects.create(
-        sparring_request=request, respondent=respondent, contact_method="telegram"
+    accepted_main_response = SparringResponse.objects.create(
+        sparring_request=request,
+        respondent=respondent,
+        contact_method="telegram",
+        status=SparringResponse.ResponseStatus.ACCEPTED,
+    )
+    request.status = SparringRequest.Status.CLOSED
+    request.save(update_fields=["status", "updated_at"])
+    match = Match.objects.create(
+        tournament=None,
+        match_type=Match.MatchType.SPARRING,
+        sparring_response=accepted_main_response,
+        player1=author,
+        player2=respondent,
     )
     phone_player = make_player(
         email_suffix="cards-phone", first_name="Мария", phone="+79990000002"
@@ -108,16 +120,20 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
     max_player.max_contact = "+79990000003"
     Player.objects.filter(pk=max_player.pk).update(max_contact=max_player.max_contact)
     accepted_player = make_player(email_suffix="cards-accepted", first_name="Анна")
+    pending_player = make_player(email_suffix="cards-pending", first_name="Олег")
+    pending_player.telegram = "pending_hidden"
+    Player.objects.filter(pk=pending_player.pk).update(telegram=pending_player.telegram)
     for player, method, status in (
-        (phone_player, "telegram", "pending"),
-        (max_player, "max", "pending"),
+        (phone_player, "telegram", "accepted"),
+        (max_player, "max", "accepted"),
         (accepted_player, "telegram", "accepted"),
+        (pending_player, "telegram", "pending"),
     ):
         other_request = SparringRequest.objects.create(
             player=author,
             city="Москва",
             description="Дружеская игра в выходные",
-            status="closed" if status == "accepted" else "active",
+            status="active" if status == "pending" else "closed",
         )
         response = SparringResponse.objects.create(
             sparring_request=other_request,
@@ -126,22 +142,21 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
             status=status,
         )
         if status == "accepted":
-            match = Match.objects.create(
+            Match.objects.create(
                 tournament=None,
                 match_type=Match.MatchType.SPARRING,
                 sparring_response=response,
                 player1=author,
                 player2=player,
             )
-            rejected = make_player(email_suffix="cards-rejected", first_name="Денис")
-            rejected.telegram = "hidden_contact"
-            Player.objects.filter(pk=rejected.pk).update(telegram=rejected.telegram)
-            SparringResponse.objects.create(
-                sparring_request=other_request,
-                respondent=rejected,
-                contact_method="telegram",
-                status="rejected",
-            )
+    rejected = make_player(email_suffix="cards-rejected", first_name="Денис")
+    Player.objects.filter(pk=rejected.pk).update(telegram="hidden_contact")
+    SparringResponse.objects.create(
+        sparring_request=request,
+        respondent=rejected,
+        contact_method="telegram",
+        status=SparringResponse.ResponseStatus.REJECTED,
+    )
     client.force_login(author.user)
     document = client.get(reverse("sparring_my_requests"), secure=True)
     assert document.status_code == 200
@@ -198,11 +213,11 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
             )
             main_card = page.locator(".sparring-card--mine").filter(has=main_response)
             expect(main_response.locator(".sparring-response__status")).to_have_text(
-                "Ожидает вашего подтверждения"
+                "Отклик принят, матч создан"
             )
             expect(
                 main_response.locator(".sparring-response__actions .btn")
-            ).to_have_text(["Подтвердить", "Написать в чат", "Профиль"])
+            ).to_have_text(["Написать в чат", "Профиль", "Матч"])
             expect(main_response.locator(".sparring-contact__label")).to_have_text(
                 ["Telegram", "WhatsApp", "MAX", "Позвонить"]
             )
@@ -211,7 +226,7 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
             )
             expect(
                 main_response.locator(".sparring-response__actions a")
-            ).to_have_count(1)
+            ).to_have_count(2)
             expect(page.locator("#sparring-contact-modal")).to_have_count(0)
             expect(
                 page.locator('.sparring-contact[href="https://t.me/hidden_contact"]')
@@ -220,9 +235,9 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
                 "MAX Нет ссылки"
             )
             expect(page.locator(".sparring-contact--text")).to_be_disabled()
-            expect(page.get_by_role("link", name="Матч", exact=True)).to_have_attribute(
-                "href", reverse("match_detail", args=[match.pk])
-            )
+            expect(
+                main_response.get_by_role("link", name="Матч", exact=True)
+            ).to_have_attribute("href", reverse("match_detail", args=[match.pk]))
             expect(
                 page.locator(
                     f'form[action="{reverse("chat:direct_start", args=[phone_player.pk])}"]'
@@ -244,20 +259,39 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
             )
             expect(
                 accepted_response.locator(".sparring-response__status")
-            ).to_have_text("Отклик принят")
+            ).to_have_text("Отклик принят, матч создан")
             expect(
                 accepted_response.locator(".sparring-response__no-contacts")
             ).to_contain_text("Кнопка «Написать в чат» откроет личный чат")
             expect(
                 accepted_response.locator(".sparring-response__actions .btn")
             ).to_have_text(["Написать в чат", "Профиль", "Матч"])
+            pending_response = page.locator(".sparring-response").filter(
+                has=page.locator(
+                    f'.sparring-response__name[href="{reverse("profile", args=[pending_player.pk])}"]'
+                )
+            )
+            expect(pending_response.locator(".sparring-response__status")).to_have_text(
+                "Ожидает вашего подтверждения"
+            )
+            expect(
+                pending_response.locator(".sparring-response__no-contacts")
+            ).to_contain_text("Контакты откроются после создания матча")
+            expect(pending_response.locator(".sparring-contact")).to_have_count(0)
+            expect(
+                pending_response.locator(".sparring-response__actions .btn")
+            ).to_have_text(["Подтвердить", "Отклонить", "Написать в чат", "Профиль"])
+            expect(
+                page.locator('.sparring-contact[href="https://t.me/pending_hidden"]')
+            ).to_have_count(0)
             rejected_response = page.locator(".sparring-response--rejected")
             expect(
                 rejected_response.locator(".sparring-response__status")
             ).to_have_text("Отклик отклонён")
             expect(
                 rejected_response.locator(".sparring-response__actions .btn")
-            ).to_have_text(["Профиль"])
+            ).to_have_text(["Написать в чат", "Профиль"])
+            expect(rejected_response.locator(".sparring-contact")).to_have_count(0)
 
             layout_errors: list[str] = []
             for width in (1440, 1024, 900, 640, 480, 390, 375, 320):
@@ -373,7 +407,8 @@ def test_response_cards_when_viewport_changes_should_align_actions_and_keep_cont
                         "element => element.getBoundingClientRect().right <= innerWidth"
                     )
             for control in (
-                main_response.locator(".sparring-response__confirm .btn"),
+                pending_response.locator(".sparring-response__confirm .btn"),
+                pending_response.locator(".sparring-response__reject .btn"),
                 main_response.locator(".direct-message-action .btn"),
                 main_response.locator(".sparring-contact").first,
             ):
@@ -406,7 +441,7 @@ def test_phone_contact_when_activated_should_confirm_before_allowing_a_call(
     Args:
         confirmed: Принять или отклонить системное подтверждение.
         keyboard: Активировать ссылку клавишей Enter вместо клика.
-        dynamic: Добавить контакт после загрузки страницы, как при AJAX-отклике.
+        dynamic: Добавить контакт после загрузки страницы.
     """
     contact: SparringContact = {
         "key": "phone",

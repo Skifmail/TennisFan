@@ -1,5 +1,8 @@
 """
-Напоминания о дедлайне матча за 2 и 1 день.
+Напоминания о дедлайне турнирного матча за 2 и 1 день.
+
+Спарринговые матчи обрабатывает отдельная команда
+``send_sparring_result_reminders``: у них свои этапы и защита от дублей.
 
 Выбирает матчи, дедлайн которых приходится на послезавтра или на завтра
 (по календарным суткам локальной таймзоны), и отправляет участникам
@@ -51,12 +54,16 @@ def matches_with_deadline_in_days(days_left: int) -> QuerySet[Match]:
     target_date = timezone.localdate() + timedelta(days=days_left)
     day_start = timezone.make_aware(datetime.combine(target_date, time.min))
     day_end = day_start + timedelta(days=1)
-    return Match.objects.filter(
-        deadline__isnull=False,
-        deadline__gte=day_start,
-        deadline__lt=day_end,
-        status=Match.MatchStatus.SCHEDULED,
-    ).select_related("tournament", "player1", "player2", "team1", "team2")
+    return (
+        Match.objects.filter(
+            deadline__isnull=False,
+            deadline__gte=day_start,
+            deadline__lt=day_end,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+        .exclude(match_type=Match.MatchType.SPARRING)
+        .select_related("tournament", "player1", "player2", "team1", "team2")
+    )
 
 
 def build_deadline_reminder_lk_message(

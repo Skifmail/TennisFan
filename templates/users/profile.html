@@ -581,15 +581,17 @@
                 {% endif %}
 
                 {% if request.user != player.user %}
-                    {% if request.user.is_authenticated and request.user.is_active and player.user.is_active and not player.is_bye or player.telegram_url or player.whatsapp_url or player.max_contact_display %}
+                    {% if request.user.is_authenticated and request.user.is_active and player.user.is_active and not player.is_bye %}
                     <div class="profile-info__contacts">
-                        {% if request.user.is_authenticated and request.user.is_active and player.user.is_active and not player.is_bye %}
                         {% include 'includes/direct_message_button.html' with target_player=player %}
-                        {% endif %}
+                        {% if can_view_player_contacts %}
                         {% if player.telegram_url or player.whatsapp_url or player.max_contact_display %}
                         <div class="profile-info__messengers">
                             {% include 'includes/messenger_links.html' with obj=player %}
                         </div>
+                        {% endif %}
+                        {% elif player.telegram_url or player.whatsapp_url or player.max_contact_display %}
+                        <p class="profile-info__contacts-locked text-secondary">Внешние контакты откроются после создания общего матча. До этого напишите игроку в чате на сайте.</p>
                         {% endif %}
                     </div>
                     {% endif %}

@@ -492,6 +492,37 @@ def confirm_onsite_payment(
 
 
 @transaction.atomic
+def receive_postpayment_on_court(
+    tournament: Tournament, invoice_id: int, *, received_by: User
+) -> None:
+    """Принять сумму выставленного счёта и атомарно закрыть долг постоплаты."""
+    tournament = Tournament.objects.select_for_update().get(pk=tournament.pk)
+    invoice = (
+        tournament.postpayment_invoices.select_for_update()
+        .filter(pk=invoice_id)
+        .first()
+    )
+    if not invoice or invoice.status != TournamentPostpaymentInvoice.Status.PENDING:
+        raise RegistrationPaymentError(
+            "Счёт уже закрыт или недоступен. Проверьте статус в списке."
+        )
+    if (
+        not tournament.allow_onsite_payment
+        or tournament.status in (TournamentStatus.CANCELLED, TournamentStatus.COMPLETED)
+        or has_received_entry_payment(tournament, invoice.user)
+        or tournament.registration_coverages.filter(user_id=invoice.user_id).exists()
+        or has_onsite_payment(tournament, invoice.user)
+    ):
+        raise RegistrationPaymentError(
+            "Принять деньги по этому счёту на корте нельзя. Проверьте статус оплаты."
+        )
+    payment = TournamentOnsitePayment.objects.create(
+        tournament=tournament, user=invoice.user, amount=invoice.amount
+    )
+    confirm_onsite_payment(tournament, payment.pk, received_by=received_by)
+
+
+@transaction.atomic
 def close_expected_onsite_payments(
     tournament: Tournament,
     *,

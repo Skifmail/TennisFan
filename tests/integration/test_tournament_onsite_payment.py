@@ -1413,3 +1413,70 @@ def test_admin_tournament_retains_links_to_closed_onsite_history(
     )
     assert card in response.content.decode()
     assert "Ожидание отменено" in response.content.decode()
+
+
+def test_manager_receives_open_invoice_on_court(client: Client, player: Player) -> None:
+    """Смена способа закрывает счёт, сохраняет состав и учитывает взнос один раз."""
+    tournament = _cup(allow_postpayment=True)
+    tournament.participants.add(player)
+    invoice = tournament.postpayment_invoices.create(
+        user=player.user,
+        amount=Decimal("850"),
+        due_at=timezone.now() + timedelta(minutes=10),
+    )
+    url = reverse(
+        "tournament_manage_receive_postpayment", args=[tournament.slug, invoice.pk]
+    )
+    assert client.post(url, secure=True).status_code == 403
+    manager = make_user(email="onsite-convert@test.local", is_staff=True)
+    client.force_login(manager)
+    board = reverse("tournament_manage", args=[tournament.slug])
+    assert url in client.get(board, secure=True).content.decode()
+    assert client.get(url, secure=True).status_code == 405
+    for _ in range(2):
+        assert client.post(url, secure=True).status_code == 302
+    receipt = tournament.onsite_payments.get()
+    assert (receipt.status, receipt.amount, receipt.received_by_id) == (
+        "received",
+        invoice.amount,
+        manager.pk,
+    )
+    invoice.refresh_from_db()
+    assert invoice.status == "cancelled"
+    invoice.due_at = timezone.now() - timedelta(minutes=1)
+    invoice.save(update_fields=["due_at"])
+    assert _remove_unpaid_players(tournament) == 0
+    assert tournament.participants.filter(pk=player.pk).exists()
+    page = client.get(board, secure=True).content.decode()
+    assert "Оплачено на корте" in page and url not in page
+
+
+def test_manage_page_shows_compact_payment_table_with_status_colors(
+    client: Client, player: Player
+) -> None:
+    """Панель организатора показывает оплаты компактной таблицей с фильтрами."""
+    tournament = _cup()
+    _register(client, tournament)
+    manager = make_user(email="payments-table@test.local", is_staff=True)
+    client.force_login(manager)
+    board = reverse("tournament_manage", args=[tournament.slug])
+
+    page = client.get(board, secure=True).content.decode()
+
+    assert 'class="payments-table"' in page
+    assert 'class="payments-row payments-row--warning"' in page
+    assert 'data-payment-filter="warning"' in page
+    assert 'data-payment-filter="success"' not in page
+    assert "payments-status--warning" in page
+
+    payment = tournament.onsite_payments.get()
+    confirm_url = reverse(
+        "tournament_manage_confirm_onsite_payment",
+        args=[tournament.slug, payment.pk],
+    )
+    assert client.post(confirm_url, secure=True).status_code == 302
+
+    page = client.get(board, secure=True).content.decode()
+    assert 'class="payments-row payments-row--success"' in page
+    assert 'data-payment-filter="success"' in page
+    assert "payments-status--success" in page

@@ -834,6 +834,14 @@
     margin-top: 0;
 }
 
+.profile-info__contacts-locked {
+    flex-basis: 100%;
+    margin: 0;
+    text-align: center;
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+}
+
 .profile-info__contacts .direct-message-action {
     display: flex;
 }

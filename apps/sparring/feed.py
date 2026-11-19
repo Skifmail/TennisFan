@@ -38,15 +38,19 @@ class SparringFeedEntry:
 
     @property
     def can_view_author_contacts(self) -> bool:
-        """Разрешить контакты только по собственному неотклонённому отклику."""
+        """Разрешить контакты автора только после создания матча."""
         return (
             isinstance(self.request, SparringRequest)
             and self.viewer_response is not None
-            and self.viewer_response.status
-            in (
-                SparringResponse.ResponseStatus.PENDING,
-                SparringResponse.ResponseStatus.ACCEPTED,
-            )
+            and self.viewer_response.status == SparringResponse.ResponseStatus.ACCEPTED
+        )
+
+    @property
+    def has_pending_response(self) -> bool:
+        """Есть ли у зрителя ожидающий решения отклик на эту заявку."""
+        return bool(
+            self.viewer_response is not None
+            and self.viewer_response.status == SparringResponse.ResponseStatus.PENDING
         )
 
     @property

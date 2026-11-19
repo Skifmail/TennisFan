@@ -25,7 +25,6 @@ from django.shortcuts import (
     redirect,
     render,
 )
-from django.template.loader import render_to_string
 
 # pyright: ignore[reportMissingImports]
 from django.urls import reverse
@@ -36,12 +35,6 @@ from django.views.decorators.http import (
     require_POST,
 )
 
-from apps.core.contact_utils import (
-    build_max_url,
-    build_telegram_url,
-    build_whatsapp_url,
-    get_max_display_contact,
-)
 from apps.core.decorators import require_filled_profile, require_verified_player
 from apps.core.home_city_counters import SPARRINGS_SEEN_COOKIE, mark_list_seen
 from apps.core.sports import sport_code
@@ -100,6 +93,7 @@ from .services import (
     confirm_sparring_response,
     delete_sparring_request,
     reject_sparring_invitation,
+    reject_sparring_response,
     respond_to_sparring,
 )
 from .utils import user_has_sparring_access
@@ -223,18 +217,6 @@ def _padel_entry_redirect(
             status=403,
         )
     return redirect_to_padel_strength(request, next_url=next_url or None)
-
-
-def _get_contact_url(player: Player, method: str) -> str | None:
-    """Return contact URL for player and method (telegram/whatsapp/max), or None."""
-    # TextChoices возвращает кортеж (value, label), используем строковые значения напрямую
-    if method == "telegram" and player.telegram:
-        return build_telegram_url(player.telegram)
-    if method == "whatsapp" and player.whatsapp:
-        return build_whatsapp_url(player.whatsapp)
-    if method == "max":
-        return player.max_url
-    return None
 
 
 def sparring_list(request: HttpRequest) -> HttpResponse:
@@ -720,14 +702,29 @@ def sparring_confirm_response(request, response_id):
     return redirect("sparring_my_requests")
 
 
-def _build_contact_urls(player: Player) -> dict[str, str | None]:
-    """Возвращает ссылки автора для клиентов ответа на отклик."""
-    return {
-        "telegram": _get_contact_url(player, "telegram"),
-        "whatsapp": _get_contact_url(player, "whatsapp"),
-        "max": build_max_url(player.max_contact),
-        "max_display": get_max_display_contact(player.max_contact),
-    }
+@require_POST
+@login_required
+def sparring_reject_response(request: HttpRequest, response_id: int) -> HttpResponse:
+    """Отклонить отклик на заявку, оставив заявку открытой для других игроков."""
+    if not user_has_sparring_access(request.user):
+        messages.error(request, "Нет доступа к спаррингам.")
+        return redirect("sparring_list")
+
+    try:
+        reject_sparring_response(response_id, request.user.pk)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    except Exception:
+        messages.error(request, "Не удалось отклонить отклик. Попробуйте позже.")
+        logger.exception("Failed to reject sparring response %s", response_id)
+    else:
+        messages.success(request, "Отклик отклонён. Заявка осталась открытой.")
+        logger.info(
+            "Sparring response rejected: response_id=%s by user=%s",
+            response_id,
+            request.user.id,
+        )
+    return redirect("sparring_my_requests")
 
 
 @require_http_methods(["GET", "POST"])
@@ -737,10 +734,11 @@ def _build_contact_urls(player: Player) -> dict[str, str | None]:
 @require_verified_player  # type: ignore[untyped-decorator, unused-ignore]
 def sparring_respond(request: HttpRequest, pk: int) -> HttpResponse:
     """
-    Записать отклик и (при GET с method) перенаправить на контакт.
-    GET /sparring/<id>/respond/?method=telegram|whatsapp|max — редирект на мессенджер.
+    Записать отклик; контакты автора остаются закрытыми до создания матча.
+
+    GET /sparring/<id>/respond/ — вернуть зрителя в ленту с пояснением.
     POST /sparring/<id>/respond/ — записать отклик, уведомить автора;
-    JSON со ссылками и разметкой контактов для карточки.
+    JSON со статусом отклика без контактов.
     """
     logger.debug(
         "sparring_respond: user=%s, pk=%s, method=%s",
@@ -779,21 +777,22 @@ def sparring_respond(request: HttpRequest, pk: int) -> HttpResponse:
     valid_methods = ("telegram", "whatsapp", "max")
 
     if request.method == "GET":
-        method = (request.GET.get("method") or "").lower()
-        if method not in valid_methods:
-            messages.error(request, "Укажите способ связи: telegram, whatsapp или max.")
-            return redirect("sparring_list")
-    else:
-        # POST: method опционален, по умолчанию telegram (только для записи)
-        method = "telegram"
-        if request.content_type and "application/json" in request.content_type:
-            try:
-                data = json.loads(request.body or "{}")
-                m = (data.get("method") or "").lower()
-                if m in valid_methods:
-                    method = m
-            except (ValueError, TypeError):
-                pass
+        messages.info(
+            request,
+            "Отправьте отклик кнопкой в карточке заявки. Контакты откроются после создания матча.",
+        )
+        return redirect("sparring_list")
+
+    # POST: method опционален, по умолчанию telegram (только для записи)
+    method = "telegram"
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            data = json.loads(request.body or "{}")
+            m = (data.get("method") or "").lower()
+            if m in valid_methods:
+                method = m
+        except (ValueError, TypeError):
+            pass
 
     try:
         respondent = user.player
@@ -861,42 +860,17 @@ def sparring_respond(request: HttpRequest, pk: int) -> HttpResponse:
         messages.error(request, "Ошибка при сохранении отклика. Попробуйте позже.")
         return redirect("sparring_list")
 
-    if request.method == "POST":
-        try:
-            contact_urls = _build_contact_urls(sparring.player)
-            contacts_html = render_to_string(
-                "sparring/_author_contacts.html", {"contacts": sparring.contact_links()}
-            )
-            return JsonResponse(
-                {
-                    "success": True,
-                    "contact_urls": contact_urls,
-                    "contacts_html": contacts_html,
-                    "message": (
-                        "Отклик успешно отправлен!" if created else "Отклик обновлен."
-                    ),
-                }
-            )
-        except Exception as e:
-            logger.error("Failed to build contact URLs: %s", e, exc_info=True)
-            return JsonResponse(
-                {
-                    "success": True,
-                    "contact_urls": {},
-                    "contacts_html": "",
-                    "message": (
-                        "Отклик успешно отправлен!" if created else "Отклик обновлен."
-                    ),
-                    "warning": "Не удалось получить контакты для связи.",
-                }
-            )
-
-    url = _get_contact_url(sparring.player, method)
-    if url:
-        return redirect(url)
-    if created:
-        messages.success(request, "Отклик записан. Автор заявки получит уведомление.")
-    return redirect("sparring_list")
+    hours = sparring.confirmation_hours_left
+    deadline_hint = f" Автор должен ответить в течение {hours} ч." if hours else ""
+    return JsonResponse(
+        {
+            "success": True,
+            "status": obj.status,
+            "message": ("Отклик успешно отправлен!" if created else "Отклик обновлён.")
+            + deadline_hint
+            + " Контакты откроются после создания матча.",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

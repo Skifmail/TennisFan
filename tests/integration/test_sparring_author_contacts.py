@@ -1,4 +1,4 @@
-"""Лента спаррингов раскрывает контакты автора только после собственного отклика."""
+"""Лента спаррингов раскрывает контакты автора только после создания матча."""
 
 from __future__ import annotations
 
@@ -22,7 +22,8 @@ from tests.support.sparring_author_contacts import (
 
 pytestmark = pytest.mark.django_db
 
-CONTACT_HINT = "Чтобы увидеть контакты автора, откликнитесь на спарринг."
+CONTACT_HINT = "Чтобы увидеть контакты автора"
+PENDING_HINT = "Контакты автора откроются после создания матча"
 AUTHOR_URLS = (
     "https://t.me/author_player",
     "https://wa.me/79999876543",
@@ -86,30 +87,36 @@ def test_other_players_response_does_not_unlock_author_contacts(
     assert all(contact not in html for contact in AUTHOR_URLS)
 
 
-@pytest.mark.parametrize(
-    ("status", "caption"),
-    [("pending", "Отклик отправлен"), ("accepted", "Отклик принят")],
-)
-def test_own_response_unlocks_author_contacts_and_prevents_resubmission(
-    client: Client,
-    scenario: SparringAuthorContactsScenario,
-    status: str,
-    caption: str,
+def test_pending_response_hides_contacts_and_prevents_resubmission(
+    client: Client, scenario: SparringAuthorContactsScenario
 ) -> None:
-    """Свежий и принятый отклики раскрывают контакты даже у повторно открытой заявки."""
-    _response(scenario, status=status)
+    """Ожидающий отклик не раскрывает контакты и блокирует повторную отправку."""
+    _response(scenario, status="pending")
 
-    page = client.get(reverse("sparring_list"), secure=True)
-    html = page.content.decode()
+    html = client.get(reverse("sparring_list"), secure=True).content.decode()
 
-    assert page.status_code == 200
+    assert all(contact not in html for contact in AUTHOR_URLS)
+    assert "Отклик отправлен" in html
+    assert PENDING_HINT in html
+    assert CONTACT_HINT not in html
+    assert f'data-id="{scenario.sparring.pk}" disabled' in html
+
+
+def test_accepted_response_unlocks_author_contacts(
+    client: Client, scenario: SparringAuthorContactsScenario
+) -> None:
+    """Принятый отклик означает созданный матч и раскрывает контакты автора."""
+    _response(scenario, status="accepted")
+
+    html = client.get(reverse("sparring_list"), secure=True).content.decode()
+
     assert all(contact in html for contact in AUTHOR_URLS)
     assert "Контакты автора" in html
     assert "8 (999) 123-45-67" in html
     assert "@author_player" not in html
     assert CONTACT_HINT not in html
     assert "data-confirm-call" in html
-    assert caption in html
+    assert "Матч создан" in html
     assert f'data-id="{scenario.sparring.pk}" disabled' in html
     assert f'action="{reverse("chat:direct_start", args=[scenario.author.pk])}"' in html
     assert "Написать в чат" in html
@@ -125,15 +132,16 @@ def test_rejected_response_hides_contacts_and_allows_a_new_response(
 
     assert all(contact not in html for contact in AUTHOR_URLS)
     assert "Ваш отклик отклонён" in html
-    assert "Чтобы увидеть контакты автора" in html
+    assert "Чтобы откликнуться снова" in html
+    assert CONTACT_HINT not in html
     assert "Откликнуться снова" in html
     assert f'data-id="{scenario.sparring.pk}" disabled' not in html
 
 
-def test_successful_reply_returns_author_markup_and_keeps_contacts_after_reload(
+def test_successful_reply_returns_no_contacts_and_keeps_them_hidden_after_reload(
     client: Client, scenario: SparringAuthorContactsScenario
 ) -> None:
-    """Настоящий POST возвращает те же кнопки, которые затем рендерит общая лента."""
+    """POST создаёт отклик, но не возвращает и не показывает контакты автора."""
     submitted = client.post(
         reverse("sparring_respond", args=[scenario.sparring.pk]),
         "{}",
@@ -144,27 +152,26 @@ def test_successful_reply_returns_author_markup_and_keeps_contacts_after_reload(
     assert submitted.status_code == 200
     data = submitted.json()
     assert data["success"] is True
-    markup = data["contacts_html"]
-    assert isinstance(markup, str)
-    assert all(contact in markup for contact in AUTHOR_URLS)
-    assert "Позвонить" in markup
-    assert "data-confirm-call" in markup
-    assert "@author_player" not in markup
-    assert "contact_urls" in data
-    responses = SparringResponse.objects.filter(
-        sparring_request=scenario.sparring, respondent=scenario.respondent
+    assert "contacts_html" not in data
+    assert "contact_urls" not in data
+    assert "контакты" in data["message"].lower()
+    assert all(contact not in submitted.content.decode() for contact in AUTHOR_URLS)
+    assert (
+        SparringResponse.objects.filter(
+            sparring_request=scenario.sparring, respondent=scenario.respondent
+        ).count()
+        == 1
     )
-    assert responses.count() == 1
 
     html = client.get(reverse("sparring_list"), secure=True).content.decode()
-    assert markup.strip() in html
-    assert CONTACT_HINT not in html
+    assert all(contact not in html for contact in AUTHOR_URLS)
+    assert PENDING_HINT in html
 
 
-def test_retrying_rejected_response_unlocks_contacts_without_a_second_response(
+def test_retrying_rejected_response_returns_to_pending_without_contacts(
     client: Client, scenario: SparringAuthorContactsScenario
 ) -> None:
-    """Повторный отклик восстанавливает доступ, не дублируя запись в базе."""
+    """Повторный отклик возвращает ожидание, не дублируя запись и не раскрывая контакты."""
     response = _response(scenario, status="rejected")
 
     submitted = client.post(
@@ -175,7 +182,7 @@ def test_retrying_rejected_response_unlocks_contacts_without_a_second_response(
     )
 
     assert submitted.status_code == 200
-    assert all(contact in submitted.json()["contacts_html"] for contact in AUTHOR_URLS)
+    assert "contacts_html" not in submitted.json()
     response.refresh_from_db()
     assert response.status == "pending"
     responses = SparringResponse.objects.filter(sparring_request=scenario.sparring)
@@ -235,14 +242,14 @@ def test_rejected_http_action_never_returns_author_contacts(
 def test_earned_contacts_remain_visible_when_subscription_is_no_longer_active(
     client: Client, scenario: SparringAuthorContactsScenario
 ) -> None:
-    """Окончание тарифа не прячет контакты уже отправленного собственного отклика."""
-    _response(scenario)
+    """Окончание тарифа не прячет контакты уже созданного матча."""
+    _response(scenario, status="accepted")
     scenario.respondent.user.subscription.delete()
 
     html = client.get(reverse("sparring_list"), secure=True).content.decode()
 
     assert all(contact in html for contact in AUTHOR_URLS)
-    assert "Отклик отправлен" in html
+    assert "Матч создан" in html
     assert CONTACT_HINT not in html
 
 
@@ -267,7 +274,7 @@ def test_author_without_contacts_has_platform_chat_fallback_after_response(
         telegram="", whatsapp="", max_contact=""
     )
     User.objects.filter(pk=scenario.author.user_id).update(phone="")
-    _response(scenario)
+    _response(scenario, status="accepted")
 
     html = client.get(reverse("sparring_list"), secure=True).content.decode()
 
@@ -278,29 +285,37 @@ def test_author_without_contacts_has_platform_chat_fallback_after_response(
     assert CONTACT_HINT not in html
 
 
-def test_author_contact_markup_escapes_player_supplied_text(
+def test_pending_response_does_not_render_author_contact_markup(
     client: Client, scenario: SparringAuthorContactsScenario
 ) -> None:
-    """Контакт из профиля остаётся текстом в HTML, подставляемом после AJAX-отклика."""
+    """Ожидание матча не подставляет в HTML даже экранированные контакты автора."""
     User.objects.filter(pk=scenario.author.user_id).update(phone="<b>123</b>")
+    _response(scenario, status="pending")
 
-    submitted = client.post(
-        reverse("sparring_respond", args=[scenario.sparring.pk]),
-        "{}",
-        content_type="application/json",
-        secure=True,
-    )
+    html = client.get(reverse("sparring_list"), secure=True).content.decode()
 
-    assert submitted.status_code == 200
-    markup = submitted.json()["contacts_html"]
-    assert "&lt;b&gt;123&lt;/b&gt;" in markup
-    assert "<b>123</b>" not in markup
+    assert "&lt;b&gt;123&lt;/b&gt;" not in html
+    assert "<b>123</b>" not in html
+    assert PENDING_HINT in html
+
+
+def test_accepted_author_contact_markup_escapes_player_supplied_text(
+    client: Client, scenario: SparringAuthorContactsScenario
+) -> None:
+    """Принятый отклик показывает контакт из профиля только как экранированный текст."""
+    User.objects.filter(pk=scenario.author.user_id).update(phone="<b>123</b>")
+    _response(scenario, status="accepted")
+
+    html = client.get(reverse("sparring_list"), secure=True).content.decode()
+
+    assert "&lt;b&gt;123&lt;/b&gt;" in html
+    assert "<b>123</b>" not in html
 
 
 def test_prefetched_feed_discloses_author_contacts_without_queries_per_card(
     scenario: SparringAuthorContactsScenario,
 ) -> None:
-    """Десять карточек используют prefetch; единственный SQL загружает справочник городов."""
+    """Десять принятых карточек используют prefetch; SQL загружает только справочник городов."""
     for index in range(9):
         request = SparringRequest.objects.create(
             player=scenario.author, city="Москва", description=f"Игра {index}"
@@ -309,8 +324,9 @@ def test_prefetched_feed_discloses_author_contacts_without_queries_per_card(
             sparring_request=request,
             respondent=scenario.respondent,
             contact_method="telegram",
+            status=SparringResponse.ResponseStatus.ACCEPTED,
         )
-    _response(scenario)
+    _response(scenario, status="accepted")
     requests = list(
         SparringRequest.objects.filter(player=scenario.author)
         .select_related("player__user")

@@ -17003,6 +17003,480 @@ html.export-loader-open {
 }
 
 /* --------------------------------------------------------------------------
+ * Оплата участников — компактная таблица со статусными цветами
+ * -------------------------------------------------------------------------- */
+.manage-page .payments-card {
+    --pay-success: #4ade80;
+    --pay-success-bg: rgb(74 222 128 / 8%);
+    --pay-success-line: rgb(74 222 128 / 38%);
+    --pay-warning: #fbbf24;
+    --pay-warning-bg: rgb(251 191 36 / 8%);
+    --pay-warning-line: rgb(251 191 36 / 38%);
+    --pay-danger: #f87171;
+    --pay-danger-bg: rgb(248 113 113 / 8%);
+    --pay-danger-line: rgb(248 113 113 / 38%);
+    --pay-neutral: rgb(241 230 207 / 60%);
+    --pay-neutral-bg: rgb(241 230 207 / 4%);
+    --pay-neutral-line: rgb(241 230 207 / 22%);
+}
+
+.payments-card__lead {
+    margin-bottom: 0.9rem;
+    color: var(--manage-muted);
+    font-size: 0.86rem;
+}
+
+/* Фильтры по статусу */
+.payments-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.85rem;
+}
+
+.payments-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 30px;
+    padding: 0.28rem 0.65rem;
+    border: 1px solid var(--manage-line-strong);
+    border-radius: 999px;
+    background: rgb(0 0 0 / 16%);
+    color: var(--manage-muted);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        background-color 160ms var(--manage-ease),
+        border-color 160ms var(--manage-ease),
+        color 160ms var(--manage-ease),
+        transform 140ms var(--manage-ease);
+}
+
+.payments-chip__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+    flex: none;
+}
+
+.payments-chip__count {
+    padding: 0.1rem 0.35rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 8%);
+    font-variant-numeric: tabular-nums;
+}
+
+.payments-chip--success {
+    border-color: var(--pay-success-line);
+    color: var(--pay-success);
+}
+
+.payments-chip--warning {
+    border-color: var(--pay-warning-line);
+    color: var(--pay-warning);
+}
+
+.payments-chip--danger {
+    border-color: var(--pay-danger-line);
+    color: var(--pay-danger);
+}
+
+.payments-chip.is-active {
+    border-color: var(--manage-gold);
+    background: rgb(233 200 126 / 16%);
+    color: var(--manage-cream);
+}
+
+.payments-chip:active {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .payments-chip:not(.is-active):hover {
+        border-color: var(--manage-gold);
+        color: var(--manage-cream);
+    }
+}
+
+/* Таблица */
+.payments-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--manage-line);
+    border-radius: 10px;
+}
+
+.payments-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.payments-table th {
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--manage-line);
+    background: rgb(0 0 0 / 22%);
+    color: var(--manage-muted);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.payments-table td {
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid rgb(166 130 74 / 10%);
+    vertical-align: top;
+}
+
+.payments-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.payments-row {
+    --pay-tone: var(--pay-neutral);
+    --pay-tone-bg: var(--pay-neutral-bg);
+
+    background: var(--pay-tone-bg);
+    transition: background-color 160ms var(--manage-ease);
+}
+
+.payments-row--success {
+    --pay-tone: var(--pay-success);
+    --pay-tone-bg: var(--pay-success-bg);
+}
+
+.payments-row--warning {
+    --pay-tone: var(--pay-warning);
+    --pay-tone-bg: var(--pay-warning-bg);
+}
+
+.payments-row--danger {
+    --pay-tone: var(--pay-danger);
+    --pay-tone-bg: var(--pay-danger-bg);
+}
+
+.payments-row[hidden] {
+    display: none !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .payments-row:hover {
+        background:
+            linear-gradient(rgb(233 200 126 / 7%), rgb(233 200 126 / 7%)),
+            var(--pay-tone-bg);
+    }
+}
+
+.payments-cell--player {
+    box-shadow: inset 3px 0 0 var(--pay-tone);
+    min-width: 8rem;
+}
+
+.payments-player__name {
+    color: var(--manage-cream);
+    font-weight: 600;
+}
+
+.payments-cell--status {
+    white-space: nowrap;
+}
+
+.payments-cell--details {
+    min-width: 11rem;
+    color: var(--manage-muted);
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
+.payments-cell--actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.payments-action {
+    padding: 0.28rem 0.65rem;
+    font-size: 0.76rem;
+}
+
+.payments-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.5rem;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.payments-status__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentcolor;
+    flex: none;
+}
+
+.payments-status--success {
+    border-color: var(--pay-success-line);
+    background: rgb(74 222 128 / 10%);
+    color: var(--pay-success);
+}
+
+.payments-status--warning {
+    border-color: var(--pay-warning-line);
+    background: rgb(251 191 36 / 10%);
+    color: var(--pay-warning);
+}
+
+.payments-status--danger {
+    border-color: var(--pay-danger-line);
+    background: rgb(248 113 113 / 10%);
+    color: var(--pay-danger);
+}
+
+.payments-status--neutral {
+    border-color: var(--pay-neutral-line);
+    background: var(--pay-neutral-bg);
+    color: var(--pay-neutral);
+}
+
+/* Принятие оплаты на корте вместо постоплаты */
+.payments-accept__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.26rem 0.6rem;
+    border: 1px dashed var(--pay-warning-line);
+    border-radius: 999px;
+    color: var(--pay-warning);
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.4;
+    list-style: none;
+    cursor: pointer;
+    transition:
+        border-color 160ms var(--manage-ease),
+        background-color 160ms var(--manage-ease),
+        transform 140ms var(--manage-ease);
+}
+
+.payments-accept__summary::-webkit-details-marker {
+    display: none;
+}
+
+.payments-accept__summary::after {
+    content: "▾";
+    font-size: 0.7rem;
+    transition: transform 160ms var(--manage-ease);
+}
+
+.payments-accept[open] .payments-accept__summary::after {
+    transform: rotate(180deg);
+}
+
+.payments-accept__summary:active {
+    transform: scale(0.97);
+}
+
+.payments-accept__body {
+    min-width: 11rem;
+    max-width: 16rem;
+    margin-top: 0.4rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--pay-warning-line);
+    border-radius: 8px;
+    background: var(--pay-warning-bg);
+    text-align: left;
+    white-space: normal;
+}
+
+.payments-accept__hint {
+    margin-bottom: 0.4rem;
+    color: var(--manage-muted);
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+
+.payments-empty {
+    margin: 0.75rem 0 0;
+    color: var(--manage-muted);
+    font-size: 0.82rem;
+}
+
+/* История взносов на корте */
+.payments-history {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--manage-line);
+}
+
+.payments-history__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--manage-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.payments-history__count {
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: rgb(233 200 126 / 14%);
+    color: var(--manage-gold);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.payments-history__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.payments-history__item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.6rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 14%);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.payments-history__name {
+    color: var(--manage-cream);
+    font-weight: 600;
+}
+
+.payments-history__meta {
+    color: var(--manage-muted);
+}
+
+/* Мобильная версия: строки таблицы превращаются в компактные карточки */
+@media (width <= 720px) {
+    .payments-table-wrap {
+        overflow: visible;
+        border: 0;
+    }
+
+    .payments-table,
+    .payments-table tbody,
+    .payments-table tr,
+    .payments-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .payments-table thead {
+        display: none;
+    }
+
+    .payments-table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .payments-table tr.payments-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "player status"
+            "details details"
+            "actions actions";
+        gap: 0.3rem 0.6rem;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid var(--manage-line);
+        border-left: 3px solid var(--pay-tone);
+        border-radius: 10px;
+    }
+
+    .payments-table td {
+        padding: 0;
+        border: 0;
+    }
+
+    .payments-cell--player {
+        grid-area: player;
+        box-shadow: none;
+        min-width: 0;
+    }
+
+    .payments-player__name {
+        font-size: 0.86rem;
+    }
+
+    .payments-cell--status {
+        grid-area: status;
+        justify-self: end;
+        min-width: 0;
+        white-space: normal;
+    }
+
+    .payments-status {
+        font-size: 0.7rem;
+    }
+
+    .payments-cell--details {
+        grid-area: details;
+        min-width: 0;
+        font-size: 0.73rem;
+    }
+
+    .payments-cell--actions {
+        grid-area: actions;
+        white-space: normal;
+    }
+
+    .payments-cell--actions .btn,
+    .payments-accept__summary {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .payments-accept__body {
+        min-width: 0;
+        max-width: none;
+        padding: 0.5rem;
+    }
+}
+
+@media (width <= 480px) {
+    .payments-table tr.payments-row {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "player"
+            "status"
+            "details"
+            "actions";
+    }
+
+    .payments-cell--status {
+        justify-self: start;
+    }
+
+    .payments-chip {
+        font-size: 0.74rem;
+    }
+}
+
+/* --------------------------------------------------------------------------
  * Фокус и нажатия
  * -------------------------------------------------------------------------- */
 .manage-page a:focus-visible,
@@ -17109,6 +17583,10 @@ html.export-loader-open {
     .manage-page .manage-start-mode__indicator,
     .manage-page .manage-start-mode__indicator::after,
     .manage-page .manage-list-item,
+    .manage-page .payments-chip,
+    .manage-page .payments-row,
+    .manage-page .payments-accept__summary,
+    .manage-page .payments-accept__summary::after,
     .manage-page .form-select {
         transition: none;
     }
@@ -17118,6 +17596,8 @@ html.export-loader-open {
     }
 
     .manage-page .btn:active,
+    .manage-page .payments-chip:active,
+    .manage-page .payments-accept__summary:active,
     .manage-page .manage-export__btn:hover,
     .manage-page .manage-export__btn:active,
     .manage-page .manage-start-mode__option:active {

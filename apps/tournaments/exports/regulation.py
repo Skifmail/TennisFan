@@ -266,6 +266,20 @@ def _fee_section(tournament: Tournament) -> Section:
         )
     else:
         rows.append(InfoRow("Постоплата", "Не предусмотрена."))
+    if tournament.allow_onsite_payment:
+        rows.append(
+            InfoRow(
+                "Оплата на корте",
+                (
+                    "Разрешена: участник может передать взнос организатору "
+                    "на площадке; организатор подтверждает получение денег "
+                    "в панели управления. Долг постоплаты не создаётся, "
+                    "FT не списываются."
+                ),
+            )
+        )
+    else:
+        rows.append(InfoRow("Оплата на корте", "Не предусмотрена."))
     if tournament.start_after_fill:
         deadline = "Не задан: турнир запускается по набору состава."
     elif tournament.registration_deadline:

@@ -202,9 +202,14 @@ def _schedule_section(tournament: Tournament) -> Section:
     rows = [
         InfoRow("Сроки", _dates_label(tournament)),
         InfoRow("Формат по длительности", duration),
-        InfoRow("Дней на раунд", str(days)),
-        InfoRow("Место", _place_label(tournament)),
     ]
+    if not tournament.is_one_day:
+        rows.append(InfoRow("Дней на раунд", str(days)))
+    rows.extend(
+        [
+            InfoRow("Место", _place_label(tournament)),
+        ]
+    )
     court = tournament.court
     if court is not None and not tournament.venue_is_pending:
         venue_address = court.display_address
@@ -345,12 +350,21 @@ def _system_section(tournament: Tournament) -> Section:
 
 def _walkover_section(tournament: Tournament) -> Section:
     """Дедлайны раундов и техническое поражение."""
-    days = tournament.match_days_per_round or 7
+    if tournament.is_one_day:
+        intro = (
+            "Матчи однодневного турнира играются в день старта. "
+            "Дедлайны и техническое поражение — по решению организатора."
+        )
+    else:
+        days = tournament.match_days_per_round or 7
+        intro = (
+            f"На проведение матчей раунда (тура) отводится {days} дн. "
+            "с даты старта раунда. Матч нужно сыграть до дедлайна."
+        )
     return Section(
         title=SECTION_WALKOVER,
         paragraphs=(
-            f"На проведение матчей раунда (тура) отводится {days} дн. "
-            "с даты старта раунда. Матч нужно сыграть до дедлайна.",
+            intro,
             "Если матч не сыгран в срок, организатор вправе зафиксировать "
             "техническое поражение неявившейся стороне. При неявке обеих сторон "
             "результат фиксируется как обоюдная неявка.",

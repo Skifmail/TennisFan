@@ -104,17 +104,7 @@
                 </td>
                 <td class="tournament-table__cell tournament-table__cell--format">
                     <div class="tournament-table__tags">
-                        {% if tournament.format == 'single_elimination' %}
-                        <span class="badge badge-soft">Олимпийская (с утешением)</span>
-                        {% elif tournament.format == 'olympic_consolation' %}
-                        <span class="badge badge-soft">Олимпийская</span>
-                        {% elif tournament.format == 'round_robin' %}
-                        <span class="badge badge-soft">Круговой</span>
-                        {% elif tournament.format == 'weekend_day' %}
-                        <span class="badge badge-soft" title="Групповой этап, затем плей-офф и утешительная сетка">Группы</span>
-                        {% else %}
-                        <span class="badge badge-soft">{{ tournament.get_format_display }}</span>
-                        {% endif %}
+                        <span class="badge badge-soft">{{ tournament.public_format_label }}</span>
                         {% if tournament.match_format %}
                         <span class="badge badge-muted">{{ tournament.get_match_format_display }}</span>
                         {% endif %}

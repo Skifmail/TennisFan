@@ -230,7 +230,7 @@
                                     <span class="club-tournament-card__tag">{{ t.get_sport_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_gender_display }}</span>
                                     <span class="club-tournament-card__tag">{{ t.get_variant_display }}</span>
-                                    <span class="club-tournament-card__tag">{{ t.get_format_display }}</span>
+                                    <span class="club-tournament-card__tag">{{ t.public_format_label }}</span>
                                     {% include 'includes/postpayment_badge.html' with tournament=t class_name='club-tournament-card__tag' %}
                                 </div>
                             </div>

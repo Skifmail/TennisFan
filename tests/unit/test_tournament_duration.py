@@ -623,3 +623,56 @@ def test_old_club_querydict_preserves_multiple_allowed_categories() -> None:
     assert form.cleaned_data["allowed_categories"] == ["novice", "amateur"]
     assert "duration" not in post
     assert form.save().duration == TournamentDuration.SINGLE_DAY
+
+
+def test_manual_format_and_onsite_fee_on_home_and_detail(client: Client) -> None:
+    """Обе версии главной и карточка учитывают ручной режим и оплату на корте."""
+    tournament = make_tournament(
+        pairing_mode="manual",
+        format=TournamentFormat.SINGLE_ELIMINATION,
+        duration=TournamentDuration.SINGLE_DAY,
+        entry_fee=5000,
+        allow_onsite_payment=True,
+        allow_postpayment=True,
+        start_date=timezone.localdate() + timedelta(days=7),
+    )
+    home = client.get(reverse("home"), secure=True)
+    assert home.status_code == 200
+    assert home.content.decode().count(">Ручной формат</span>") >= 2
+    assert home.content.decode().count(">Оплата на корте</span>") >= 2
+    detail = client.get(
+        reverse("tournament_detail", args=[tournament.slug]), secure=True
+    )
+    assert detail.status_code == 200
+    assert "Оплата на корте или по ссылке" in detail.content.decode()
+    assert "Оплата при записи" not in detail.content.decode()
+
+
+@pytest.mark.parametrize(
+    ("onsite", "postpay", "window_open", "expected"),
+    [
+        (False, False, False, "Оплата при записи"),
+        (False, True, False, "Оплата по ссылке после открытия постоплаты"),
+        (True, False, False, "Оплата на корте или онлайн при записи"),
+        (True, True, True, "Оплата на корте или онлайн при записи"),
+    ],
+)
+def test_public_fee_note_follows_payment_options(
+    onsite: bool,
+    postpay: bool,
+    window_open: bool,
+    expected: str,
+) -> None:
+    """Подпись взноса описывает варианты, доступные в момент записи."""
+    from django.template.loader import render_to_string
+
+    tournament = Tournament(
+        entry_fee=5000,
+        allow_onsite_payment=onsite,
+        allow_postpayment=postpay,
+        court_has_extra_fee=False,
+        postpayment_window_started_at=timezone.now() if window_open else None,
+    )
+    assert f">{expected}</span>" in render_to_string(
+        "tournaments/includes/entry_fee_note.html", {"tournament": tournament}
+    )

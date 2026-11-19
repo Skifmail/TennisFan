@@ -40,19 +40,9 @@
                     <span class="tournament-card__chip tournament-card__chip--brand">{% include 'includes/tennis_fan_platform_badge.html' %}</span>
                     {% endif %}
                     <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_variant_display }}</span>
-                    {% if tournament.uses_manual_pairing %}
-                    <span class="tournament-card__chip tournament-card__chip--format">Ручной формат</span>
-                    {% elif tournament.format == 'single_elimination' %}
-                    <span class="tournament-card__chip tournament-card__chip--format" title="Турнир на выбывание с подвалом для проигравших в 1-м круге">{{ tournament.get_format_display }}</span>
-                    {% elif tournament.format == 'olympic_consolation' %}
-                    <span class="tournament-card__chip tournament-card__chip--format">Олимпийская</span>
-                    {% elif tournament.format == 'round_robin' %}
-                    <span class="tournament-card__chip tournament-card__chip--format">Круговой</span>
-                    {% if tournament.match_format %}
+                    <span class="tournament-card__chip tournament-card__chip--format">{{ tournament.public_format_label }}</span>
+                    {% if tournament.format == 'round_robin' and tournament.match_format and not tournament.uses_manual_pairing %}
                     <span class="tournament-card__chip tournament-card__chip--muted">{{ tournament.get_match_format_display }}</span>
-                    {% endif %}
-                    {% elif tournament.format == 'weekend_day' %}
-                    <span class="tournament-card__chip tournament-card__chip--format" title="Групповой этап, затем плей-офф и утешительная сетка">Группы</span>
                     {% endif %}
                     {% if tournament.duration == 'multi' and tournament.entry_fee and tournament.entry_fee > 0 %}
                     <span class="tournament-card__chip tournament-card__chip--fee">Взнос {{ tournament.entry_fee|floatformat:0|intcomma }} ₽</span>

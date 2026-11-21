@@ -1,0 +1,33 @@
+.tournament-player-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: 1rem;
+    width: min(75vw, 76rem);
+    max-width: 100%;
+}
+.tournament-player-picker section {
+    min-width: 0;
+    padding: .7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+.tournament-player-picker input, .tournament-player-picker select {
+    max-width: 100%;
+    margin: 0 .3rem .4rem 0;
+}
+.tournament-player-picker ul {
+    padding: 0;
+    margin: .5rem 0 0;
+    overflow: auto;
+    max-height: 21rem;
+}
+.tournament-player-picker li {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    padding: .45rem .15rem;
+    border-top: 1px solid var(--hairline-color);
+}
+.tournament-player-picker li > span:first-child { flex: 1 1 8rem; }
+.tournament-player-picker button { cursor: pointer; }

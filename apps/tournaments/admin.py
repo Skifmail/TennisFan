@@ -364,6 +364,26 @@ class TournamentPhotoInline(admin.TabularInline):
     fields = ("image", "caption")
 
 
+class ParticipantSelect(forms.SelectMultiple):
+    """Передаёт в список участников город и контакт игрока."""
+
+    class Media:
+        js = ("js/admin_tournament_participants.js",)
+        css = {"all": ("css/admin_tournament_participants.css",)}
+
+    def create_option(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        option = super().create_option(*args, **kwargs)
+        player = getattr(option["value"], "instance", None)
+        if player is not None:
+            phone = player.user.phone.strip()
+            option["attrs"].update({
+                "data-city": player.city.strip(),
+                "data-phone": phone,
+                "data-tel": phone_to_tel_href(phone),
+            })
+        return option
+
+
 class TournamentAdminForm(TournamentFormatForm):
     """Форма турнира с полем «Допустимые категории» в виде чекбоксов (1–5)."""
 
@@ -380,11 +400,16 @@ class TournamentAdminForm(TournamentFormatForm):
 
     class Meta:
         model = Tournament
+        widgets = {"participants": ParticipantSelect(attrs={"data-player-picker": "1"})}
         fields = "__all__"
         exclude: tuple[str, ...] = ("is_one_day",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        if "participants" in self.fields:
+            participants = self.fields["participants"]
+            participants.queryset = participants.queryset.select_related("user")
+            participants.help_text = ""
         if "format" in self.fields:
             details = mark_safe(
                 str(self.fields["format"].help_text or "").replace("\n", "<br>")
@@ -840,7 +865,6 @@ class TournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     search_fields = ("name", "description")
     list_editable = ("status",)
     prepopulated_fields = {"slug": ("name",)}
-    filter_horizontal = ("participants",)
     autocomplete_fields = ("court",)
     date_hierarchy = "start_date"
     readonly_fields = (
@@ -1704,7 +1728,6 @@ class TVDTournamentAdmin(TournamentGeoAdminMixin, admin.ModelAdmin):
     search_fields = ("name", "description")
     list_editable = ("status",)
     prepopulated_fields = {"slug": ("name",)}
-    filter_horizontal = ("participants",)
     autocomplete_fields = ("court",)
     date_hierarchy = "start_date"
     readonly_fields = (

@@ -21,7 +21,12 @@ from .broadcast_progress import broadcast_progress, broadcast_stage
 from .domain.rules import NotificationValidationError
 from .forms import BroadcastForm
 from .models import Broadcast, Delivery, EventPolicy, NotificationPreference, PushDevice
-from .services import center_enabled, event_policy, queue_broadcast
+from .services import (
+    broadcast_recipients,
+    center_enabled,
+    event_policy,
+    queue_broadcast,
+)
 
 FORM_TOKEN_AGE: Final = 3600
 FORM_TOKEN_SALT: Final = "notification-broadcast-form"
@@ -32,6 +37,10 @@ CONTENT_FIELDS: Final = (
     "send_push",
     "send_email",
     "send_inbox",
+    "audience_mode",
+    "cities",
+    "gender",
+    "recipient_ids",
 )
 
 
@@ -58,18 +67,13 @@ def _same_content(left: Broadcast, right: Broadcast) -> bool:
 def _fingerprint(campaign: Broadcast) -> str:
     content = [
         campaign.pk,
-        campaign.title,
-        campaign.body,
-        campaign.url,
-        campaign.send_push,
-        campaign.send_email,
-        campaign.send_inbox,
+        *(getattr(campaign, field) for field in CONTENT_FIELDS),
     ]
     return hashlib.sha256(json.dumps(content, ensure_ascii=False).encode()).hexdigest()
 
 
 def _counts(campaign: Broadcast) -> dict[str, int]:
-    users = User.objects.filter(is_active=True)
+    users = broadcast_recipients(campaign)
     policy = event_policy("manual.broadcast")
     return {
         "ЛК": users.count() if campaign.send_inbox and policy.inbox_enabled else 0,
@@ -182,6 +186,10 @@ class BroadcastAdmin(_BroadcastAdmin):
     ]
     fieldsets = [
         ("Сообщение", {"fields": ["title", "body", "url"]}),
+        (
+            "Получатели",
+            {"fields": ["audience_mode", "cities", "gender", "recipient_ids"]},
+        ),
         ("Каналы отправки", {"fields": ["send_push", "send_email", "send_inbox"]}),
         (
             "Служебные сведения",
@@ -520,6 +528,7 @@ class BroadcastAdmin(_BroadcastAdmin):
                 messages.SUCCESS,
             )
             return redirect("admin:notifications_broadcast_change", pk)
+        recipients = broadcast_recipients(campaign)
         context: dict[str, Any] = {
             **self.admin_site.each_context(request),
             "title": "Подтверждение рассылки",
@@ -529,6 +538,10 @@ class BroadcastAdmin(_BroadcastAdmin):
             ),
             "campaign": campaign,
             "counts": _counts(campaign),
+            "audience_size": recipients.count(),
+            "selected_users": recipients.order_by("email")
+            if campaign.audience_mode == "selected"
+            else (),
             "snapshot": signing.dumps(
                 _fingerprint(campaign), salt="notification-broadcast"
             ),

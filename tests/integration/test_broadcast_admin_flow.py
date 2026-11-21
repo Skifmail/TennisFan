@@ -322,3 +322,47 @@ def test_broadcast_when_older_writer_omits_new_counters_should_use_database_defa
     assert row is not None
     draft = Broadcast.objects.get(pk=row[0])
     assert draft.processed_users == draft.inbox_created == 0
+
+
+def test_filtered_broadcast_expands_only_matching_users(client: Client) -> None:
+    """Предпросмотр и очередь учитывают город и пол одновременно."""
+    from apps.users.models import Player
+
+    actor = _admin(client)
+    for index, (city, gender) in enumerate(
+        [("Раменское", "female"), ("Раменское", "male"), ("Москва", "female")]
+    ):
+        user = User.objects.create_user(email=f"audience-{index}@example.test")
+        Player.objects.update_or_create(
+            user=user, defaults={"city": city, "gender": gender}
+        )
+    data = _payload(client, "_send_now")
+    data.update(audience_mode="filters", cities="Раменское", gender="female")
+    response = client.post(reverse("admin:notifications_broadcast_add"), data)
+    assert response.status_code == 302
+    campaign = Broadcast.objects.get()
+    preview = client.get(response.headers["Location"])
+    assert preview.context["audience_size"] == preview.context["counts"]["ЛК"] == 1
+    queue_broadcast(campaign.pk, actor=actor)
+    expand_broadcast(campaign.pk)
+    campaign.refresh_from_db()
+    assert campaign.inbox_created == campaign.processed_users == 1
+
+
+def test_selected_broadcast_targets_only_picked_users(client: Client) -> None:
+    """Пустой выбор отклоняется, тест получает админ, рассылку — выбранный адресат."""
+    from apps.notifications.services import broadcast_recipients
+
+    actor = _admin(client)
+    recipient = User.objects.create_user(email="picked@example.test")
+    data = _payload(client, "_test_now")
+    data["audience_mode"] = "selected"
+    url = reverse("admin:notifications_broadcast_add")
+    assert client.post(url, data).status_code == 200
+    assert not Broadcast.objects.exists()
+    data["recipient_ids"] = str(recipient.pk)
+    assert client.post(url, data).status_code == 302
+    assert list(broadcast_recipients(Broadcast.objects.get(is_test=False))) == [
+        recipient
+    ]
+    assert list(broadcast_recipients(Broadcast.objects.get(is_test=True))) == [actor]

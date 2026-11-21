@@ -4,6 +4,14 @@
 <p><strong>Заголовок:</strong> {{ campaign.title }}</p>
 <p><strong>Текст:</strong> {{ campaign.body }}</p>
 <p><strong>Переход:</strong> {{ campaign.url|default:'Личный кабинет' }}</p>
+<h2>Получатели</h2>
+<p><strong>{{ campaign.get_audience_mode_display }}</strong> · Пользователей: {{ audience_size }}</p>
+{% if selected_users %}
+<details><summary>Список получателей</summary><ul>{% for user in selected_users %}<li>{{ user.get_display_name }} · {{ user.email }}</li>{% endfor %}</ul></details>
+{% endif %}
+{% if campaign.audience_mode == 'filters' %}
+<p>Города: {{ campaign.cities|join:", "|default:"Все города" }} · Пол: {{ campaign.get_gender_display|default:"Любой" }}</p>
+{% endif %}
 <p>Оценка аудитории на сейчас (согласия повторно проверяются перед отправкой):</p>
 <ul>{% for channel,count in counts.items %}<li>{{ channel }}: {{ count }} пользователей</li>{% endfor %}</ul>
 <p>Push может прийти на несколько включённых устройств одного пользователя. ЛК не зависит от пользовательских переключателей.</p>

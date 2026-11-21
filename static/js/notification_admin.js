@@ -82,3 +82,27 @@ document.addEventListener('DOMContentLoaded', function () {
     if (button) button.addEventListener('click', refresh);
     schedule();
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const mode = document.getElementById('id_audience_mode');
+    if (!mode) return;
+    const controls = [
+        ['cities', 'filters', 'Найти город'],
+        ['gender', 'filters'],
+        ['recipient_ids', 'selected', 'Найти по имени или email'],
+    ];
+    function updateAudience() {
+        for (const [name, activeMode, placeholder] of controls) {
+            const field = document.getElementById('id_' + name);
+            const active = mode.value === activeMode;
+            field.closest('.form-row').hidden = !active;
+            field.disabled = !active;
+            const jq = window.django?.jQuery;
+            if (active && placeholder && jq?.fn.select2 && !jq(field).data('select2')) {
+                jq(field).select2({placeholder, width: '100%', language: 'ru', closeOnSelect: false});
+            }
+        }
+    }
+    mode.addEventListener('change', updateAudience);
+    updateAudience();
+});

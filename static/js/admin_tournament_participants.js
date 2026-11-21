@@ -26,8 +26,16 @@ document.addEventListener("DOMContentLoaded", () => {
             search.type = "search";
             search.placeholder = "Имя или фамилия";
             search.setAttribute("aria-label", title.textContent + " — поиск по имени");
-            const city = element("select");
+            const city = element("input");
+            city.type = "search";
+            city.placeholder = "Поиск города";
+            const suggestions = element("datalist");
+            suggestions.id = select.id + "-cities-" + chosen;
+            city.setAttribute("list", suggestions.id);
             city.setAttribute("aria-label", title.textContent + " — город");
+            const count = element("span");
+            count.setAttribute("role", "status");
+            count.setAttribute("aria-atomic", "true");
             const list = element("ul");
             const move = options => {
                 for (const option of options) option.selected = !chosen;
@@ -35,19 +43,24 @@ document.addEventListener("DOMContentLoaded", () => {
             };
             let visible = [];
             const bulk = button(chosen ? "Убрать всех из списка ниже" : "Добавить всех из списка ниже", () => move(visible));
-            pane.append(title, search, city, bulk, list);
+            const filters = element("div");
+            filters.className = "participant-filters";
+            filters.append(search, city, suggestions);
+            const actions = element("div");
+            actions.className = "participant-actions";
+            actions.append(count, bulk);
+            pane.append(title, filters, actions, list);
             picker.append(pane);
             function render() {
                 const options = Array.from(select.options);
-                const previous = city.value;
-                const cities = [...new Set(options.map(o => o.dataset.city || ""))].sort((a,b) => a.localeCompare(b, "ru"));
-                city.replaceChildren(new Option("Все города", ""));
-                for (const name of cities) city.add(new Option(name || "Город не указан", "=" + name));
-                city.value = previous;
+                const cityQuery = city.value.trim().toLowerCase();
+                const exactCity = Array.from(suggestions.options).some(o => o.value.toLowerCase() === cityQuery);
                 const words = search.value.trim().toLowerCase().split(/\s+/);
                 visible = options.filter(o => o.selected === chosen &&
-                    (!city.value || city.value === "=" + (o.dataset.city || "")) &&
+                    (exactCity ? cityName(o).toLowerCase() === cityQuery : cityName(o).toLowerCase().includes(cityQuery)) &&
                     words.every(word => o.text.toLowerCase().includes(word)));
+                const summary = "Найдено игроков: " + visible.length;
+                if (count.textContent !== summary) count.textContent = summary;
                 bulk.disabled = !visible.length;
                 list.replaceChildren();
                 for (const option of visible) {
@@ -66,11 +79,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     row.append(label, contact, button(chosen ? "Убрать" : "Добавить", () => move([option])));
                     list.append(row);
                 }
-                if (!visible.length) list.append(element("li", "Список пуст"));
+                if (!visible.length) list.append(element("li", search.value || cityQuery ? "Игроки не найдены" : "Список пуст"));
             }
-            draw.push(render);
+            function cityName(option) {
+                return option.dataset.city || "Город не указан";
+            }
+            function updateCities() {
+                const names = [...new Set(Array.from(select.options, cityName))];
+                names.sort((a, b) => a.localeCompare(b, "ru"));
+                suggestions.replaceChildren(...names.map(name => new Option(name, name)));
+                render();
+            }
+            draw.push(updateCities);
             search.addEventListener("input", render);
-            city.addEventListener("change", render);
+            city.addEventListener("input", render);
         }
         select.addEventListener("change", refresh);
         new MutationObserver(refresh).observe(select, {childList: true, subtree: true});

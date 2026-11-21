@@ -86,5 +86,13 @@
 .tournament-player-picker li > span:first-child { overflow-wrap: anywhere; }
 @media (max-width: 767px) {
     .tournament-player-picker { width: 100%; grid-template-columns: minmax(0, 1fr); }
-    .form-row .tournament-player-picker ul { height: auto; max-height: 18rem; }
+    .tournament-player-picker li {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-block: .65rem;
+    }
+    .tournament-player-picker li > span:first-child { grid-column: 1 / -1; }
+    .tournament-player-picker li > span { overflow-wrap: anywhere; }
+    .tournament-player-picker section button { min-height: 2.75rem; }
+    .form-row .tournament-player-picker ul { height: auto; max-height: none; overflow: visible; scrollbar-gutter: auto; }
 }

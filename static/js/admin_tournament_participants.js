@@ -16,6 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
         picker.className = "tournament-player-picker";
         select.after(picker);
         select.hidden = true;
+        const mobile = window.matchMedia("(max-width: 767px)");
+        const pageSize = 5;
         const revealed = new Set();
         const draw = [];
         const refresh = () => draw.forEach(render => render());
@@ -42,14 +44,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 select.dispatchEvent(new Event("change", {bubbles: true}));
             };
             let visible = [];
-            const bulk = button(chosen ? "Убрать всех из списка ниже" : "Добавить всех из списка ниже", () => move(visible));
+            let limit = pageSize;
+            const more = button("", () => {
+                limit += pageSize;
+                render();
+            });
+            const bulk = button("", () => move(visible));
             const filters = element("div");
             filters.className = "participant-filters";
             filters.append(search, city, suggestions);
             const actions = element("div");
             actions.className = "participant-actions";
             actions.append(count, bulk);
-            pane.append(title, filters, actions, list);
+            pane.append(title, filters, actions, list, more);
             picker.append(pane);
             function render() {
                 const options = Array.from(select.options);
@@ -59,11 +66,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 visible = options.filter(o => o.selected === chosen &&
                     (exactCity ? cityName(o).toLowerCase() === cityQuery : cityName(o).toLowerCase().includes(cityQuery)) &&
                     words.every(word => o.text.toLowerCase().includes(word)));
-                const summary = "Найдено игроков: " + visible.length;
+                const shown = mobile.matches ? visible.slice(0, limit) : visible;
+                const remaining = visible.length - shown.length;
+                more.hidden = remaining === 0;
+                more.textContent = "Показать ещё " + Math.min(remaining, pageSize);
+                const summary = remaining ? "Показано " + shown.length + " из " + visible.length : "Найдено игроков: " + visible.length;
+                bulk.textContent = (chosen ? "Убрать всех" : "Добавить всех") + " (" + visible.length + ")";
                 if (count.textContent !== summary) count.textContent = summary;
                 bulk.disabled = !visible.length;
                 list.replaceChildren();
-                for (const option of visible) {
+                for (const option of shown) {
                     const row = element("li");
                     const label = element("span", [option.text, option.dataset.city].filter(Boolean).join(" · "));
                     const contact = element("span");
@@ -91,8 +103,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 render();
             }
             draw.push(updateCities);
-            search.addEventListener("input", render);
-            city.addEventListener("input", render);
+            function resetPage() {
+                limit = pageSize;
+                render();
+            }
+            search.addEventListener("input", resetPage);
+            city.addEventListener("input", resetPage);
+            mobile.addEventListener("change", resetPage);
         }
         select.addEventListener("change", refresh);
         new MutationObserver(refresh).observe(select, {childList: true, subtree: true});

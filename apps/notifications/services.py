@@ -6,7 +6,7 @@ from typing import Final
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, QuerySet
 from django.utils import timezone
 from loguru import logger
 
@@ -25,6 +25,24 @@ from .presence import is_in_chat
 
 DELIVERY_LIFETIME: Final = timedelta(days=1)
 BATCH_SIZE: Final = 100
+
+
+def broadcast_recipients(campaign: Broadcast) -> QuerySet[User]:
+    """Возвращает активных адресатов для предпросмотра и фактической отправки."""
+    users = User.objects.filter(is_active=True)
+    if campaign.is_test:
+        return users.filter(pk=campaign.target_user_id)
+    if campaign.audience_mode == "all":
+        return users
+    if campaign.audience_mode == "selected":
+        return users.filter(pk__in=campaign.recipient_ids)
+    if campaign.audience_mode == "filters" and (campaign.cities or campaign.gender):
+        if campaign.cities:
+            users = users.filter(player__city__in=campaign.cities)
+        if campaign.gender:
+            users = users.filter(player__gender=campaign.gender)
+        return users
+    return users.none()
 
 
 def center_enabled() -> bool:
@@ -250,11 +268,9 @@ def expand_broadcast(broadcast_id: int, *, batch_size: int = BATCH_SIZE) -> int:
     campaign = Broadcast.objects.select_for_update().get(pk=broadcast_id)
     if campaign.status != "queued" or not center_enabled():
         return 0
-    users = User.objects.filter(
-        is_active=True, pk__gt=campaign.cursor_user_id, pk__lte=campaign.upper_user_id
+    users = broadcast_recipients(campaign).filter(
+        pk__gt=campaign.cursor_user_id, pk__lte=campaign.upper_user_id
     )
-    if campaign.is_test:
-        users = users.filter(pk=campaign.target_user_id)
     rows = list(users.order_by("pk")[:batch_size])
     policy = event_policy("manual.broadcast")
     now = timezone.now()

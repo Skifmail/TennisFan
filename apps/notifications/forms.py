@@ -1,9 +1,13 @@
 """Минимальные настройки пользователя и короткая форма администратора."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django import forms
 from django.conf import settings
+from django.contrib.admin.widgets import AutocompleteMixin
+
+from apps.users.display import format_user_admin_label
+from apps.users.models import Player, User
 
 from .domain.rules import (
     BODY_LIMIT,
@@ -33,6 +37,13 @@ else:
     _BroadcastForm = forms.ModelForm
 
 
+class AudienceSelect(forms.SelectMultiple):
+    """Подключает локальные стили и поиск Select2 из комплекта админки."""
+
+    i18n_name = "ru"
+    media = AutocompleteMixin.media
+
+
 class BroadcastForm(_BroadcastForm):
     """Проверяет лимиты и безопасный переход до сохранения черновика.
 
@@ -40,9 +51,57 @@ class BroadcastForm(_BroadcastForm):
         Meta: Только изменяемые поля черновика.
     """
 
+    cities = forms.MultipleChoiceField(
+        widget=AudienceSelect,
+        label="Города",
+        required=False,
+        help_text="Можно выбрать несколько городов.",
+    )
+    recipient_ids = forms.TypedMultipleChoiceField(
+        widget=AudienceSelect, label="Пользователи", coerce=int, required=False
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if "cities" in self.fields:
+            cities = (
+                Player.objects.filter(user__is_active=True)
+                .exclude(city="")
+                .order_by("city")
+                .values_list("city", flat=True)
+                .distinct()
+            )
+            self.fields["cities"].choices = [(city, city) for city in cities]
+        if "recipient_ids" in self.fields:
+            users = (
+                User.objects.filter(is_active=True)
+                .only("pk", "first_name", "last_name", "email")
+                .order_by("last_name", "first_name", "pk")
+            )
+            self.fields["recipient_ids"].choices = [
+                (user.pk, format_user_admin_label(user)) for user in users
+            ]
+        if "audience_mode" in self.fields:
+            self.fields["audience_mode"].required = False
+            self.fields["gender"].choices = [
+                ("", "Любой пол"),
+                *Player._meta.get_field("gender").choices,
+            ]
+
     class Meta:
         model = Broadcast
-        fields = ["title", "body", "url", "send_push", "send_email", "send_inbox"]
+        fields = [
+            "title",
+            "body",
+            "url",
+            "send_push",
+            "send_email",
+            "send_inbox",
+            "audience_mode",
+            "cities",
+            "gender",
+            "recipient_ids",
+        ]
         widgets = {
             "title": forms.TextInput(
                 attrs={"maxlength": TITLE_LIMIT, "data-counter": str(TITLE_LIMIT)}
@@ -63,6 +122,16 @@ class BroadcastForm(_BroadcastForm):
             Проверенные данные формы.
         """
         data = super().clean() or {}
+        mode = data.get("audience_mode") or self.instance.audience_mode
+        data["audience_mode"] = mode
+        if mode == "filters" and not (data.get("cities") or data.get("gender")):
+            self.add_error("cities", "Выберите хотя бы один город или укажите пол.")
+        if mode == "selected" and not data.get("recipient_ids"):
+            self.add_error("recipient_ids", "Выберите хотя бы одного пользователя.")
+        if mode != "filters":
+            data.update(cities=[], gender="")
+        if mode != "selected":
+            data["recipient_ids"] = []
         if "title" in data and "body" in data:
             try:
                 data["title"], data["body"] = validate_content(

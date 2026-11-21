@@ -3,7 +3,7 @@
 {{ block.super }}
 <input type="hidden" name="_broadcast_submission" value="{{ broadcast_submission }}">
 {% if broadcast_progress %}{% include 'admin/notifications/broadcast_progress.html' %}{% endif %}
-{% if show_broadcast_actions %}<p class="help">Заполните сообщение и выберите каналы. Можно сохранить черновик, отправить тест только себе или перейти к подтверждению массовой отправки.</p>{% endif %}
+{% if show_broadcast_actions %}<p class="help">Заполните сообщение, выберите получателей и каналы. Можно сохранить черновик, отправить тест только себе или перейти к подтверждению массовой отправки.</p>{% endif %}
 {% endblock %}
 {% block submit_buttons_bottom %}
 {% if show_broadcast_actions %}

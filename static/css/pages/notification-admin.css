@@ -39,3 +39,24 @@
     outline: 2px solid var(--link-fg, #417690);
     outline-offset: 3px;
 }
+
+#broadcast_form .form-row[hidden] { display: none; }
+#broadcast_form .select2-container { max-width: min(100%, 38rem); }
+#broadcast_form .select2-selection--multiple {
+    background: var(--body-bg);
+    color: var(--body-fg);
+    border-color: var(--border-color);
+    min-height: 2.4rem;
+}
+#broadcast_form .select2-selection__choice {
+    background: var(--darkened-bg);
+    border-color: var(--border-color);
+}
+body.model-broadcast .select2-dropdown {
+    background: var(--body-bg);
+    color: var(--body-fg);
+}
+body.model-broadcast .select2-results__option[aria-selected=true] {
+    background: var(--selected-bg);
+    color: var(--body-fg);
+}

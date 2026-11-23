@@ -8,11 +8,13 @@ from urllib.parse import urlsplit
 from django.contrib.auth.models import Permission
 from django.core import mail
 from django.core.exceptions import PermissionDenied
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from apps.core.email_service import send_training_enrollment_email
+from apps.notifications.domain.rules import INBOX_LIMIT
 from apps.notifications.models import Delivery, EventPolicy, NotificationPreference
 from apps.training.enrollment_services import distribute_enrollment
 from apps.training.models import Coach, Training, TrainingEnrollment
@@ -110,6 +112,103 @@ class TrainingEnrollmentDistributionTests(TestCase):
         delivery = Delivery.objects.get(event_key="training.enrollment", channel="push")
         self.assertEqual(delivery.user_id, self.admin.pk)
         self.assertEqual(urlsplit(delivery.url).path, note.url)
+
+    def test_long_training_enrollment_form_notifies_all_administrators(self) -> None:
+        """Длинная реальная заявка не теряет ЛК, push и email ни одного администратора."""
+        second_admin = make_user(
+            email="second-distributor@test.local", is_staff=True, is_superuser=True
+        )
+        NotificationPreference.objects.create(
+            user=second_admin, push_enabled=True, email_enabled=True
+        )
+        player = make_player(email_suffix="long-distribution-player")
+        long_message = (
+            "Хочу индивидуальную тренировку вечером. " * 60 + "Последнее пожелание."
+        )
+        for user in (None, player.user):
+            with self.subTest(authenticated=user is not None):
+                self.client.logout()
+                if user is not None:
+                    self.client.force_login(user)
+                emails_before = len(mail.outbox)
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = self.client.post(
+                        reverse("training_enroll", args=[self.training.slug]),
+                        {
+                            "full_name": "Александр Шатайло",
+                            "contact_method": "email",
+                            "contact_value": "long-player@test.local",
+                            "message": long_message,
+                            "agree_legal": "on",
+                        },
+                        secure=True,
+                    )
+                self.assertEqual(response.status_code, 302)
+                enrollment = TrainingEnrollment.objects.latest("pk")
+                url = reverse(
+                    "admin:training_trainingenrollment_change", args=[enrollment.pk]
+                )
+                notes = Notification.objects.filter(
+                    event_key="training.enrollment", url=url
+                )
+                self.assertEqual(
+                    set(notes.values_list("user_id", flat=True)),
+                    {self.admin.pk, second_admin.pk},
+                )
+                for note in notes:
+                    note.full_clean()
+                    self.assertLessEqual(len(note.message), INBOX_LIMIT)
+                    self.assertTrue(note.message.endswith("…"))
+                    self.assertIn("Александр Шатайло", note.message)
+                    self.assertTrue(note.is_visible)
+                    push = Delivery.objects.get(notification=note, channel="push")
+                    self.assertEqual(push.user_id, note.user.pk)
+                emails = mail.outbox[emails_before:]
+                self.assertEqual(len(emails), 2)
+                for email in emails:
+                    assert isinstance(email, EmailMultiAlternatives)
+                    self.assertIn(long_message, str(email.alternatives[0][0]))
+                self.assertEqual(enrollment.message, long_message)
+                self.assertIsNone(enrollment.assigned_at)
+
+    def test_long_training_enrollment_assignment_preserves_all_channels(self) -> None:
+        """Каждая кнопка распределения доставляет длинную заявку назначенному получателю."""
+        long_message = "Нужны упражнения для подачи. " * 80 + "Последнее пожелание."
+        for action, recipient in (
+            ("original", self.original_user),
+            ("other", self.other_user),
+            ("self", self.admin),
+        ):
+            with self.subTest(action=action):
+                enrollment = TrainingEnrollment.objects.create(
+                    training=self.training, full_name="Игрок", message=long_message
+                )
+                url = reverse(
+                    "admin:training_trainingenrollment_distribute", args=[enrollment.pk]
+                )
+                emails_before = len(mail.outbox)
+                with self.captureOnCommitCallbacks(execute=True):
+                    response = self.client.post(
+                        url,
+                        {"action": action, "coach_id": self.other.pk},
+                        secure=True,
+                    )
+                self.assertEqual(response.status_code, 302)
+                note = Notification.objects.get(
+                    url=reverse("enrollment_detail", args=[enrollment.pk]),
+                    event_key="training.enrollment",
+                )
+                self.assertEqual(note.user.pk, recipient.pk)
+                note.full_clean()
+                self.assertLessEqual(len(note.message), INBOX_LIMIT)
+                self.assertTrue(note.message.endswith("…"))
+                push = Delivery.objects.get(notification=note, channel="push")
+                self.assertEqual(push.user_id, recipient.pk)
+                emails = mail.outbox[emails_before:]
+                self.assertEqual(len(emails), 1)
+                self.assertEqual(emails[0].to, [recipient.email])
+                assert isinstance(emails[0], EmailMultiAlternatives)
+                self.assertIn(long_message, str(emails[0].alternatives[0][0]))
 
     def test_authenticated_and_guest_forms_both_go_to_distribution(self) -> None:
         """Обе формы сохраняют исходного тренера и не назначают его автоматически."""

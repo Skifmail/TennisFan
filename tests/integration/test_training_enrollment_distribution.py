@@ -387,6 +387,61 @@ class TrainingEnrollmentDistributionTests(TestCase):
             ):
                 self.assertContains(response, label)
 
+    def test_compact_list_preserves_search_filters_and_status_editing(self) -> None:
+        """Компактный список сохраняет стандартный поиск, фильтры и изменение статуса."""
+        response = self.client.get(self.list_url, secure=True)
+        self.assertContains(response, "Заявки на тренировки")
+        self.assertContains(response, "training_enrollment.css")
+        self.assertContains(response, self.enrollment.get_display_name())
+        changelist = response.context["cl"]
+        self.assertEqual(len(changelist.list_display), 6)  # Пять колонок и checkbox.
+        form = changelist.formset.forms[0]
+        status = form.fields["status"]
+        self.assertEqual(status.widget.attrs["aria-label"], "Статус заявки")
+        data = {
+            "_save": "Сохранить",
+            f"{form.prefix}-id": str(self.enrollment.pk),
+            f"{form.prefix}-status": TrainingEnrollment.Status.CONTACTED,
+        }
+        data.update(
+            {
+                field.html_name: str(field.value())
+                for field in changelist.formset.management_form
+            }
+        )
+        response = self.client.post(self.list_url, data, secure=True)
+        self.assertEqual(response.status_code, 302)
+        self.enrollment.refresh_from_db()
+        self.assertEqual(self.enrollment.status, TrainingEnrollment.Status.CONTACTED)
+        self.assertIsNone(self.enrollment.assigned_at)
+        self.assertFalse(Notification.objects.exists())
+        filtered = self.client.get(
+            self.list_url, {"status__exact": "contacted", "q": "Пётр"}, secure=True
+        )
+        self.assertContains(filtered, "Пётр Игрок")
+        self.assertContains(filtered, "Фильтры · применены")
+        empty = self.client.get(
+            self.list_url, {"status__exact": "completed"}, secure=True
+        )
+        self.assertNotContains(empty, "Пётр Игрок")
+
+    def test_compact_list_escapes_user_fields_and_keeps_profile_name(self) -> None:
+        """Поля заявки экранируются, а игрок без ФИО не превращается в пустую строку."""
+        player = make_player(email_suffix="compact-list-player")
+        self.enrollment.player = player
+        self.enrollment.full_name = ""
+        self.enrollment.telegram = '<script>alert("contact")</script>'
+        self.enrollment.save(update_fields=["player", "full_name", "telegram"])
+        self.training.title = '<script>alert("training")</script>'
+        self.training.save(update_fields=["title"])
+        response = self.client.get(self.list_url, secure=True)
+        self.assertContains(response, player.user.get_display_name())
+        self.assertNotContains(response, '<script>alert("contact")</script>')
+        self.assertNotContains(response, '<script>alert("training")</script>')
+        self.assertContains(
+            response, "&lt;script&gt;alert(&quot;contact&quot;)&lt;/script&gt;"
+        )
+
     def test_staff_without_permission_and_ordinary_coach_cannot_distribute(
         self,
     ) -> None:

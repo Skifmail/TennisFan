@@ -1,0 +1,5 @@
+<div class="enrollment-actions" role="group" aria-label="Распределить заявку №{{ enrollment.pk }}">
+    <button class="enrollment-action enrollment-action--primary" type="submit" form="enrollment-distribute-{{ enrollment.pk }}" name="action" value="original" {% if not enrollment.requested_coach_id %}disabled title="Исходный тренер удалён — выберите другого"{% endif %}>Отдать {{ enrollment.requested_coach_name|default:"исходному тренеру" }}</button>
+    <button class="enrollment-action" type="submit" form="enrollment-distribute-{{ enrollment.pk }}" name="action" value="self">Забрать себе</button>
+    <a class="enrollment-action" href="{% url 'admin:training_trainingenrollment_distribute' enrollment.pk %}">Отдать другому тренеру</a>
+</div>

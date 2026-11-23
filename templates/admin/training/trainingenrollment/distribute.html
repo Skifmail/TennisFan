@@ -1,22 +1,25 @@
 {% extends "admin/base_site.html" %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/training_enrollment.css' %}">{% endblock %}
 {% block content %}
 <p><a href="{% url 'admin:training_trainingenrollment_changelist' %}">К записям на тренировки</a></p>
-<div class="module">
+<div class="module enrollment-selection">
     <h2>{{ enrollment.get_display_name }} — {{ enrollment.training.title }}</h2>
     <p>Исходный тренер: {{ enrollment.requested_coach_name|default:"Не указан" }}</p>
     {% if enrollment.assigned_at %}
     <p>Заявка уже распределена: {{ enrollment.assigned_coach|default:"Тренер удалён" }}.</p>
     {% else %}
     <p>Выберите активного тренера. После нажатия заявка и уведомления будут переданы ему.</p>
-    <ul>
+    <ul class="enrollment-coaches">
         {% for coach in coaches %}
-        <li>
+        <li class="enrollment-coach">
             <form method="post">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="other">
                 <input type="hidden" name="coach_id" value="{{ coach.pk }}">
-                <button type="submit">Отдать {{ coach.name }}</button> — {{ coach.city }}
-                {% if not coach.user_id %}<span>(нет аккаунта: заявка будет назначена, уведомления в ЛК, email и push недоступны)</span>{% endif %}
+                <div class="enrollment-coach-info"><strong>{{ coach.name }}</strong><span>{{ coach.city }}</span>
+                {% if not coach.user_id %}<small>Нет аккаунта: назначение возможно, но ЛК, email и push недоступны.</small>{% endif %}</div>
+                <button class="enrollment-action enrollment-action--primary" type="submit">Отдать {{ coach.name }}</button>
             </form>
         </li>
         {% empty %}<li>Других активных тренеров нет.</li>{% endfor %}

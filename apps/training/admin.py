@@ -1,17 +1,19 @@
-"""
-Training admin configuration.
-"""
+"""Настройка админки тренеров, тренировок и распределения заявок."""
+
+from __future__ import annotations
 
 import logging
 from typing import Any
 
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
-from django.urls import URLPattern, path, reverse
+from django.urls import URLPattern, path
 from django.utils.decorators import method_decorator
 from django.utils.html import format_html
 from django.views.decorators.http import require_http_methods
@@ -302,19 +304,17 @@ class TrainingEnrollmentAdmin(admin.ModelAdmin):
     change_list_template = "admin/training/trainingenrollment/change_list.html"
     change_form_template = "admin/training/trainingenrollment/change_form.html"
 
+    class Media:
+        css = {"all": ("admin/css/training_enrollment.css",)}
+
     list_display = (
-        "training",
-        "full_name",
-        "email",
-        "player",
-        "desired_court",
-        "requested_coach_name",
-        "assigned_coach",
-        "distribution_state",
+        "applicant_summary",
+        "training_summary",
+        "coach_summary",
         "status",
-        "created_at",
         "distribution_actions",
     )
+    list_display_links = None
     list_filter = (
         "assigned_at",
         "assigned_coach",
@@ -350,6 +350,47 @@ class TrainingEnrollmentAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+
+    def changelist_view(
+        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        """Дать списку короткий заголовок, не меняя поиск, фильтры и формы Django."""
+        return super().changelist_view(
+            request, {"title": "Заявки на тренировки", **(extra_context or {})}
+        )
+
+    @admin.display(description="Заявка / контакт", ordering="created_at")
+    def applicant_summary(self, obj: TrainingEnrollment) -> str:
+        """Объединить имя, контакт, номер и дату заявки без дублирования профиля."""
+        return render_to_string(
+            "admin/training/trainingenrollment/applicant_summary.html",
+            {"enrollment": obj},
+        )
+
+    @admin.display(description="Тренировка", ordering="training__title")
+    def training_summary(self, obj: TrainingEnrollment) -> str:
+        """Показать тренировку и место в одной компактной ячейке."""
+        return render_to_string(
+            "admin/training/trainingenrollment/training_summary.html",
+            {"enrollment": obj},
+        )
+
+    @admin.display(description="Тренер / распределение", ordering="assigned_at")
+    def coach_summary(self, obj: TrainingEnrollment) -> str:
+        """Различить исходного тренера и получателя без отдельных колонок."""
+        return render_to_string(
+            "admin/training/trainingenrollment/coach_summary.html",
+            {"enrollment": obj},
+        )
+
+    def formfield_for_choice_field(
+        self, db_field: models.Field[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> Any:
+        """Подписать выпадающий статус для чтения без заголовка таблицы на телефоне."""
+        field = super().formfield_for_choice_field(db_field, request, **kwargs)
+        if db_field.name == "status" and field is not None:
+            field.widget.attrs["aria-label"] = "Статус заявки"
+        return field
 
     def has_module_permission(self, request: HttpRequest) -> bool:
         """Скрыть раздел от сотрудников без полномочий распределения."""
@@ -403,17 +444,10 @@ class TrainingEnrollmentAdmin(admin.ModelAdmin):
         """Кнопки отправляют POST через отдельные формы вне формы списка Django."""
         if not obj.pk or obj.assigned_at:
             return "—"
-        html: str = format_html(
-            '<button type="submit" form="enrollment-distribute-{}" name="action" value="original" {}>Отдать {}</button> '
-            '<button type="submit" form="enrollment-distribute-{}" name="action" value="self">Забрать себе</button> '
-            '<a class="button" href="{}">Отдать другому тренеру</a>',
-            obj.pk,
-            "" if obj.requested_coach_id else "disabled",
-            obj.requested_coach_name or "исходному тренеру",
-            obj.pk,
-            reverse("admin:training_trainingenrollment_distribute", args=[obj.pk]),
+        return render_to_string(
+            "admin/training/trainingenrollment/distribution_actions.html",
+            {"enrollment": obj},
         )
-        return html
 
     def get_urls(self) -> list[URLPattern]:
         """Добавить защищённый маршрут распределения конкретной заявки."""

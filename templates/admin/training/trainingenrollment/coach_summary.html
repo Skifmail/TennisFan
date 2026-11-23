@@ -1,0 +1,9 @@
+<div class="enrollment-stack">
+    {% if enrollment.assigned_at %}
+        <span class="enrollment-badge">Распределена</span>
+        <span>Назначен: <strong>{{ enrollment.assigned_coach.name|default:"Тренер удалён" }}</strong></span>
+    {% else %}
+        <span class="enrollment-badge enrollment-badge--pending">Ожидает распределения</span>
+    {% endif %}
+    <small class="enrollment-muted">Исходный: {{ enrollment.requested_coach_name|default:"Не указан" }}</small>
+</div>

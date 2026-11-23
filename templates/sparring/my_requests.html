@@ -185,7 +185,7 @@
                                 {% include 'includes/direct_message_button.html' with target_player=response.respondent compact=True button_label='Написать в чат' %}
                                 <a href="{% url 'profile' pk=response.respondent.pk %}" class="btn btn-outline btn-sm">Профиль</a>
                                 {% if response.status == 'accepted' %}
-                                {% with match=response.matches.first %}
+                                {% with match=response.match %}
                                 {% if match %}
                                 <a href="{% url 'match_detail' pk=match.pk %}" class="btn btn-outline btn-sm">Матч</a>
                                 {% endif %}

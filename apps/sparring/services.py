@@ -276,7 +276,7 @@ def respond_to_sparring(
     if response is not None:
         if (
             response.status == SparringResponse.ResponseStatus.ACCEPTED
-            or response.matches.exists()
+            or Match.objects.filter(sparring_response=response).exists()
         ):
             raise ValueError("Ваш отклик уже принят. По нему создан матч.")
         response.contact_method = contact_method
@@ -326,7 +326,7 @@ def _accept_response_locked(
         raise ValueError("По этой заявке уже создан матч.")
     if (
         response.status != SparringResponse.ResponseStatus.PENDING
-        or response.matches.exists()
+        or Match.objects.filter(sparring_response=response).exists()
     ):
         raise ValueError("Этот отклик уже обработан.")
 
@@ -565,7 +565,7 @@ def cancel_sparring_response(response_id: int, acting_user_id: int) -> None:
     if (
         request.status != SparringRequest.Status.ACTIVE
         or response.status != SparringResponse.ResponseStatus.PENDING
-        or response.matches.exists()
+        or Match.objects.filter(sparring_response=response).exists()
     ):
         raise ValueError("Отклик уже обработан.")
     response.status = SparringResponse.ResponseStatus.REJECTED

@@ -276,7 +276,7 @@ class TelegramMutationAtomicityTests(TestCase):
         self.assertEqual(result.status_code, 409)
         response.refresh_from_db()
         self.assertEqual(response.status, SparringResponse.ResponseStatus.ACCEPTED)
-        self.assertEqual(response.matches.get().pk, match.pk)
+        self.assertEqual(response.match.pk, match.pk)
 
     def test_site_response_rechecks_request_closed_after_initial_read(self) -> None:
         response = self._response()

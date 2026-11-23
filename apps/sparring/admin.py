@@ -110,9 +110,9 @@ class SparringResponseAdmin(admin.ModelAdmin):
     date_hierarchy = "created_at"
     readonly_fields = ("created_at", "updated_at")
 
-    def has_match(self, obj):
+    def has_match(self, obj: SparringResponse) -> bool:
         """Проверка, создан ли матч из этого отклика."""
-        return obj.matches.exists()
+        return hasattr(obj, "match")
 
     has_match.boolean = True
     has_match.short_description = "Матч создан"

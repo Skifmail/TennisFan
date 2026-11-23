@@ -1394,7 +1394,8 @@ def test_parallel_sparring_accept_and_cancel_preserve_created_match() -> None:
         assert cancellation.result(timeout=15) is False
     response.refresh_from_db()
     assert response.status == SparringResponse.ResponseStatus.ACCEPTED
-    assert response.matches.count() == 1
+    assert response.match.sparring_response_id == response.pk
+    assert Match.objects.filter(sparring_response=response).count() == 1
 
 
 def test_parallel_team_generation_and_roster_change_keep_full_series() -> None:

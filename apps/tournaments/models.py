@@ -1764,13 +1764,12 @@ class Match(models.Model):
         db_index=True,
         help_text="Для турнирного матча совпадает с турниром. От него зависит, какой рейтинг обновлять.",
     )
-    sparring_response = models.ForeignKey(
+    sparring_response = models.OneToOneField(
         "sparring.SparringResponse",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        unique=True,
-        related_name="matches",
+        related_name="match",
         verbose_name="Отклик на спарринг",
         help_text="Связь с откликом на спарринг, если матч создан из спарринга",
     )

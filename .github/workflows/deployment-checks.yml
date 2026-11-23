@@ -77,6 +77,11 @@ jobs:
           docker compose --env-file /dev/null -f docker-compose.dokploy.yml config --no-interpolate --quiet
           docker compose --env-file /dev/null -f docker-compose.yml config --no-interpolate --quiet
           bash -n entrypoint.sh cron-entrypoint.sh scripts/backup-postgres.sh
+      - name: Sparring one-to-one regression typing and formatting
+        run: |
+          venv/bin/mypy --config-file=mypy-chat.ini tests/unit/test_sparring_match_relation.py tests/integration/test_sparring_match_relation.py tests/integration/test_sparring_match_relation_migration.py
+          venv/bin/black --check apps/tournaments/models.py apps/sparring/services.py apps/sparring/admin.py apps/sparring/views.py apps/tournaments/migrations/0082_sparring_response_one_to_one.py tests/unit/test_sparring_match_relation.py tests/integration/test_sparring_match_relation.py tests/integration/test_sparring_match_relation_migration.py tests/integration/test_telegram_mutation_atomicity.py tests/integration/test_telegram_postgres_concurrency.py
+          venv/bin/ruff check --no-fix apps/tournaments/models.py apps/sparring/services.py apps/sparring/admin.py apps/sparring/views.py apps/tournaments/migrations/0082_sparring_response_one_to_one.py tests/unit/test_sparring_match_relation.py tests/integration/test_sparring_match_relation.py tests/integration/test_sparring_match_relation_migration.py tests/integration/test_telegram_mutation_atomicity.py tests/integration/test_telegram_postgres_concurrency.py
       - name: Full regression suite on UTF-8 PostgreSQL
         run: venv/bin/pytest tests/ --no-cov -q
       - name: Strict typing and formatting of changed modules

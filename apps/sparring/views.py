@@ -621,7 +621,7 @@ def sparring_my_requests(request):
     if sparring_type == "singles":
         requests_qs = (
             SparringRequest.objects.filter(player=player)
-            .prefetch_related("responses__respondent__user", "responses__matches")
+            .prefetch_related("responses__respondent__user", "responses__match")
             .order_by("-created_at")
         )
         context["sparring_requests"] = requests_qs

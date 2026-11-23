@@ -5,6 +5,7 @@ from urllib.parse import parse_qsl, unquote, urljoin, urlsplit
 
 TITLE_LIMIT: Final = 40
 BODY_LIMIT: Final = 120
+INBOX_LIMIT: Final = 255
 URL_LIMIT: Final = 255
 FORBIDDEN_PATHS: Final = ("password-reset", "verify-email", "token", "unsubscribe")
 # Параметры с секретами, токенами и адресами не должны уходить стороннему push-провайдеру.

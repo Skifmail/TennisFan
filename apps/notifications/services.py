@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Max, QuerySet
 from django.utils import timezone
+from django.utils.text import Truncator
 from loguru import logger
 
 from apps.users.models import Notification, User
@@ -15,6 +16,7 @@ from apps.users.models import Notification, User
 from .domain.catalog import EVENTS, INBOX_ONLY_EVENTS
 from .domain.rules import (
     BODY_LIMIT,
+    INBOX_LIMIT,
     TITLE_LIMIT,
     NotificationValidationError,
     validate_content,
@@ -200,6 +202,7 @@ def capture_email_event(
 
     По умолчанию текст нейтральный: содержимое письма автоматически не копируется.
     Производитель события может явно передать сведения заявки через ``message``.
+    Текст ЛК ограничивается длиной поля; полные сведения остаются по ссылке и в письме.
 
     Args:
         event_key: Событие почтового адаптера.
@@ -213,8 +216,9 @@ def capture_email_event(
     note = create_notification(
         event_key=event_key,
         user=user,
-        message=message
-        or f"{definition.title}. Подробности доступны в личном кабинете.",
+        message=Truncator(
+            message or f"{definition.title}. Подробности доступны в личном кабинете."
+        ).chars(INBOX_LIMIT, truncate="…"),
         url=url or "/users/notifications/",
     )
     if center_enabled():

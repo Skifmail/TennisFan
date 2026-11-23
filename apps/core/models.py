@@ -1027,6 +1027,12 @@ class PlatformActivityEvent(models.Model):
             return "Создал парный спарринг"
         return str(self.description or "")
 
+    def get_public_feed_description(self) -> str:
+        """Вернуть публичный текст, скрывая выбранную тренировку в старых и новых записях."""
+        if self.event_type == self.EventType.TRAINING_ENROLLED:
+            return "Записался на тренировку"
+        return self.get_feed_description()
+
     def get_actor_display(self) -> str:
         """Вернуть имя действующего лица для отображения в ленте.
 
@@ -1137,11 +1143,13 @@ class PlatformActivityEvent(models.Model):
         return bool(self.event_type == self.EventType.ADMIN_ANNOUNCEMENT)
 
     def get_public_target_url(self) -> str:
-        """Вернуть публичную ссылку события, скрывая адреса админки.
+        """Вернуть публичную ссылку, скрывая адреса админки и выбранной тренировки.
 
         Returns:
             str: Относительный URL для посетителей сайта либо пустая строка.
         """
+        if self.event_type == self.EventType.TRAINING_ENROLLED:
+            return ""
         url = (self.target_url or "").strip()
         if not url:
             return ""

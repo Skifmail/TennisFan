@@ -122,12 +122,14 @@ class TrainingCatalogTests(TestCase):
 
     def test_styles_use_only_platform_color_tokens(self) -> None:
         """Локальная тема не вводит ни новых цветов, ни внешних шрифтов."""
-        css = (
-            Path(__file__).resolve().parents[2]
-            / "static/css/pages/training_catalog.css"
-        ).read_text(encoding="utf-8")
-        self.assertNotRegex(css, r"#[0-9a-fA-F]{3,8}\b|(?:rgb|hsl|oklch)\(")
-        self.assertNotIn("@import", css)
-        self.assertIn("var(--color-primary)", css)
-        self.assertIn("var(--color-text)", css)
-        self.assertIn("prefers-reduced-motion", css)
+        for filename in ("training_catalog.css", "coach_catalog.css"):
+            with self.subTest(filename=filename):
+                css = (
+                    Path(__file__).resolve().parents[2] / "static/css/pages" / filename
+                ).read_text(encoding="utf-8")
+                self.assertNotRegex(css, r"#[0-9a-fA-F]{3,8}\b|(?:rgb|hsl|oklch)\(")
+                self.assertNotIn("@import", css)
+                self.assertIn("var(--color-primary)", css)
+                if filename == "training_catalog.css":
+                    self.assertIn("var(--color-text)", css)
+                    self.assertIn("prefers-reduced-motion", css)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from mimetypes import guess_type
 from os import environ
 from pathlib import Path
+from re import compile as compile_regex
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
@@ -15,7 +16,10 @@ from playwright.sync_api import Browser, Route, expect, sync_playwright
 from apps.core.geo import GeoRegion
 from apps.core.models import GeoArea
 from apps.courts.models import Court
-from apps.training.models import Training
+from apps.training.catalog_presentation import HIGHEST_CATEGORY_COACH_SLUG
+from apps.training.models import Coach, Training
+from apps.users.models import Player
+from tests.support.factories import make_player
 from tests.support.training_catalog import make_catalog_training
 
 pytestmark = [
@@ -30,7 +34,15 @@ pytestmark = [
 @pytest.fixture
 def catalog_documents(client: Client) -> dict[str, bytes]:
     """Подготовить HTML до запуска Playwright, не вызывая ORM из async-цикла."""
-    make_catalog_training()
+    full_offer = make_catalog_training()
+    player = make_player(email_suffix="catalog-browser-avatar")
+    player.avatar = "avatars/catalog-browser.svg"
+    Player.objects.filter(pk=player.pk).update(avatar=player.avatar.name)
+    assert full_offer.coach is not None
+    full_offer.coach.user = player.user
+    full_offer.coach.slug = HIGHEST_CATEGORY_COACH_SLUG
+    full_offer.coach.name = "Леонид Ермолаев"
+    full_offer.coach.save(update_fields=["user", "slug", "name"])
     Training.objects.create(
         title="Индивидуальная тренировка",
         slug="catalog-simple",
@@ -44,6 +56,11 @@ def catalog_documents(client: Client) -> dict[str, bytes]:
         slug="catalog-long",
         description="ДлинноеОписаниеБезПробелов" * 10,
         city="ОченьДлинныйГородБезПробелов" * 3,
+        coach=Coach.objects.create(
+            name=("ДлинноеИмяБезПробелов" * 6)[:100],
+            slug="catalog-long-name-coach",
+            city="Москва",
+        ),
     )
     area = GeoArea.objects.get(slug="yug")
     for name, slug in (
@@ -76,6 +93,10 @@ def catalog_documents(client: Client) -> dict[str, bytes]:
             response.content[:500],
         )
         documents[key] = response.content
+    client.force_login(player.user)
+    response = client.get("/training/coaches/", secure=True)
+    assert response.status_code == 200
+    documents["/training/coaches/"] = response.content
     return documents
 
 
@@ -100,6 +121,12 @@ def route_catalog(browser: Browser, documents: dict[str, bytes]) -> None:
                 )
             else:
                 route.fulfill(status=404)
+            return
+        if url.path.startswith("/media/"):
+            route.fulfill(
+                body='<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="14" fill="currentColor"/></svg>',
+                content_type="image/svg+xml",
+            )
             return
         key = url.path + ("?" + unquote(url.query) if url.query else "")
         body = documents.get(
@@ -131,6 +158,31 @@ def test_catalog_layout_and_information(
             page.goto("https://testserver/training/")
             page.evaluate("document.fonts.ready")
             expect(page.locator(".training-offer")).to_have_count(3)
+            featured = page.locator(".training-offer--highest-category")
+            expect(featured).to_have_count(1)
+            expect(
+                featured.get_by_text("Тренер высшей категории", exact=True)
+            ).to_be_visible()
+            avatar = featured.locator(".training-offer__avatar")
+            expect(avatar).to_be_visible()
+            avatar.scroll_into_view_if_needed()
+            expect(avatar).to_have_js_property("naturalWidth", 28)
+            assert avatar.evaluate(
+                "el => el.complete && el.naturalWidth > 0 && getComputedStyle(el).borderRadius === '50%'"
+            )
+            avatar_bounds = avatar.bounding_box()
+            assert avatar_bounds is not None
+            assert avatar_bounds["width"] == 28
+            assert featured.evaluate(
+                "el => getComputedStyle(el).boxShadow.includes('inset')"
+            )
+            badge_layout = """el => {
+                    const badge = el.querySelector('.training-offer__category').getBoundingClientRect();
+                    const media = el.querySelector('.training-offer__media').getBoundingClientRect();
+                    const card = el.getBoundingClientRect();
+                    return badge.bottom <= media.top && badge.right < card.right && badge.left > card.left;
+                }"""
+            assert featured.evaluate(badge_layout)
             expect(
                 page.get_by_role("button", name="Показать тренировки")
             ).to_be_visible()
@@ -166,6 +218,50 @@ def test_catalog_layout_and_information(
                     page.locator(".training-catalog").screenshot(
                         path=str(path / f"catalog-{width}.png")
                     )
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize("width", [320, 390, 768, 1440])
+def test_catalog_coach_frame_and_large_text(
+    catalog_documents: dict[str, bytes], width: int
+) -> None:
+    """Рамка тренера постоянная; бейдж и имя выдерживают увеличенный текст."""
+    with sync_playwright() as driver:
+        browser = driver.chromium.launch(
+            executable_path=environ["CHAT_BROWSER_EXECUTABLE"]
+        )
+        page = browser.new_page(viewport={"width": width, "height": 900})
+        route_catalog(browser, catalog_documents)
+        try:
+            page.goto("https://testserver/training/coaches/")
+            coach = page.locator(".coach-list-card").first
+            expect(coach).to_have_class(
+                compile_regex(r"\bcoach-list-card--highest-category\b")
+            )
+            expect(coach.get_by_role("heading", name="Леонид Ермолаев")).to_be_visible()
+            assert coach.evaluate(
+                "el => getComputedStyle(el).boxShadow.includes('inset')"
+            )
+            coach.hover()
+            assert coach.evaluate(
+                "el => getComputedStyle(el).boxShadow.includes('inset')"
+            )
+            coach.focus()
+            assert coach.evaluate("el => getComputedStyle(el).outlineStyle") == "solid"
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            page.goto("https://testserver/training/")
+            page.add_style_tag(content="html { font-size: 200% !important; }")
+            expect(
+                page.get_by_text("Тренер высшей категории", exact=True)
+            ).to_be_visible()
+            # Увеличенный текст проверяем в границах каталога, не переделывая общий футер.
+            assert page.locator(".training-catalog").evaluate(
+                "el => el.scrollWidth <= el.clientWidth + 1"
+            )
+            assert page.locator(".training-offer__coach").evaluate_all(
+                "elements => elements.every(el => el.scrollWidth <= el.clientWidth + 1)"
+            )
         finally:
             browser.close()
 

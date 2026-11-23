@@ -1,4 +1,9 @@
-<article class="training-offer">
+<article class="training-offer{% if training.coach.is_highest_category %} training-offer--highest-category{% endif %}">
+    {% if training.coach.is_highest_category %}
+    <div class="training-offer__category-row">
+        <span class="training-offer__category">Тренер высшей категории</span>
+    </div>
+    {% endif %}
     <div class="training-offer__media">
         {% if training.image %}
         <img src="{{ training.image.url }}" alt="" class="training-offer__image" loading="lazy" decoding="async">
@@ -23,7 +28,18 @@
         </p>
         {% endif %}
         <h3 class="training-offer__title"><a href="{% url 'training_detail' slug=training.slug %}">{{ training.title }}</a></h3>
-        {% if training.coach %}<p class="training-offer__coach">Тренер: <strong>{{ training.coach.name }}</strong></p>{% endif %}
+        {% if training.coach %}
+        <p class="training-offer__coach">
+            {% with avatar=training.coach.catalog_avatar %}
+            {% if avatar %}
+            <img src="{{ avatar.url }}" alt="" class="training-offer__avatar" width="28" height="28" loading="lazy" decoding="async">
+            {% else %}
+            <span class="training-offer__avatar training-offer__avatar--placeholder" aria-hidden="true">{{ training.coach.name|first|upper }}</span>
+            {% endif %}
+            {% endwith %}
+            <span>Тренер: <strong>{{ training.coach.name }}</strong></span>
+        </p>
+        {% endif %}
         <p class="training-offer__description">{{ training.short_description|default:training.description|truncatewords:15 }}</p>
         <dl class="training-offer__facts">
             {% if training.training_types_display %}

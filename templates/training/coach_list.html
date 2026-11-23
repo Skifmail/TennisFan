@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
-{% load skill_tags %}
+{% load skill_tags static %}
 
 {% block title %}Тренеры{% if current_sport == 'padel' %} — падел{% endif %}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/coach_catalog.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header page-header--coaches">
@@ -24,7 +28,7 @@
     <div data-sport-swap="coaches">
         <div class="coach-list-grid">
             {% for coach in coaches %}
-            <a href="{% url 'coach_detail' slug=coach.slug %}" class="card coach-list-card" style="text-align: center;">
+            <a href="{% url 'coach_detail' slug=coach.slug %}" class="card coach-list-card{% if coach.is_highest_category %} coach-list-card--highest-category{% endif %}" style="text-align: center;">
                 <div class="card-body">
                     {% if coach.photo_or_avatar %}
                     <img src="{{ coach.photo_or_avatar.url }}" alt="" class="player-avatar"

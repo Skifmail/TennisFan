@@ -121,9 +121,9 @@ jobs:
         run: |
           export CHAT_BROWSER_EXECUTABLE="$(venv/bin/python -c 'import sys; from playwright.sync_api import sync_playwright; driver = sync_playwright().start(); sys.stdout.write(driver.chromium.executable_path); driver.stop()')"
           venv/bin/pytest tests/ -k training_catalog_browser --no-cov -q
-          venv/bin/mypy --config-file=mypy-chat.ini tests/support/training_catalog.py tests/integration/test_training_catalog.py tests/e2e/test_training_catalog_browser.py
-          venv/bin/black --check tests/support/training_catalog.py tests/integration/test_training_catalog.py tests/e2e/test_training_catalog_browser.py
-          venv/bin/ruff check --no-fix tests/support/training_catalog.py tests/integration/test_training_catalog.py tests/e2e/test_training_catalog_browser.py
+          venv/bin/mypy --config-file=mypy-chat.ini apps/training/catalog_presentation.py tests/support/training_catalog.py tests/integration/test_training_catalog.py tests/integration/test_training_catalog_presentation.py tests/e2e/test_training_catalog_browser.py
+          venv/bin/black --check apps/training/catalog_presentation.py tests/support/training_catalog.py tests/integration/test_training_catalog.py tests/integration/test_training_catalog_presentation.py tests/e2e/test_training_catalog_browser.py
+          venv/bin/ruff check --no-fix apps/training/catalog_presentation.py tests/support/training_catalog.py tests/integration/test_training_catalog.py tests/integration/test_training_catalog_presentation.py tests/e2e/test_training_catalog_browser.py
       - name: OneSignal strict typing and formatting
         run: |
           venv/bin/mypy --config-file=mypy-chat.ini apps/core/web_push.py tests/unit/test_web_push.py tests/integration/test_web_push.py tests/e2e/test_web_push_browser.py
@@ -141,7 +141,7 @@ jobs:
       - name: Chat stylesheet and JavaScript checks
         run: |
           npm ci --ignore-scripts
-          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css static/css/pages/applications.css static/admin/css/chat_room.css static/css/pages/notification-settings.css static/css/pages/training_catalog.css
+          npx stylelint static/css/pages/chat.css static/css/pages/sparring.css static/css/pages/applications.css static/admin/css/chat_room.css static/css/pages/notification-settings.css static/css/pages/training_catalog.css static/css/pages/coach_catalog.css
           node --check static/js/main.js
           node --check static/js/sparring-respond.js
           node --check static/js/chat_shell.js

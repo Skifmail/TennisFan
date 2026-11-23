@@ -30,6 +30,10 @@ from apps.core.metrika import (
 )
 from apps.core.text_search import filter_field_contains_ci
 
+from .catalog_presentation import (
+    prioritize_catalog_coaches,
+    prioritize_catalog_trainings,
+)
 from .coach_services import (
     activate_coach,
     coach_deletion_summary,
@@ -131,7 +135,9 @@ def training_list(request):
     district_slug = district.slug if district is not None else ""
     viewer_city = _training_viewer_city(request)
 
-    trainings = Training.objects.filter(is_active=True).select_related("coach")
+    trainings = Training.objects.filter(is_active=True).select_related(
+        "coach__user__player"
+    )
     sport_values = venue_sport_catalog_values(sport_filter)
     if sport_values is not None:
         trainings = trainings.filter(sport__in=sport_values)
@@ -155,6 +161,10 @@ def training_list(request):
             selected_courts = courts_for_training_city(geo.city, areas)
     else:
         trainings = order_trainings_by_proximity(trainings, viewer_city)
+
+    trainings = prioritize_catalog_trainings(
+        trainings, geo.city if has_geo_filter else viewer_city
+    )
 
     moscow_zones: list[dict[str, str | bool]] = []
     if geo.show_moscow_zones:
@@ -286,7 +296,7 @@ def coach_list(request):
     city = (request.GET.get("city") or "").strip()
     sport_filter = parse_sport_filter(request.GET.get("sport"))
 
-    coaches = _visible_coaches()
+    coaches = _visible_coaches().select_related("user__player")
     sport_values = venue_sport_catalog_values(sport_filter)
     if sport_values is not None:
         coaches = coaches.filter(sport__in=sport_values)
@@ -296,7 +306,7 @@ def coach_list(request):
         )
 
     context = {
-        "coaches": coaches,
+        "coaches": prioritize_catalog_coaches(coaches, city),
         "current_city": city,
         "current_sport": sport_filter,
     }

@@ -6,6 +6,7 @@ import logging
 from typing import Any, cast
 
 from django.db import models
+from django.db.models.fields.files import ImageFieldFile
 
 from apps.content.utils import SLUG_MAX_LENGTH
 from apps.core.contact_utils import (
@@ -103,6 +104,23 @@ class Coach(models.Model):
         if player and player.avatar:
             return player.avatar
         return None
+
+    @property
+    def catalog_avatar(self) -> ImageFieldFile | None:
+        """Аватар игрока для строки тренера; собственное фото — запасной вариант."""
+        player = self.player_profile
+        if player and player.avatar:
+            return cast(ImageFieldFile, player.avatar)
+        if self.photo:
+            return cast(ImageFieldFile, self.photo)
+        return None
+
+    @property
+    def is_highest_category(self) -> bool:
+        """Показывать адресно выбранному тренеру рамку и подпись категории."""
+        from .catalog_presentation import is_highest_category_coach
+
+        return is_highest_category_coach(self.slug)
 
     @property
     def telegram_url(self) -> str | None:

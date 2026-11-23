@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,6 +36,7 @@ from .coach_services import (
     deactivate_coach,
     delete_coach,
 )
+from .enrollment_services import notify_enrollment
 from .forms import (
     CoachApplicationForm,
     CoachProfileForm,
@@ -243,15 +245,7 @@ def training_enroll(request, slug):
             if player is not None:
                 enrollment.player = player
             enrollment.save()
-            try:
-                from apps.core.email_service import send_training_enrollment_email
-
-                send_training_enrollment_email(enrollment)
-            except Exception:
-                logger.exception(
-                    "send_training_enrollment_email failed | enrollment=%s",
-                    enrollment.pk,
-                )
+            transaction.on_commit(lambda: notify_enrollment(enrollment.pk))
             messages.success(request, "Заявка на тренировку отправлена!")
             queue_metrika_goal(
                 request,
@@ -390,7 +384,9 @@ def my_trainings(request):
             .prefetch_related(
                 Prefetch(
                     "enrollments",
-                    queryset=TrainingEnrollment.objects.select_related("player__user"),
+                    queryset=TrainingEnrollment.objects.filter(
+                        assigned_coach=coach, assigned_at__isnull=False
+                    ).select_related("player__user"),
                 )
             )
             .order_by("-created_at")
@@ -402,6 +398,16 @@ def my_trainings(request):
             .order_by("-created_at")
         )
 
+    assigned_enrollments = (
+        TrainingEnrollment.objects.filter(
+            assigned_coach=coach, assigned_at__isnull=False
+        )
+        .exclude(training__coach=coach)
+        .select_related("training", "player__user", "desired_court")
+        if coach
+        else TrainingEnrollment.objects.none()
+    )
+
     return render(
         request,
         "training/my_trainings.html",
@@ -409,6 +415,7 @@ def my_trainings(request):
             "coach": coach,
             "coach_trainings": coach_trainings,
             "my_enrollments": my_enrollments,
+            "assigned_enrollments": assigned_enrollments,
         },
     )
 
@@ -573,13 +580,14 @@ def training_edit(request, pk):
 @login_required
 @require_safe
 def enrollment_detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Показывает владельцу тренировки данные заявки и контакты без перенаправления."""
+    """Показывает назначенному тренеру данные заявки и контакты без перенаправления."""
     enrollment = get_object_or_404(
         TrainingEnrollment.objects.select_related(
             "training", "desired_court", "player__user"
         ),
         pk=pk,
-        training__coach__user_id=request.user.pk,
+        assigned_coach__user_id=request.user.pk,
+        assigned_at__isnull=False,
     )
     phone = normalize_russian_phone(enrollment.whatsapp)
     response = render(
@@ -610,7 +618,7 @@ def enrollment_contact(request, pk, method):
         TrainingEnrollment.objects.select_related("training"),
         pk=pk,
     )
-    if enrollment.training.coach_id != coach.id:
+    if enrollment.assigned_at is None or enrollment.assigned_coach_id != coach.id:
         messages.error(request, "Нет доступа к этой заявке.")
         return redirect("my_trainings")
 

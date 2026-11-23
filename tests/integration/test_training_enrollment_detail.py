@@ -37,6 +37,8 @@ class TrainingEnrollmentDetailTests(TestCase):
         )
         self.enrollment = TrainingEnrollment.objects.create(
             training=self.training,
+            assigned_coach=self.coach,
+            assigned_at=datetime(2026, 11, 23, 8, 15, tzinfo=UTC),
             full_name="Юлия Соколова",
             telegram="Sokolova731",
             whatsapp="8 (999) 123-45-67",
@@ -175,8 +177,10 @@ class TrainingEnrollmentDetailTests(TestCase):
         self.assertNotContains(response, f'href="{public_url}"')
 
     def test_unassigned_training_does_not_expose_contacts(self) -> None:
-        """Бывший тренер не видит контакты, когда тренировка ему больше не принадлежит."""
-        Training.objects.filter(pk=self.training.pk).update(coach=None)
+        """Тренер не видит контакты, когда заявка больше ему не назначена."""
+        TrainingEnrollment.objects.filter(pk=self.enrollment.pk).update(
+            assigned_coach=None
+        )
 
         response = self.client.get(self.detail_url, secure=True)
 

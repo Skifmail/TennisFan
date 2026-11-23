@@ -1,0 +1,5 @@
+{% extends "admin/change_form.html" %}
+{% block content %}
+{{ block.super }}
+{% include "admin/training/trainingenrollment/distribution_form.html" with enrollment=original %}
+{% endblock %}

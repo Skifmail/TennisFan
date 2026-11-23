@@ -3,7 +3,7 @@ Training models for adult tennis training.
 """
 
 import logging
-from typing import cast
+from typing import Any, cast
 
 from django.db import models
 
@@ -457,7 +457,11 @@ class Training(CompressImageFieldsMixin, models.Model):
 
 
 class TrainingEnrollment(models.Model):
-    """Training enrollment model."""
+    """Заявка игрока с исходным тренером и отдельным назначением администратора."""
+
+    requested_coach_id: int | None
+    assigned_coach_id: int | None
+    assigned_by_id: int | None
 
     class Status(models.TextChoices):
         PENDING = "pending", "Ожидает"
@@ -472,6 +476,34 @@ class TrainingEnrollment(models.Model):
         related_name="enrollments",
         verbose_name="Тренировка",
     )
+    requested_coach = models.ForeignKey(
+        Coach,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requested_enrollments",
+        verbose_name="Исходный тренер",
+    )
+    requested_coach_name = models.CharField(
+        "Имя исходного тренера при записи", max_length=100, blank=True
+    )
+    assigned_coach = models.ForeignKey(
+        Coach,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_enrollments",
+        verbose_name="Назначенный тренер",
+    )
+    assigned_by = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="distributed_training_enrollments",
+        verbose_name="Распределил",
+    )
+    assigned_at = models.DateTimeField("Дата распределения", null=True, blank=True)
     player = models.ForeignKey(
         "users.Player",
         on_delete=models.CASCADE,
@@ -510,6 +542,14 @@ class TrainingEnrollment(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_display_name()} на {self.training}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """При создании сохранить тренера, которого выбрал игрок."""
+        if self._state.adding and self.training_id:
+            coach = self.training.coach
+            self.requested_coach = coach
+            self.requested_coach_name = coach.name if coach is not None else ""
+        super().save(*args, **kwargs)
 
     def get_display_name(self) -> str:
         """Имя для карточки заявки.

@@ -814,6 +814,14 @@
     text-underline-offset: 0.2em;
 }
 
+.my-trainings-enrollment__meta {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+}
+
 .my-trainings-enrollment__status {
     display: inline-flex;
     align-items: center;

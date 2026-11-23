@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p><a href="{% url 'admin:training_trainingenrollment_changelist' %}">К записям на тренировки</a></p>
+<div class="module">
+    <h2>{{ enrollment.get_display_name }} — {{ enrollment.training.title }}</h2>
+    <p>Исходный тренер: {{ enrollment.requested_coach_name|default:"Не указан" }}</p>
+    {% if enrollment.assigned_at %}
+    <p>Заявка уже распределена: {{ enrollment.assigned_coach|default:"Тренер удалён" }}.</p>
+    {% else %}
+    <p>Выберите активного тренера. После нажатия заявка и уведомления будут переданы ему.</p>
+    <ul>
+        {% for coach in coaches %}
+        <li>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="other">
+                <input type="hidden" name="coach_id" value="{{ coach.pk }}">
+                <button type="submit">Отдать {{ coach.name }}</button> — {{ coach.city }}
+                {% if not coach.user_id %}<span>(нет аккаунта: заявка будет назначена, уведомления в ЛК, email и push недоступны)</span>{% endif %}
+            </form>
+        </li>
+        {% empty %}<li>Других активных тренеров нет.</li>{% endfor %}
+    </ul>
+    {% endif %}
+</div>
+{% endblock %}

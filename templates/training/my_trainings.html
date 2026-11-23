@@ -115,6 +115,27 @@
         <p class="my-trainings__hint">У вас пока нет тренировок. <a href="{% url 'training_add' %}">Добавить</a>.</p>
         {% endfor %}
     </section>
+    <section class="my-trainings__section" aria-labelledby="assigned-enrollments-title">
+        <h2 id="assigned-enrollments-title" class="section-title my-trainings__section-title">Назначенные мне заявки на тренировки</h2>
+        {% for e in assigned_enrollments %}
+        <article class="card my-trainings-offer">
+            <div class="card-body my-trainings-offer__body">
+                <div class="my-trainings-enrollment">
+                    <div class="my-trainings-enrollment__info">
+                        <a href="{% url 'enrollment_detail' pk=e.pk %}" class="my-trainings-enrollment__name">{{ e.get_display_name }}</a>
+                        <span class="my-trainings-enrollment__status my-trainings-enrollment__status--{{ e.status }}">{{ e.get_status_display }}</span>
+                        <p class="my-trainings-enrollment__meta">{{ e.training.title }} · {{ e.training.city }} · Исходный тренер: {{ e.requested_coach_name|default:"Не указан" }}</p>
+                    </div>
+                    <div class="my-trainings-enrollment__contacts">
+                        <a href="{% url 'enrollment_detail' pk=e.pk %}" class="btn btn-primary my-trainings__btn">Открыть заявку</a>
+                    </div>
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <p class="my-trainings__hint">Назначенных заявок на тренировки других тренеров пока нет.</p>
+        {% endfor %}
+    </section>
     {% endif %}
 
     <section class="my-trainings__section" aria-labelledby="my-trainings-requests-title">

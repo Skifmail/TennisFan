@@ -28,6 +28,11 @@ urlpatterns = [
     ),
     path("my/<int:pk>/edit/", views.training_edit, name="training_edit"),
     path(
+        "my/enrollments/<int:pk>/",
+        views.enrollment_detail,
+        name="enrollment_detail",
+    ),
+    path(
         "my/enrollments/<int:pk>/contact/<str:method>/",
         views.enrollment_contact,
         name="enrollment_contact",

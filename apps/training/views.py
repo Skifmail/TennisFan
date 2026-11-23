@@ -11,9 +11,15 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import (
+    require_http_methods,
+    require_POST,
+    require_safe,
+)
 
 from apps.content.utils import generate_unique_slug
+from apps.core.contact_utils import normalize_russian_phone
 from apps.core.decorators import login_required_with_message
 from apps.core.geo import GeoRegion
 from apps.core.metrika import (
@@ -561,6 +567,35 @@ def training_edit(request, pk):
         "training/training_form.html",
         {"form": form, "training": training},
     )
+
+
+@never_cache
+@login_required
+@require_safe
+def enrollment_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """Показывает владельцу тренировки данные заявки и контакты без перенаправления."""
+    enrollment = get_object_or_404(
+        TrainingEnrollment.objects.select_related(
+            "training", "desired_court", "player__user"
+        ),
+        pk=pk,
+        training__coach__user_id=request.user.pk,
+    )
+    phone = normalize_russian_phone(enrollment.whatsapp)
+    response = render(
+        request,
+        "training/enrollment_detail.html",
+        {
+            "enrollment": enrollment,
+            "telegram": enrollment.telegram.strip(),
+            "whatsapp": enrollment.whatsapp.strip(),
+            "email": enrollment.email.strip(),
+            "phone_url": f"tel:{phone}" if phone else None,
+        },
+    )
+    response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    response["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @login_required

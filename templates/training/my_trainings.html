@@ -81,10 +81,11 @@
                     {% for e in t.enrollments.all %}
                     <div class="my-trainings-enrollment">
                         <div class="my-trainings-enrollment__info">
-                            <strong class="my-trainings-enrollment__name">{{ e.get_display_name }}</strong>
+                            <a href="{% url 'enrollment_detail' pk=e.pk %}" class="my-trainings-enrollment__name">{{ e.get_display_name }}</a>
                             <span class="my-trainings-enrollment__status my-trainings-enrollment__status--{{ e.status }}">{{ e.get_status_display }}</span>
                         </div>
                         <div class="my-trainings-enrollment__contacts">
+                            <a href="{% url 'enrollment_detail' pk=e.pk %}" class="btn btn-primary my-trainings__btn">Открыть заявку</a>
                             {% if e.telegram_url %}
                             <a href="{% url 'enrollment_contact' pk=e.pk method='telegram' %}" class="btn btn-outline my-trainings__btn messenger-btn" target="_blank" rel="noopener">
                                 <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="16" height="16">

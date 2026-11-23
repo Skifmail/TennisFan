@@ -4,7 +4,7 @@
     }
 
     function initCityFilter() {
-        var form = document.querySelector(".training-browse__filters");
+        var form = document.querySelector("[data-training-filters]");
         if (!form) {
             return;
         }
@@ -14,21 +14,29 @@
             return;
         }
 
-        function apply() {
+        form.addEventListener("submit", function () {
             if (area && !isMoscow(city.value)) {
                 area.value = "";
             }
-            form.submit();
-        }
-
-        city.addEventListener("change", apply);
-        city.addEventListener("keydown", function (event) {
-            if (event.key !== "Enter") {
-                return;
-            }
-            event.preventDefault();
-            window.setTimeout(apply, 0);
         });
+
+        var areaLinks = document.querySelectorAll("[data-training-area]");
+        function updateAreaLinks() {
+            areaLinks.forEach(function (link) {
+                var url = new URL(link.href, window.location.href);
+                ["sport", "type", "level"].forEach(function (name) {
+                    var field = form.elements.namedItem(name);
+                    if (field.value) {
+                        url.searchParams.set(name, field.value);
+                    } else {
+                        url.searchParams.delete(name);
+                    }
+                });
+                link.href = url.href;
+            });
+        }
+        form.addEventListener("change", updateAreaLinks);
+        updateAreaLinks();
     }
 
     function initCourtSearch() {

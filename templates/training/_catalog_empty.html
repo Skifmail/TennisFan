@@ -1,0 +1,8 @@
+<div class="training-catalog__empty">
+    <h3>{% if current_level or current_type or current_city or current_area or current_sport != 'tennis' %}По этим условиям ничего не найдено{% else %}Тренировки пока не добавлены.{% endif %}</h3>
+    <p>Попробуйте другой город, формат или уровень — либо посмотрите профили тренеров.</p>
+    <div class="training-catalog__empty-actions">
+        <a href="{% url 'training_list' %}" class="training-catalog__button">Все тренировки</a>
+        <a href="{% url 'coach_list' %}" class="training-catalog__text-link">Наши тренеры</a>
+    </div>
+</div>

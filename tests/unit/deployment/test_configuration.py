@@ -1,11 +1,13 @@
 """Контракт безопасной сборки и порядка запуска Dokploy."""
 
+import re
 from pathlib import Path
 from typing import Any, Final
 
 import yaml
 
 ROOT: Final = Path(__file__).resolve().parents[3]
+SOCIAL_PROVIDERS: Final = ("yandex", "vk")
 
 
 def _compose() -> dict[str, Any]:
@@ -94,3 +96,20 @@ def test_compose_when_starting_http_should_not_run_as_root_or_gain_privileges() 
         assert service["user"] == "10001:10001"
         assert service["cap_drop"] == ["ALL"]
         assert service["security_opt"] == ["no-new-privileges:true"]
+
+
+def test_compose_when_social_login_enabled_should_pass_provider_environment() -> None:
+    """Переменные соцвхода из Dokploy доходят до контейнера, иначе кнопки скрыты."""
+    app_env = dict(_compose()["x-app-env"])
+    settings_source = (ROOT / "config/settings.py").read_text()
+    suffixes = set(
+        re.findall(r'f"SOCIAL_\{key\.upper\(\)\}_([A-Z_]+)"', settings_source)
+    )
+    assert suffixes == {"ENABLED", "CLIENT_ID", "CLIENT_SECRET", "REDIRECT_URI"}
+    for provider in SOCIAL_PROVIDERS:
+        for suffix in suffixes:
+            name = f"SOCIAL_{provider.upper()}_{suffix}"
+            assert name in app_env, f"{name} отсутствует в x-app-env"
+            assert str(app_env[name]).startswith(
+                "${" + name
+            ), f"{name} должен читаться из окружения Dokploy"

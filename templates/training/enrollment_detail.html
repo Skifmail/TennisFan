@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Заявка на тренировку №{{ enrollment.pk }}{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex, nofollow, noarchive">{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Заявка №{{ enrollment.pk }}</h1>
+    <p class="page-subtitle">{{ enrollment.training.title }}</p>
+</div>
+
+<div class="container my-trainings enrollment-detail ym-hide-content">
+    <div class="enrollment-detail__navigation">
+        <a href="{% url 'my_trainings' %}" class="btn btn-outline my-trainings__btn">К моим тренировкам</a>
+        <span class="my-trainings-enrollment__status my-trainings-enrollment__status--{{ enrollment.status }}">{{ enrollment.get_status_display }}</span>
+    </div>
+
+    <div class="enrollment-detail__grid">
+        <section class="card" aria-labelledby="enrollment-contacts-title">
+            <div class="card-body">
+                <h2 id="enrollment-contacts-title" class="enrollment-detail__title">Как связаться</h2>
+                <p class="enrollment-detail__client">{{ enrollment.get_display_name }}</p>
+                {% if telegram or whatsapp or email %}
+                <p class="enrollment-detail__hint">Если ссылка не открывается, скопируйте контакт и найдите клиента в приложении вручную. Контакт также можно выделить и скопировать.</p>
+                <dl class="enrollment-detail__contacts">
+                    {% if telegram %}
+                    <div class="enrollment-detail__contact">
+                        <dt>Telegram</dt>
+                        <dd>
+                            <span id="enrollment-telegram" class="enrollment-detail__contact-value">{{ telegram }}</span>
+                            <div class="enrollment-detail__contact-actions">
+                                <button type="button" class="btn btn-outline my-trainings__btn" data-copy-contact="enrollment-telegram" aria-label="Скопировать Telegram" hidden>Скопировать</button>
+                                {% if enrollment.telegram_url %}
+                                <a href="{{ enrollment.telegram_url }}" class="btn btn-outline my-trainings__btn messenger-btn" target="_blank" rel="noopener noreferrer">
+                                    <img src="{% static 'images/Telegram_logo.svg' %}" alt="" class="messenger-btn__icon" width="16" height="16">
+                                    Открыть Telegram
+                                </a>
+                                {% endif %}
+                            </div>
+                        </dd>
+                    </div>
+                    {% endif %}
+                    {% if whatsapp %}
+                    <div class="enrollment-detail__contact">
+                        <dt>WhatsApp / телефон</dt>
+                        <dd>
+                            <span id="enrollment-phone" class="enrollment-detail__contact-value">{{ whatsapp }}</span>
+                            <div class="enrollment-detail__contact-actions">
+                                <button type="button" class="btn btn-outline my-trainings__btn" data-copy-contact="enrollment-phone" aria-label="Скопировать телефон" hidden>Скопировать</button>
+                                {% if phone_url %}
+                                <a href="{{ phone_url }}" class="btn btn-outline my-trainings__btn" data-no-page-spinner>Позвонить</a>
+                                {% endif %}
+                                {% if enrollment.whatsapp_url %}
+                                <a href="{{ enrollment.whatsapp_url }}" class="btn btn-outline my-trainings__btn messenger-btn" target="_blank" rel="noopener noreferrer">
+                                    <img src="{% static 'images/WhatsApp.svg' %}" alt="" class="messenger-btn__icon" width="16" height="16">
+                                    Открыть WhatsApp
+                                </a>
+                                {% endif %}
+                            </div>
+                        </dd>
+                    </div>
+                    {% endif %}
+                    {% if email %}
+                    <div class="enrollment-detail__contact">
+                        <dt>Email</dt>
+                        <dd>
+                            <span id="enrollment-email" class="enrollment-detail__contact-value">{{ email }}</span>
+                            <div class="enrollment-detail__contact-actions">
+                                <button type="button" class="btn btn-outline my-trainings__btn" data-copy-contact="enrollment-email" aria-label="Скопировать email" hidden>Скопировать</button>
+                                <a href="mailto:{{ email }}" class="btn btn-outline my-trainings__btn" data-no-page-spinner>Написать письмо</a>
+                            </div>
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+                <p class="enrollment-detail__copy-status" data-copy-status role="status" aria-live="polite" aria-atomic="true"></p>
+                {% else %}
+                <p class="enrollment-detail__hint">Клиент не указал контакты для связи.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="card" aria-labelledby="enrollment-data-title">
+            <div class="card-body">
+                <h2 id="enrollment-data-title" class="enrollment-detail__title">Данные заявки</h2>
+                <dl class="enrollment-detail__data">
+                    <div>
+                        <dt>Имя клиента</dt>
+                        <dd>{{ enrollment.get_display_name }}</dd>
+                    </div>
+                    <div>
+                        <dt>Тренировка</dt>
+                        <dd>{% if enrollment.training.is_active %}<a href="{% url 'training_detail' slug=enrollment.training.slug %}">{{ enrollment.training.title }}</a>{% else %}{{ enrollment.training.title }}{% endif %}</dd>
+                    </div>
+                    <div>
+                        <dt>Населённый пункт</dt>
+                        <dd>{{ enrollment.training.city|default:"Не указан" }}</dd>
+                    </div>
+                    <div>
+                        <dt>Желаемый корт</dt>
+                        <dd>{% if enrollment.desired_court %}{{ enrollment.desired_court.name }}<br>{{ enrollment.desired_court.city }}{% if enrollment.desired_court.address %}<br>{{ enrollment.desired_court.address }}{% endif %}{% else %}Не указан{% endif %}</dd>
+                    </div>
+                    <div>
+                        <dt>Предпочтительное время</dt>
+                        <dd>{% if enrollment.preferred_datetime %}<time datetime="{{ enrollment.preferred_datetime|date:'c' }}">{{ enrollment.preferred_datetime|date:"d.m.Y H:i" }}</time>{% else %}Не указано — согласуйте с клиентом{% endif %}</dd>
+                    </div>
+                    <div>
+                        <dt>Пожелания</dt>
+                        <dd>{{ enrollment.message|default:"Не указаны"|linebreaksbr }}</dd>
+                    </div>
+                    <div>
+                        <dt>Дата заявки</dt>
+                        <dd><time datetime="{{ enrollment.created_at|date:'c' }}">{{ enrollment.created_at|date:"d.m.Y H:i" }}</time></dd>
+                    </div>
+                    <div>
+                        <dt>Последнее обновление</dt>
+                        <dd><time datetime="{{ enrollment.updated_at|date:'c' }}">{{ enrollment.updated_at|date:"d.m.Y H:i" }}</time></dd>
+                    </div>
+                </dl>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}<script defer src="{% static 'js/training_enrollment_detail.js' %}"></script>{% endblock %}

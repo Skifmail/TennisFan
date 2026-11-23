@@ -854,7 +854,7 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
         )
         return False
     coach = training.coach
-    if coach is None or not coach.user_id:
+    if coach is None or coach.user is None:
         logger.warning(
             "send_training_enrollment_email: coach has no user | enrollment=%s coach=%s",
             enrollment.pk,
@@ -884,6 +884,11 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
         desired_court = " — ".join(part for part in (city, name) if part)
 
     coach_name = (coach.name or "").strip() or user.get_display_name() or recipient
+    enrollment_path = (
+        reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
+        if enrollment.pk
+        else reverse("my_trainings")
+    )
     return _send_html_email(
         subject=f"TennisFan: заявка на тренировку «{training.title}»",
         template_name="emails/training_enrollment.html",
@@ -898,7 +903,7 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
             "desired_court": desired_court,
             "message": (enrollment.message or "").strip(),
             "created_at": created_at,
-            "my_trainings_url": f"{base_url}{reverse('my_trainings')}",
+            "enrollment_url": f"{base_url}{enrollment_path}",
             "training_url": (
                 f"{base_url}{reverse('training_detail', kwargs={'slug': training.slug})}"
             ),
@@ -906,7 +911,7 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
         recipient=recipient,
         category="other",
         event_key="training.enrollment",
-        notification_url=reverse("my_trainings"),
+        notification_url=enrollment_path,
     )
 
 

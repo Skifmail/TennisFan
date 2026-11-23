@@ -3,8 +3,9 @@
  *
  * Описание: Макет страницы тренировки с двухколоночной структурой и sticky-сайдбаром.
  * Компоненты: .training-detail-grid, .training-detail-sidebar-card,
- *             .my-trainings, .my-trainings-offer, .my-trainings-enrollment
- * Используется на: страница тренировки, «Мои тренировки»
+ *             .my-trainings, .my-trainings-offer, .my-trainings-enrollment,
+ *             .enrollment-detail
+ * Используется на: страница тренировки, «Мои тренировки», подробности заявки
  *
  * Последнее обновление: 2026-10
  */
@@ -809,6 +810,8 @@
     font-weight: 600;
     line-height: 1.35;
     overflow-wrap: anywhere;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
 }
 
 .my-trainings-enrollment__status {
@@ -937,5 +940,136 @@
 @media (prefers-reduced-motion: reduce) {
     .my-trainings .card:hover {
         transform: none;
+    }
+}
+
+/* Подробности заявки: контакты видны без JavaScript и внешней навигации. */
+.container.enrollment-detail {
+    max-width: 1100px;
+}
+
+.enrollment-detail__navigation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.enrollment-detail__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+    gap: var(--spacing-lg);
+}
+
+.enrollment-detail__grid .card,
+.enrollment-detail__grid .card-body {
+    min-width: 0;
+}
+
+.enrollment-detail__title {
+    margin: 0 0 var(--spacing-md);
+    color: var(--color-text);
+    font-family: var(--font-heading);
+    font-size: var(--font-size-lg);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.enrollment-detail__client {
+    margin: 0 0 var(--spacing-sm);
+    color: var(--color-text);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.enrollment-detail__hint {
+    margin: 0 0 var(--spacing-lg);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+}
+
+.enrollment-detail__contacts,
+.enrollment-detail__data {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-lg);
+    margin: 0;
+}
+
+.enrollment-detail__contacts dt,
+.enrollment-detail__data dt {
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.enrollment-detail__contacts dd,
+.enrollment-detail__data dd {
+    margin: 0;
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.enrollment-detail__contact + .enrollment-detail__contact {
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-primary-transparent);
+}
+
+.enrollment-detail__contact-value {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.enrollment-detail__contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.enrollment-detail__contact-actions .my-trainings__btn {
+    flex: 1 1 8rem;
+    height: auto;
+    min-height: 44px;
+    min-width: 0;
+    padding-block: var(--spacing-sm);
+    line-height: 1.4;
+    text-align: center;
+    white-space: normal;
+    touch-action: manipulation;
+}
+
+.enrollment-detail__contact-actions [data-copy-contact][hidden] {
+    display: none;
+}
+
+.enrollment-detail__copy-status {
+    min-height: 1.6em;
+    margin: var(--spacing-md) 0 0;
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+}
+
+.my-trainings-enrollment__name:focus-visible,
+.enrollment-detail a:focus-visible,
+.enrollment-detail button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+@media (width <= 900px) {
+    .enrollment-detail__grid {
+        grid-template-columns: minmax(0, 1fr);
     }
 }

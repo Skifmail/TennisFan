@@ -39,6 +39,14 @@ def _make_training(
     )
 
 
+def _email_html(message: mail.EmailMessage) -> str:
+    """Возвращает HTML отправленного письма, проверяя тип MIME-содержимого."""
+    assert isinstance(message, mail.EmailMultiAlternatives)
+    html = message.alternatives[0][0]
+    assert isinstance(html, str)
+    return html
+
+
 @override_settings(
     EMAIL_BACKEND="apps.core.mail.LoggingEmailBackend",
     EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
@@ -84,11 +92,15 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
         message = mail.outbox[0]
         self.assertEqual(message.to, ["coach-mail@test.local"])
         self.assertIn("Утренняя группа", message.subject)
-        html = message.alternatives[0][0]
+        html = _email_html(message)
         self.assertIn("Анна Игрок", html)
         self.assertIn("@anna_player", html)
         self.assertIn("Корт Юг", html)
         self.assertIn("Хочу в группу по вторникам", html)
+        enrollment = TrainingEnrollment.objects.get()
+        detail_url = reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
+        self.assertIn(detail_url, html)
+        self.assertIn("Открыть заявку", html)
         outbound = OutboundEmail.objects.get()
         self.assertEqual(outbound.category, OutboundEmail.Category.OTHER)
         self.assertEqual(outbound.to_email, "coach-mail@test.local")
@@ -109,13 +121,13 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
-        html = mail.outbox[0].alternatives[0][0]
+        html = _email_html(mail.outbox[0])
         self.assertIn("Пётр Игрок", html)
         self.assertIn("+79990001122", html)
 
     @override_settings(NOTIFICATION_CENTER_ENABLED=True)
-    def test_enroll_notification_links_to_coach_trainings(self) -> None:
-        """Уведомление в ЛК ведёт к заявкам тренера, а не на саму ленту."""
+    def test_enroll_notification_links_to_enrollment_details(self) -> None:
+        """Уведомление в ЛК ведёт сразу к подробностям новой заявки."""
         url = reverse("training_enroll", kwargs={"slug": self.training.slug})
         response = self.client.post(
             url,
@@ -133,7 +145,10 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
             user=self.coach_user,
             event_key="training.enrollment",
         )
-        self.assertEqual(note.url, reverse("my_trainings"))
+        enrollment = TrainingEnrollment.objects.get()
+        self.assertEqual(
+            note.url, reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
+        )
 
     def test_enroll_sends_email_when_contact_is_email(self) -> None:
         """Email из заявки попадает в письмо тренеру."""
@@ -151,7 +166,7 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(mail.outbox), 1)
-        html = mail.outbox[0].alternatives[0][0]
+        html = _email_html(mail.outbox[0])
         self.assertIn("Мария Игрок", html)
         self.assertIn("maria@test.local", html)
 

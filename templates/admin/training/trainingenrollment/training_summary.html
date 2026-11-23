@@ -1,0 +1,5 @@
+<div class="enrollment-stack">
+    <span>{{ enrollment.training.title }}</span>
+    {% if enrollment.desired_court_id %}<small class="enrollment-muted">Корт: {{ enrollment.desired_court.name }}</small>{% endif %}
+    {% if enrollment.training.city %}<small class="enrollment-muted">{{ enrollment.training.city }}</small>{% endif %}
+</div>

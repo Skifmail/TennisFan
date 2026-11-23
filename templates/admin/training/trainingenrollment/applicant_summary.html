@@ -1,0 +1,7 @@
+<div class="enrollment-stack">
+    <a class="enrollment-name" href="{% url 'admin:training_trainingenrollment_change' enrollment.pk %}">{{ enrollment.get_display_name }}</a>
+    {% if enrollment.email %}<span>{{ enrollment.email }}</span>{% elif enrollment.player_id %}<span>{{ enrollment.player.user.email }}</span>{% endif %}
+    {% if enrollment.telegram %}<span class="enrollment-muted">Telegram: {{ enrollment.telegram }}</span>{% endif %}
+    {% if enrollment.whatsapp %}<span class="enrollment-muted">WhatsApp: {{ enrollment.whatsapp }}</span>{% endif %}
+    <small class="enrollment-muted">№{{ enrollment.pk }} · {{ enrollment.created_at|date:"d.m.Y H:i" }} · {% if enrollment.player_id %}Игрок{% else %}Гость{% endif %}</small>
+</div>

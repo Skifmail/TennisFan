@@ -1,0 +1,328 @@
+/* Только список заявок и действия распределения; стандартные формы Django сохранены. */
+.model-trainingenrollment #changelist .changelist-form-container {
+    flex-direction: column;
+}
+
+.model-trainingenrollment #changelist .changelist-form-container > div,
+.model-trainingenrollment #changelist .changelist-form-container:has(#changelist-filter) > div {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.model-trainingenrollment .enrollment-filters {
+    width: 100%;
+    margin-bottom: 12px;
+    background: var(--darkened-bg);
+    border: 1px solid var(--hairline-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.model-trainingenrollment .enrollment-filters > summary {
+    padding: 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.model-trainingenrollment #changelist-filter {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    width: 100%;
+    margin: 0;
+    padding: 8px 0;
+    box-sizing: border-box;
+}
+
+.model-trainingenrollment #changelist-filter h2 {
+    display: none;
+}
+
+.model-trainingenrollment #changelist-filter-extra-actions {
+    grid-column: 1 / -1;
+}
+
+.model-trainingenrollment #changelist #result_list {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.model-trainingenrollment #result_list .action-checkbox-column {
+    width: 32px;
+}
+
+.model-trainingenrollment #result_list .column-applicant_summary { width: 25%; }
+.model-trainingenrollment #result_list .column-training_summary { width: 21%; }
+.model-trainingenrollment #result_list .column-coach_summary { width: 22%; }
+.model-trainingenrollment #result_list .column-status { width: 13%; }
+.model-trainingenrollment #result_list .column-distribution_actions { width: 19%; }
+
+.model-trainingenrollment #result_list td,
+.model-trainingenrollment #result_list th {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    vertical-align: top;
+    box-sizing: border-box;
+}
+
+.model-trainingenrollment #result_list tbody td {
+    padding: 12px 10px;
+}
+
+.model-trainingenrollment #result_list thead th .text a,
+.model-trainingenrollment #result_list thead th .text span {
+    white-space: normal;
+}
+
+.model-trainingenrollment .enrollment-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    min-width: 0;
+    line-height: 1.4;
+}
+
+.model-trainingenrollment .enrollment-name { font-weight: 600; }
+.model-trainingenrollment .enrollment-muted { color: var(--body-quiet-color); }
+.model-trainingenrollment small.enrollment-muted { font-size: 0.75rem; }
+
+.model-trainingenrollment .enrollment-badge {
+    display: inline-block;
+    padding: 3px 7px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--body-quiet-color);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.model-trainingenrollment .enrollment-badge--pending {
+    color: var(--body-fg);
+    border-color: var(--body-quiet-color);
+    font-weight: 600;
+}
+
+.model-trainingenrollment .enrollment-actions,
+.enrollment-selection .enrollment-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 280px;
+}
+
+.model-trainingenrollment .enrollment-action,
+.enrollment-selection .enrollment-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 36px;
+    width: 100%;
+    margin: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--body-bg);
+    color: var(--link-fg);
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    text-align: center;
+    text-decoration: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.model-trainingenrollment .enrollment-action--primary,
+.enrollment-selection .enrollment-action--primary {
+    background: var(--button-bg);
+    color: var(--button-fg);
+    border-color: var(--button-bg);
+}
+
+@media (hover: hover) {
+    .model-trainingenrollment .enrollment-action:hover,
+    .enrollment-selection .enrollment-action:hover {
+        border-color: var(--link-hover-color);
+        background: var(--darkened-bg);
+        color: var(--link-hover-color);
+    }
+
+    .model-trainingenrollment .enrollment-action--primary:hover,
+    .enrollment-selection .enrollment-action--primary:hover {
+        background: var(--button-hover-bg);
+        color: var(--button-fg);
+    }
+}
+
+.model-trainingenrollment .enrollment-action:focus-visible,
+.enrollment-selection .enrollment-action:focus-visible,
+.model-trainingenrollment .enrollment-filters > summary:focus-visible {
+    outline: 2px solid var(--link-fg);
+    outline-offset: 3px;
+}
+
+.model-trainingenrollment .enrollment-action:active,
+.enrollment-selection .enrollment-action:active {
+    background: var(--selected-bg);
+    color: var(--body-fg);
+}
+
+.model-trainingenrollment .enrollment-action:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--darkened-bg);
+    color: var(--body-quiet-color);
+    border-color: var(--border-color);
+}
+
+.model-trainingenrollment #result_list select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.model-trainingenrollment #changelist a.enrollment-action:link,
+.model-trainingenrollment #changelist a.enrollment-action:visited,
+.model-trainingenrollment .readonly a.enrollment-action {
+    text-decoration: none;
+}
+
+.enrollment-selection {
+    max-width: 960px;
+    overflow-wrap: anywhere;
+}
+
+.enrollment-selection > p {
+    padding: 0 12px;
+}
+
+.enrollment-selection .enrollment-coaches {
+    padding: 0;
+    margin: 12px 0;
+    list-style: none;
+}
+
+.enrollment-selection .enrollment-coach {
+    margin: 0;
+    padding: 12px;
+    border-bottom: 1px solid var(--hairline-color);
+}
+
+.enrollment-selection .enrollment-coach form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 280px);
+    gap: 12px;
+    align-items: center;
+}
+
+.enrollment-selection .enrollment-coach-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.enrollment-selection .enrollment-coach-info small {
+    color: var(--body-quiet-color);
+}
+
+@media (max-width: 768px) {
+    .enrollment-selection .enrollment-coach form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .model-trainingenrollment #changelist-form .results {
+        overflow: visible;
+    }
+
+    .model-trainingenrollment #result_list,
+    .model-trainingenrollment #result_list tbody {
+        display: block;
+    }
+
+    .model-trainingenrollment #result_list thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .model-trainingenrollment #result_list tbody tr {
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr);
+        margin: 12px 0;
+        padding: 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 7px;
+        background: var(--body-bg);
+    }
+
+    .model-trainingenrollment #result_list tbody td {
+        display: block;
+        grid-column: 1 / -1;
+        width: auto;
+        padding: 10px 0;
+        border: 0;
+    }
+
+    .model-trainingenrollment #result_list tbody td.action-checkbox {
+        grid-column: 1;
+        grid-row: 1;
+        padding: 0;
+    }
+
+    .model-trainingenrollment #result_list tbody td.field-applicant_summary {
+        grid-column: 2;
+        grid-row: 1;
+        padding-top: 0;
+    }
+
+    .model-trainingenrollment #result_list tbody td.field-training_summary,
+    .model-trainingenrollment #result_list tbody td.field-coach_summary,
+    .model-trainingenrollment #result_list tbody td.field-status {
+        border-top: 1px solid var(--hairline-color);
+    }
+
+    .model-trainingenrollment #result_list .field-training_summary::before,
+    .model-trainingenrollment #result_list .field-status::before {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--body-quiet-color);
+        font-size: 0.75rem;
+    }
+
+    .model-trainingenrollment #result_list .field-training_summary::before { content: "Тренировка"; }
+    .model-trainingenrollment #result_list .field-status::before { content: "Статус заявки"; }
+
+    .model-trainingenrollment .enrollment-actions {
+        max-width: none;
+    }
+
+    .model-trainingenrollment .enrollment-action,
+    .enrollment-selection .enrollment-action,
+    .model-trainingenrollment #result_list select {
+        min-height: 44px;
+        font-size: 1rem;
+    }
+
+    .model-trainingenrollment #changelist .changelist-footer {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .model-trainingenrollment #changelist .changelist-footer .paginator ul {
+        white-space: normal;
+        flex-wrap: wrap;
+    }
+
+    .model-trainingenrollment #toolbar #searchbar {
+        font-size: 1rem;
+    }
+}

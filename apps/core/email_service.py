@@ -829,7 +829,7 @@ def send_coach_application_decision_email(
 
 
 def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
-    """Отправить тренеру письмо о новой заявке на тренировку.
+    """Уведомить администраторов до распределения, затем только назначенного тренера.
 
     Args:
         enrollment (TrainingEnrollment): Созданная заявка игрока.
@@ -837,39 +837,26 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
     Returns:
         bool: ``True``, если письмо отправлено.
     """
+    from apps.notifications.services import capture_email_event
+    from apps.training.enrollment_services import enrollment_admins
     from apps.training.models import TrainingEnrollment as Enrollment
 
     if enrollment.pk:
         enrollment = Enrollment.objects.select_related(
-            "training__coach__user",
+            "training",
+            "assigned_coach__user",
+            "player__user",
             "desired_court",
         ).get(pk=enrollment.pk)
 
     training = enrollment.training
-    if not training.coach_id:
-        logger.warning(
-            "send_training_enrollment_email: no coach | enrollment=%s training=%s",
-            enrollment.pk,
-            training.pk,
-        )
-        return False
-    coach = training.coach
-    if coach is None or coach.user is None:
-        logger.warning(
-            "send_training_enrollment_email: coach has no user | enrollment=%s coach=%s",
-            enrollment.pk,
-            getattr(coach, "pk", None),
-        )
-        return False
-    user = coach.user
-    recipient = _resolve_user_email(user)
-    if not recipient:
-        logger.warning(
-            "send_training_enrollment_email: coach has no valid email | enrollment=%s user=%s",
-            enrollment.pk,
-            user.pk,
-        )
-        return False
+    awaiting_distribution = enrollment.assigned_at is None
+    coach = enrollment.assigned_coach
+    users = (
+        enrollment_admins()
+        if awaiting_distribution
+        else ([coach.user] if coach is not None and coach.user is not None else [])
+    )
 
     base_url = _get_site_base_url()
     created_at = enrollment.created_at
@@ -883,36 +870,72 @@ def send_training_enrollment_email(enrollment: TrainingEnrollment) -> bool:
         name = (court.name or "").strip()
         desired_court = " — ".join(part for part in (city, name) if part)
 
-    coach_name = (coach.name or "").strip() or user.get_display_name() or recipient
     enrollment_path = (
-        reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
-        if enrollment.pk
-        else reverse("my_trainings")
+        reverse("admin:training_trainingenrollment_change", args=[enrollment.pk])
+        if awaiting_distribution
+        else reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
     )
-    return _send_html_email(
-        subject=f"TennisFan: заявка на тренировку «{training.title}»",
-        template_name="emails/training_enrollment.html",
-        context={
-            "coach_name": coach_name,
-            "training": training,
-            "enrollment": enrollment,
-            "full_name": (enrollment.full_name or "").strip() or "—",
-            "telegram": (enrollment.telegram or "").strip(),
-            "whatsapp": (enrollment.whatsapp or "").strip(),
-            "email": (enrollment.email or "").strip(),
-            "desired_court": desired_court,
-            "message": (enrollment.message or "").strip(),
-            "created_at": created_at,
-            "enrollment_url": f"{base_url}{enrollment_path}",
-            "training_url": (
-                f"{base_url}{reverse('training_detail', kwargs={'slug': training.slug})}"
-            ),
-        },
-        recipient=recipient,
-        category="other",
-        event_key="training.enrollment",
-        notification_url=enrollment_path,
-    )
+    details = [
+        f"{enrollment.get_display_name()} оставил(а) заявку на тренировку «{training.title}».",
+        f"Исходный тренер: {enrollment.requested_coach_name or 'Не указан'}.",
+        (
+            "Ожидает распределения администратором."
+            if awaiting_distribution
+            else f"Заявка назначена тренеру: {coach.name if coach else 'Не указан'}."
+        ),
+        f"Населённый пункт: {training.city}.",
+    ]
+    for label, value in (
+        ("Telegram", enrollment.telegram),
+        ("WhatsApp / телефон", enrollment.whatsapp),
+        ("Email", enrollment.email),
+        ("Желаемый корт", desired_court),
+        ("Предпочтительное время", str(enrollment.preferred_datetime or "")),
+        ("Пожелания", enrollment.message),
+    ):
+        if value:
+            details.append(f"{label}: {value}")
+    sent = False
+    for user in users:
+        if not user.is_active:
+            continue
+        # ЛК и push независимы от наличия email и результата SMTP.
+        capture_email_event(
+            "training.enrollment", user, url=enrollment_path, message="\n".join(details)
+        )
+        recipient = _resolve_user_email(user)
+        if not recipient:
+            continue
+        sent = (
+            _send_html_email(
+                subject=f"TennisFan: заявка на тренировку «{training.title}»",
+                template_name="emails/training_enrollment.html",
+                context={
+                    "coach_name": user.get_display_name(),
+                    "awaiting_distribution": awaiting_distribution,
+                    "training": training,
+                    "enrollment": enrollment,
+                    "full_name": enrollment.get_display_name(),
+                    "telegram": (enrollment.telegram or "").strip(),
+                    "whatsapp": (enrollment.whatsapp or "").strip(),
+                    "email": (enrollment.email or "").strip(),
+                    "desired_court": desired_court,
+                    "message": (enrollment.message or "").strip(),
+                    "created_at": created_at,
+                    "enrollment_url": f"{base_url}{enrollment_path}",
+                    "training_url": (
+                        f"{base_url}{reverse('training_detail', kwargs={'slug': training.slug})}"
+                    ),
+                },
+                recipient=recipient,
+                category="other",
+                event_key="training.enrollment",
+                notification_url=enrollment_path,
+                capture_event=False,
+            )
+            or sent
+        )
+    return sent
 
 
 def send_court_application_decision_email(

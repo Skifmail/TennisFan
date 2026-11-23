@@ -193,15 +193,19 @@ def create_notification(
 
 
 @transaction.atomic
-def capture_email_event(event_key: str, user: User, *, url: str = "") -> None:
-    """Создаёт нейтральное уведомление для события с почтовым источником.
+def capture_email_event(
+    event_key: str, user: User, *, url: str = "", message: str = ""
+) -> None:
+    """Создаёт уведомление для события с почтовым источником независимо от SMTP.
 
-    Секреты и содержимое письма намеренно не передаются в ЛК и на экран устройства.
+    По умолчанию текст нейтральный: содержимое письма автоматически не копируется.
+    Производитель события может явно передать сведения заявки через ``message``.
 
     Args:
         event_key: Событие почтового адаптера.
         user: Получатель письма в платформе.
         url: Необязательный относительный адрес раздела с подробностями.
+        message: Явный текст бизнес-события, если нужны данные заявки в ЛК.
     """
     definition = EVENTS[event_key]
     if definition.source != "email":
@@ -209,10 +213,12 @@ def capture_email_event(event_key: str, user: User, *, url: str = "") -> None:
     note = create_notification(
         event_key=event_key,
         user=user,
-        message=f"{definition.title}. Подробности доступны в личном кабинете.",
+        message=message
+        or f"{definition.title}. Подробности доступны в личном кабинете.",
         url=url or "/users/notifications/",
     )
-    _queue_push(note, definition.title, user.pk)
+    if center_enabled():
+        _queue_push(note, definition.title, user.pk)
 
 
 @transaction.atomic

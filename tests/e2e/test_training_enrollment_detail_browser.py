@@ -12,6 +12,7 @@ import pytest
 from django.contrib.staticfiles import finders
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 from playwright.sync_api import Route, expect, sync_playwright
 
 from apps.courts.models import Court
@@ -53,6 +54,8 @@ def enrollment() -> TrainingEnrollment:
     )
     return TrainingEnrollment.objects.create(
         training=training,
+        assigned_coach=coach,
+        assigned_at=timezone.now(),
         full_name="Юлия Соколова",
         telegram="example_player",
         whatsapp="8 (999) 123-45-67",

@@ -1,0 +1,5 @@
+{% if enrollment.pk and not enrollment.assigned_at %}
+<form id="enrollment-distribute-{{ enrollment.pk }}" action="{% url 'admin:training_trainingenrollment_distribute' enrollment.pk %}" method="post" hidden>
+    {% csrf_token %}
+</form>
+{% endif %}

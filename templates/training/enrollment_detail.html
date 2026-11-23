@@ -94,6 +94,14 @@
                         <dd>{% if enrollment.training.is_active %}<a href="{% url 'training_detail' slug=enrollment.training.slug %}">{{ enrollment.training.title }}</a>{% else %}{{ enrollment.training.title }}{% endif %}</dd>
                     </div>
                     <div>
+                        <dt>Исходный тренер</dt>
+                        <dd>{{ enrollment.requested_coach_name|default:"Не указан" }}</dd>
+                    </div>
+                    <div>
+                        <dt>Назначенный тренер</dt>
+                        <dd>{{ enrollment.assigned_coach.name|default:"Не назначен" }}</dd>
+                    </div>
+                    <div>
                         <dt>Населённый пункт</dt>
                         <dd>{{ enrollment.training.city|default:"Не указан" }}</dd>
                     </div>

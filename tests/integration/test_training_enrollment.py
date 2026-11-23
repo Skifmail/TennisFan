@@ -1,6 +1,9 @@
-"""Запись на тренировку: письмо тренеру с данными заявки."""
+"""Запись на тренировку: уведомления администраторам до распределения."""
+
+from typing import Any
 
 from django.core import mail
+from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -51,8 +54,8 @@ def _email_html(message: mail.EmailMessage) -> str:
     EMAIL_BACKEND="apps.core.mail.LoggingEmailBackend",
     EMAIL_BACKEND_INNER="django.core.mail.backends.locmem.EmailBackend",
 )
-class TrainingEnrollmentCoachEmailTestCase(TestCase):
-    """При записи на тренировку тренер получает письмо с данными заявки."""
+class TrainingEnrollmentAdminEmailTestCase(TestCase):
+    """При записи на тренировку администратор получает все данные заявки."""
 
     def setUp(self) -> None:
         self.coach_user = make_user(
@@ -69,11 +72,19 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
         )
         self.training = _make_training(coach=self.coach)
         self.court = _make_court()
+        self.admin_user = make_user(
+            email="enrollment-admin@test.local", is_staff=True, is_superuser=True
+        )
 
-    def test_enroll_sends_email_to_coach_with_request_data(self) -> None:
-        """Письмо уходит на email тренера и содержит контакты игрока."""
+    def _post(self, *args: Any, **kwargs: Any) -> HttpResponse:
+        """Отправить форму и выполнить уведомления после фиксации транзакции."""
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(*args, **kwargs)
+
+    def test_enroll_sends_email_to_admin_with_request_data(self) -> None:
+        """Письмо уходит только администратору и содержит контакты игрока."""
         url = reverse("training_enroll", kwargs={"slug": self.training.slug})
-        response = self.client.post(
+        response = self._post(
             url,
             {
                 "full_name": "Анна Игрок",
@@ -90,7 +101,7 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
         self.assertEqual(TrainingEnrollment.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
-        self.assertEqual(message.to, ["coach-mail@test.local"])
+        self.assertEqual(message.to, ["enrollment-admin@test.local"])
         self.assertIn("Утренняя группа", message.subject)
         html = _email_html(message)
         self.assertIn("Анна Игрок", html)
@@ -98,17 +109,22 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
         self.assertIn("Корт Юг", html)
         self.assertIn("Хочу в группу по вторникам", html)
         enrollment = TrainingEnrollment.objects.get()
-        detail_url = reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
+        detail_url = reverse(
+            "admin:training_trainingenrollment_change", args=[enrollment.pk]
+        )
         self.assertIn(detail_url, html)
         self.assertIn("Открыть заявку", html)
         outbound = OutboundEmail.objects.get()
         self.assertEqual(outbound.category, OutboundEmail.Category.OTHER)
-        self.assertEqual(outbound.to_email, "coach-mail@test.local")
+        self.assertEqual(outbound.to_email, "enrollment-admin@test.local")
+        self.assertIn("Иван Тренер", html)
+        self.assertIsNone(enrollment.assigned_coach_id)
+        self.assertFalse(Notification.objects.filter(user=self.coach_user).exists())
 
     def test_enroll_sends_email_when_contact_is_whatsapp(self) -> None:
-        """WhatsApp из заявки попадает в письмо тренеру."""
+        """WhatsApp из заявки попадает в письмо администратору."""
         url = reverse("training_enroll", kwargs={"slug": self.training.slug})
-        response = self.client.post(
+        response = self._post(
             url,
             {
                 "full_name": "Пётр Игрок",
@@ -129,7 +145,7 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
     def test_enroll_notification_links_to_enrollment_details(self) -> None:
         """Уведомление в ЛК ведёт сразу к подробностям новой заявки."""
         url = reverse("training_enroll", kwargs={"slug": self.training.slug})
-        response = self.client.post(
+        response = self._post(
             url,
             {
                 "full_name": "Анна Игрок",
@@ -142,18 +158,19 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
 
         self.assertEqual(response.status_code, 302)
         note = Notification.objects.get(
-            user=self.coach_user,
+            user=self.admin_user,
             event_key="training.enrollment",
         )
         enrollment = TrainingEnrollment.objects.get()
         self.assertEqual(
-            note.url, reverse("enrollment_detail", kwargs={"pk": enrollment.pk})
+            note.url,
+            reverse("admin:training_trainingenrollment_change", args=[enrollment.pk]),
         )
 
     def test_enroll_sends_email_when_contact_is_email(self) -> None:
-        """Email из заявки попадает в письмо тренеру."""
+        """Email из заявки попадает в письмо администратору."""
         url = reverse("training_enroll", kwargs={"slug": self.training.slug})
-        response = self.client.post(
+        response = self._post(
             url,
             {
                 "full_name": "Мария Игрок",
@@ -180,7 +197,7 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
         )
         training = _make_training(coach=coach, slug="enroll-no-email-training")
         url = reverse("training_enroll", kwargs={"slug": training.slug})
-        response = self.client.post(
+        response = self._post(
             url,
             {
                 "full_name": "Гость",
@@ -197,10 +214,13 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
                 training=training, full_name="Гость"
             ).exists()
         )
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.admin_user.email])
 
-    def test_send_training_enrollment_email_skips_without_coach_user(self) -> None:
-        """Сервис не отправляет письмо, если у тренера нет пользователя."""
+    def test_send_training_enrollment_email_notifies_admin_without_coach_user(
+        self,
+    ) -> None:
+        """Даже без аккаунта исходного тренера уведомление получает администратор."""
         coach = Coach.objects.create(
             name="Без аккаунта",
             slug="no-user-coach",
@@ -216,5 +236,6 @@ class TrainingEnrollmentCoachEmailTestCase(TestCase):
 
         ok = send_training_enrollment_email(enrollment)
 
-        self.assertFalse(ok)
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertTrue(ok)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.admin_user.email])

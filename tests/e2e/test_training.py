@@ -2,6 +2,7 @@
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.training.models import Coach, Training, TrainingEnrollment
 from apps.users.models import User
@@ -130,6 +131,8 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
             player=None,
             full_name="Анна Гость",
             telegram="@anna_guest",
+            assigned_coach=self.coach,
+            assigned_at=timezone.now(),
         )
 
         response = self.client.get(reverse("my_trainings"), secure=True)
@@ -151,6 +154,8 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
             training=self.training,
             player=player,
             full_name="",
+            assigned_coach=self.coach,
+            assigned_at=timezone.now(),
         )
 
         response = self.client.get(reverse("my_trainings"), secure=True)
@@ -165,6 +170,8 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
             training=self.training,
             player=player,
             full_name="",
+            assigned_coach=self.coach,
+            assigned_at=timezone.now(),
         )
 
         response = self.client.get(reverse("my_trainings"), secure=True)
@@ -178,6 +185,8 @@ class MyTrainingsAnonymousEnrollmentTests(TestCase):
             training=self.training,
             player=None,
             full_name="",
+            assigned_coach=self.coach,
+            assigned_at=timezone.now(),
         )
 
         response = self.client.get(reverse("my_trainings"), secure=True)

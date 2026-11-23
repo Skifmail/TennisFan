@@ -28,6 +28,12 @@ body { margin:0; padding:0; background:#f4f6f8; font-family:Arial,Helvetica,sans
     <h2>Новая заявка на тренировку</h2>
     <p>Здравствуйте{% if coach_name %}, {{ coach_name }}{% endif %}!</p>
     <p>На тренировку «<a href="{{ training_url }}">{{ training.title }}</a>» поступила заявка.</p>
+    <p class="row"><span>Исходный тренер:</span> {{ enrollment.requested_coach_name|default:"Не указан" }}</p>
+    {% if awaiting_distribution %}
+    <p>Заявка ожидает распределения администратором. Тренер пока не получает её и уведомления.</p>
+    {% else %}
+    <p class="row"><span>Назначенный тренер:</span> {{ enrollment.assigned_coach.name }}</p>
+    {% endif %}
     {% if created_at %}
     <p class="row"><span>Когда:</span> {{ created_at|date:"d.m.Y H:i" }}</p>
     {% endif %}
@@ -50,6 +56,9 @@ body { margin:0; padding:0; background:#f4f6f8; font-family:Arial,Helvetica,sans
     {% if message %}
     <p class="row"><span>Пожелания:</span></p>
     <p>{{ message|linebreaksbr }}</p>
+    {% endif %}
+    {% if enrollment.preferred_datetime %}
+    <p class="row"><span>Предпочтительное время:</span> {{ enrollment.preferred_datetime|date:"d.m.Y H:i" }}</p>
     {% endif %}
     {% if enrollment_url %}
     <p><a href="{{ enrollment_url }}" class="btn" target="_blank" rel="noopener">Открыть заявку</a></p>

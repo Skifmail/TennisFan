@@ -3,16 +3,27 @@ Training admin configuration.
 """
 
 import logging
+from typing import Any
 
 from django.contrib import admin, messages
-from django.http import HttpRequest, JsonResponse
-from django.shortcuts import get_object_or_404
-from django.urls import path
+from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.template.response import TemplateResponse
+from django.urls import URLPattern, path, reverse
+from django.utils.decorators import method_decorator
 from django.utils.html import format_html
+from django.views.decorators.http import require_http_methods
 
 from apps.training.coach_defaults import coach_defaults_from_user
 from apps.users.models import User
 
+from .enrollment_services import (
+    available_coaches,
+    distribute_enrollment,
+    is_enrollment_admin,
+)
 from .forms import AdminTrainingForm, CoachAdminForm, CoachApplicationAdminForm
 from .models import (
     Coach,
@@ -286,7 +297,10 @@ class TrainingAdmin(admin.ModelAdmin):
 
 @admin.register(TrainingEnrollment)
 class TrainingEnrollmentAdmin(admin.ModelAdmin):
-    """Admin for TrainingEnrollment model."""
+    """Все записи на тренировки и их распределение администраторами платформы."""
+
+    change_list_template = "admin/training/trainingenrollment/change_list.html"
+    change_form_template = "admin/training/trainingenrollment/change_form.html"
 
     list_display = (
         "training",
@@ -294,17 +308,165 @@ class TrainingEnrollmentAdmin(admin.ModelAdmin):
         "email",
         "player",
         "desired_court",
+        "requested_coach_name",
+        "assigned_coach",
+        "distribution_state",
         "status",
         "created_at",
+        "distribution_actions",
     )
-    list_filter = ("status", "training")
+    list_filter = (
+        "assigned_at",
+        "assigned_coach",
+        "requested_coach",
+        "status",
+        "training",
+    )
+    list_select_related = (
+        "training",
+        "player__user",
+        "desired_court",
+        "assigned_coach",
+    )
     search_fields = (
         "full_name",
         "email",
         "telegram",
+        "whatsapp",
+        "requested_coach_name",
         "player__user__first_name",
         "player__user__last_name",
     )
     list_editable = ("status",)
     raw_id_fields = ("training", "player")
     date_hierarchy = "created_at"
+    readonly_fields = (
+        "requested_coach",
+        "requested_coach_name",
+        "assigned_coach",
+        "assigned_by",
+        "assigned_at",
+        "distribution_actions",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        """Скрыть раздел от сотрудников без полномочий распределения."""
+        return is_enrollment_admin(request.user)
+
+    def has_view_permission(
+        self, request: HttpRequest, obj: TrainingEnrollment | None = None
+    ) -> bool:
+        """Разрешить чтение всех заявок только администраторам распределения."""
+        return is_enrollment_admin(request.user)
+
+    def has_change_permission(
+        self, request: HttpRequest, obj: TrainingEnrollment | None = None
+    ) -> bool:
+        """Проверить права изменения заявок и выполнения кнопок распределения."""
+        return is_enrollment_admin(request.user)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Проверить права ручного создания заявки."""
+        return is_enrollment_admin(request.user) and super().has_add_permission(request)
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: TrainingEnrollment | None = None
+    ) -> bool:
+        """Не разрешать удаление чужих записей обычному тренеру-сотруднику."""
+        return is_enrollment_admin(request.user) and super().has_delete_permission(
+            request, obj
+        )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[TrainingEnrollment]:
+        """Загрузить все записи без дополнительных запросов к назначениям."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "training",
+                "assigned_coach",
+                "assigned_by",
+                "player__user",
+                "desired_court",
+            )
+        )
+
+    @admin.display(description="Распределение")
+    def distribution_state(self, obj: TrainingEnrollment) -> str:
+        """Показать независимый от обработки заявки статус назначения."""
+        return "Распределена" if obj.assigned_at else "Ожидает распределения"
+
+    @admin.display(description="Распределить заявку")
+    def distribution_actions(self, obj: TrainingEnrollment) -> str:
+        """Кнопки отправляют POST через отдельные формы вне формы списка Django."""
+        if not obj.pk or obj.assigned_at:
+            return "—"
+        html: str = format_html(
+            '<button type="submit" form="enrollment-distribute-{}" name="action" value="original" {}>Отдать {}</button> '
+            '<button type="submit" form="enrollment-distribute-{}" name="action" value="self">Забрать себе</button> '
+            '<a class="button" href="{}">Отдать другому тренеру</a>',
+            obj.pk,
+            "" if obj.requested_coach_id else "disabled",
+            obj.requested_coach_name or "исходному тренеру",
+            obj.pk,
+            reverse("admin:training_trainingenrollment_distribute", args=[obj.pk]),
+        )
+        return html
+
+    def get_urls(self) -> list[URLPattern]:
+        """Добавить защищённый маршрут распределения конкретной заявки."""
+        urls: list[URLPattern] = super().get_urls()
+        return [
+            path(
+                "<int:enrollment_id>/distribute/",
+                self.admin_site.admin_view(self.distribute_view),
+                name="training_trainingenrollment_distribute",
+            )
+        ] + urls
+
+    @method_decorator(require_http_methods(["GET", "POST"]))
+    def distribute_view(self, request: HttpRequest, enrollment_id: int) -> HttpResponse:
+        """Показать активных тренеров или однократно передать заявку выбранному тренеру."""
+        if not is_enrollment_admin(request.user):
+            raise PermissionDenied
+        enrollment = get_object_or_404(self.get_queryset(request), pk=enrollment_id)
+        if request.method == "POST":
+            raw_id = request.POST.get("coach_id", "")
+            try:
+                coach_id = int(raw_id) if raw_id else None
+            except ValueError:
+                messages.error(request, "Выберите активного тренера.")
+                return redirect(
+                    "admin:training_trainingenrollment_distribute", enrollment_id
+                )
+            try:
+                assigned = distribute_enrollment(
+                    enrollment_id,
+                    actor=request.user,
+                    action=request.POST.get("action", ""),
+                    coach_id=coach_id,
+                )
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                self.log_change(
+                    request,
+                    assigned,
+                    f"Заявка назначена тренеру {assigned.assigned_coach}.",
+                )
+                messages.success(
+                    request, f"Заявка передана тренеру {assigned.assigned_coach}."
+                )
+            return redirect("admin:training_trainingenrollment_changelist")
+        context: dict[str, Any] = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "title": f"Отдать другому тренеру: заявка №{enrollment.pk}",
+            "enrollment": enrollment,
+            "coaches": available_coaches().exclude(pk=enrollment.requested_coach_id),
+        }
+        return TemplateResponse(
+            request, "admin/training/trainingenrollment/distribute.html", context
+        )

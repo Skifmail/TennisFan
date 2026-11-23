@@ -213,6 +213,12 @@ def test_enrollment_list_fits_viewport_and_separates_actions(
         page.route("**/*", serve)
         try:
             page.goto("https://testserver" + list_url)
+            pending = page.locator(".enrollment-badge--pending")
+            assigned = page.locator(".enrollment-badge:not(.enrollment-badge--pending)")
+            expect(pending).to_have_css("background-color", "rgb(185, 28, 28)")
+            expect(assigned).to_have_css("background-color", "rgb(21, 128, 61)")
+            for badge in (pending, assigned):
+                expect(badge).to_have_css("color", "rgb(255, 255, 255)")
             if directory := environ.get("ENROLLMENT_SCREENSHOTS"):
                 folder = Path(directory)
                 folder.mkdir(parents=True, exist_ok=True)

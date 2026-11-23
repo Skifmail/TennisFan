@@ -90,17 +90,18 @@
 .model-trainingenrollment .enrollment-badge {
     display: inline-block;
     padding: 3px 7px;
-    border: 1px solid var(--border-color);
+    border: 1px solid #15803d;
     border-radius: 4px;
-    color: var(--body-quiet-color);
+    background: #15803d;
+    color: #fff;
     font-size: 0.75rem;
+    font-weight: 600;
     line-height: 1.4;
 }
 
 .model-trainingenrollment .enrollment-badge--pending {
-    color: var(--body-fg);
-    border-color: var(--body-quiet-color);
-    font-weight: 600;
+    background: #b91c1c;
+    border-color: #b91c1c;
 }
 
 .model-trainingenrollment .enrollment-actions,

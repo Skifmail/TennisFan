@@ -69,7 +69,10 @@ def test_report_and_images_live_in_same_support_thread(client, support_settings)
     response = client.get(url)
     assert response.status_code == 200
     assert "no-store" in response["Cache-Control"]
-    response.close()
+    # Обёртка Client сама закрывает файл и корректно завершает потоковый запрос.
+    content = b"".join(response.streaming_content)
+    assert response.closed
+    assert Image.open(BytesIO(content)).format == "JPEG"
     payload = client.get(reverse("feedback_threads")).json()["threads"][0]["messages"][
         0
     ]

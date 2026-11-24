@@ -322,6 +322,10 @@ def test_broadcast_when_older_writer_omits_new_counters_should_use_database_defa
     assert row is not None
     draft = Broadcast.objects.get(pk=row[0])
     assert draft.processed_users == draft.inbox_created == 0
+    assert draft.audience_mode == "all"
+    assert draft.cities == []
+    assert draft.gender == ""
+    assert draft.recipient_ids == []
 
 
 def test_filtered_broadcast_expands_only_matching_users(client: Client) -> None:

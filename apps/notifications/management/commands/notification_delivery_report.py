@@ -3,13 +3,13 @@
 import json
 from typing import Any
 
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from loguru import logger
 
 from apps.notifications.infrastructure.push import fetch_delivery_stats
 from apps.notifications.models import Delivery, PushDevice
 from apps.notifications.services import preferences
+from apps.users.models import User
 
 
 class Command(BaseCommand):
@@ -66,11 +66,9 @@ class Command(BaseCommand):
         deliveries = Delivery.objects.filter(channel="push").select_related("user")
         user = None
         if options["email"]:
-            user = (
-                get_user_model()
-                .objects.filter(email__iexact=str(options["email"]).strip())
-                .first()
-            )
+            user = User.objects.filter(
+                email__iexact=str(options["email"]).strip()
+            ).first()
             if user is None:
                 raise CommandError("Пользователь с таким email не найден.")
             deliveries = deliveries.filter(user=user)

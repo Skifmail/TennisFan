@@ -97,7 +97,7 @@ def open_direct(*, user: User, recipient_id: int) -> ChatRoom:
             member.save(update_fields=["is_active"])
     if created:
         logger.info("Личный диалог создан", room_id=room.pk, actor_id=user.pk)
-    return cast(ChatRoom, room)
+    return room
 
 
 def notify_direct_message(message: ChatMessage) -> None:

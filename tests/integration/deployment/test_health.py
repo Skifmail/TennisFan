@@ -1,5 +1,7 @@
 """Проверки HTTP-готовности без побочных эффектов и утечки ошибок."""
 
+from datetime import timedelta
+
 import pytest
 from django.db import OperationalError
 from django.test import Client, override_settings
@@ -121,8 +123,8 @@ def test_notification_probe_when_queue_is_old_should_return_503() -> None:
         title="Тема",
         body="Текст",
         url="https://tennisfan.ru/",
-        available_at=timezone.now() - timezone.timedelta(hours=1),
-        expires_at=timezone.now() + timezone.timedelta(days=1),
+        available_at=timezone.now() - timedelta(hours=1),
+        expires_at=timezone.now() + timedelta(days=1),
     )
     response = Client().get("/health/notifications/")
     assert response.status_code == 503

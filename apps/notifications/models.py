@@ -165,24 +165,30 @@ class Broadcast(models.Model):
         inbox_created: Число реально созданных уведомлений ЛК.
     """
 
-    audience_mode = models.CharField(
+    audience_mode: models.CharField[str, str] = models.CharField(
         "Кому отправить",
         max_length=12,
         default="all",
+        db_default="all",
         choices=[
             ("all", "Всем активным пользователям"),
             ("filters", "По городу и полу"),
             ("selected", "Конкретным пользователям"),
         ],
     )
-    cities = models.JSONField("Города", default=list, blank=True)
-    gender = models.CharField(
+    cities: models.JSONField[list[str], list[str]] = models.JSONField(
+        "Города", default=list, db_default=[], blank=True
+    )
+    gender: models.CharField[str, str] = models.CharField(
         "Пол",
         max_length=10,
         blank=True,
+        db_default="",
         choices=[("male", "Мужской"), ("female", "Женский")],
     )
-    recipient_ids = models.JSONField("Пользователи", default=list, blank=True)
+    recipient_ids: models.JSONField[list[int], list[int]] = models.JSONField(
+        "Пользователи", default=list, db_default=[], blank=True
+    )
 
     title: models.CharField[str, str] = models.CharField(
         "Заголовок",

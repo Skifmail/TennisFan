@@ -124,7 +124,7 @@ class EventPolicyAdmin(_PolicyAdmin):
     readonly_fields = ["key", "title", "group", "description"]
     actions = None
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[EventPolicy]:
         """Детские настройки находятся в единой группе «Детская лига»."""
         return super().get_queryset(request).exclude(key__startswith="junior.")
 
@@ -539,9 +539,11 @@ class BroadcastAdmin(_BroadcastAdmin):
             "campaign": campaign,
             "counts": _counts(campaign),
             "audience_size": recipients.count(),
-            "selected_users": recipients.order_by("email")
-            if campaign.audience_mode == "selected"
-            else (),
+            "selected_users": (
+                recipients.order_by("email")
+                if campaign.audience_mode == "selected"
+                else ()
+            ),
             "snapshot": signing.dumps(
                 _fingerprint(campaign), salt="notification-broadcast"
             ),

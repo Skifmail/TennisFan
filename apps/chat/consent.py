@@ -161,7 +161,7 @@ def _bundle_version(documents: dict[str, DocumentSnapshot]) -> str:
     ).hexdigest()
 
 
-def _subject(user: User) -> dict[str, str | int]:
+def _subject(user: User) -> dict[str, str | int | None]:
     return {"id": user.pk, "name": user.get_full_name(), "email": user.email}
 
 

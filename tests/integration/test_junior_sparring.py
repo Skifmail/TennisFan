@@ -22,6 +22,7 @@ from apps.juniors.sparring import (
     child_can_sparring,
     close_request,
     create_sparring_request,
+    reject_response,
     respond_to_sparring,
 )
 from apps.users.models import Notification
@@ -339,6 +340,48 @@ def test_respondent_can_cancel_own_pending_response() -> None:
     cancel_response(actor=adult.user, response_id=response.pk)
     response.refresh_from_db()
     assert response.status == JuniorSparringResponse.Status.REJECTED
+
+
+@pytest.mark.parametrize("respondent_kind", ["adult", "child"])
+@pytest.mark.parametrize("action", ["reject", "cancel"])
+def test_pending_response_decisions_preserve_permissions_and_request(
+    respondent_kind: str, action: str
+) -> None:
+    """Nullable-связи не мешают решению, чужие и повторные действия запрещены."""
+    parent = subscriber("decision-parent@junior.test")
+    sparring = create_request(parent, make_child(parent))
+    if respondent_kind == "child":
+        respondent = subscriber("decision-guardian@junior.test")
+        response = respond_to_sparring(
+            actor=respondent,
+            request_id=sparring.pk,
+            child_id=make_child(respondent, first_name="Мария").pk,
+        )
+    else:
+        player = make_player(email_suffix="decision-adult")
+        respondent = player.user
+        make_subscription(
+            respondent,
+            tier_name="decision-adult",
+            tier_kwargs={"has_sparring": True},
+        )
+        response = respond_to_sparring(actor=respondent, request_id=sparring.pk)
+    decision = reject_response if action == "reject" else cancel_response
+    owner = parent if action == "reject" else respondent
+    stranger = make_user(email="decision-stranger@junior.test")
+    with pytest.raises(PermissionDenied):
+        decision(actor=stranger, response_id=response.pk)
+    response.refresh_from_db()
+    assert response.status == JuniorSparringResponse.Status.PENDING
+    decision(actor=owner, response_id=response.pk)
+    response.refresh_from_db()
+    sparring.refresh_from_db()
+    assert response.status == JuniorSparringResponse.Status.REJECTED
+    assert sparring.status == JuniorSparringRequest.Status.ACTIVE
+    with pytest.raises(ValidationError, match="обработан"):
+        decision(actor=owner, response_id=response.pk)
+    with pytest.raises(ValidationError, match="обработан"):
+        accept_response(actor=parent, response_id=response.pk)
 
 
 def test_detail_page_hides_child_name_and_contacts_before_acceptance(client) -> None:

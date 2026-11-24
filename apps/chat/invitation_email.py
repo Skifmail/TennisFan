@@ -35,7 +35,7 @@ def send_invitation_email(invitation: ChatInvitation) -> bool:
                 args=[invitation_email_token(user_id=invitation.recipient_id)],
             ),
         },
-        recipient=invitation.recipient.email,
+        recipient=invitation.recipient.email or "",
         category="other",
         timeout_seconds=SMTP_TIMEOUT_SECONDS,
         event_key="chat.invited",

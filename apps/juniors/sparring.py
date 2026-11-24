@@ -254,7 +254,7 @@ def respond_to_sparring(
 ) -> JuniorSparringResponse:
     """Откликается взрослый по подписке либо представитель другого ребёнка."""
     request = (
-        JuniorSparringRequest.objects.select_for_update()
+        JuniorSparringRequest.objects.select_for_update(of=("self",))
         .select_related("child", "guardian__user")
         .filter(pk=request_id)
         .first()
@@ -314,7 +314,7 @@ def accept_response(*, actor: User, response_id: int) -> JuniorSparringResponse:
     )
     response = cast(
         JuniorSparringResponse | None,
-        JuniorSparringResponse.objects.select_for_update()
+        JuniorSparringResponse.objects.select_for_update(of=("self",))
         .select_related("player__user", "child", "guardian__user")
         .filter(pk=response_id, request=request)
         .first(),
@@ -350,7 +350,7 @@ def reject_response(*, actor: User, response_id: int) -> JuniorSparringResponse:
     """Отклоняет один отклик, оставляя заявку открытой для других."""
     response = cast(
         JuniorSparringResponse | None,
-        JuniorSparringResponse.objects.select_for_update()
+        JuniorSparringResponse.objects.select_for_update(of=("self",))
         .select_related("request__child", "request__guardian__user", "player__user")
         .filter(pk=response_id)
         .first(),
@@ -369,7 +369,7 @@ def reject_response(*, actor: User, response_id: int) -> JuniorSparringResponse:
 def cancel_response(*, actor: User, response_id: int) -> None:
     """Отменяет собственный ожидающий отклик без доступа к чужим решениям."""
     response = (
-        JuniorSparringResponse.objects.select_for_update()
+        JuniorSparringResponse.objects.select_for_update(of=("self",))
         .select_related("player__user", "guardian__user")
         .filter(pk=response_id)
         .first()

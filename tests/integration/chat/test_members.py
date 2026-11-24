@@ -100,6 +100,7 @@ def test_members_when_page_is_full_should_return_next_page(
         user=viewer,
         city_id=City.objects.create(name="Город страниц участников").pk,
     )
+    assert room.city_id is not None
     _join_room(
         user=make_user(email="members-page-second@test.local"),
         city_id=room.city_id,

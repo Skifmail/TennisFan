@@ -322,7 +322,7 @@
     margin-top: 0.9rem;
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
     .web-push-ios-help__steps {
         grid-auto-columns: clamp(235px, 82%, 320px);
     }

@@ -75,12 +75,10 @@ def controls_page() -> Iterator[Page]:
         )
         page.goto(SITE_ORIGIN)
         page.evaluate(SDK_MOCK)
-        page.evaluate(
-            """() => {
+        page.evaluate("""() => {
             window.mockSubscription.id='test-subscription'; window.mockSubscription.optedIn=true;
             window.mockNotificationPermission='granted'; window.mockOneSignal.Notifications.permission=true;
-        }"""
-        )
+        }""")
         page.add_script_tag(
             content=(ROOT / "static/js/notification_settings.js").read_text()
         )

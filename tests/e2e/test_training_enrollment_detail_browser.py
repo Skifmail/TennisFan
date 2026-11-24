@@ -77,9 +77,18 @@ def test_contacts_stay_available_when_telegram_or_copying_is_blocked(
         mode: Успешный буфер обмена, его отказ, отключённый JS или длинные данные.
     """
     if mode == "long":
-        enrollment.full_name = "ОченьДлинноеИмяБезПробелов" * 8
+        name_limit = TrainingEnrollment._meta.get_field("full_name").max_length
+        assert name_limit is not None
+        enrollment.full_name = ("ОченьДлинноеИмяБезПробелов" * name_limit)[:name_limit]
+        assert len(enrollment.full_name) == name_limit
         enrollment.telegram = "long_" + "username" * 11
-        enrollment.email = "long.email." * 18 + "@example.test"
+        email_limit = TrainingEnrollment._meta.get_field("email").max_length
+        assert email_limit is not None
+        email_suffix = "@example.test"
+        enrollment.email = ("long.email." * email_limit)[
+            : email_limit - len(email_suffix)
+        ] + email_suffix
+        assert len(enrollment.email) == email_limit
         enrollment.message = "ДлинныеПожеланияБезПробелов" * 40
         enrollment.save()
 
@@ -223,8 +232,7 @@ def test_contacts_stay_available_when_telegram_or_copying_is_blocked(
                 layout_errors.extend(
                     cast(
                         list[str],
-                        page.evaluate(
-                            """() => {
+                        page.evaluate("""() => {
                                 const problems = [];
                                 if (document.documentElement.scrollWidth > innerWidth) {
                                     problems.push(`${innerWidth}px: страница шире экрана`);
@@ -241,8 +249,7 @@ def test_contacts_stay_available_when_telegram_or_copying_is_blocked(
                                     }
                                 }
                                 return problems;
-                            }"""
-                        ),
+                            }"""),
                     )
                 )
                 if mode in {"copy", "no-js", "long"} and width in {375, 1440}:

@@ -87,7 +87,10 @@ def test_verified_parent_can_edit_city_and_photo_through_form(client, private_pr
     assert photo.status_code == 200
     assert photo["Content-Type"] == "image/jpeg"
     assert "no-store" in photo["Cache-Control"]
-    photo.close()
+    # Чтение завершает поток через обёртку Django Client, сохраняя транзакцию теста.
+    content = b"".join(photo.streaming_content)
+    assert photo.closed
+    assert Image.open(BytesIO(content)).format == "JPEG"
     outsider = make_user(email="photo-stranger@kids.test", is_staff=True)
     client.force_login(outsider)
     assert (

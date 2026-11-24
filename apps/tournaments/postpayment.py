@@ -1320,7 +1320,7 @@ def _remove_unpaid_players(tournament: Tournament) -> int:
     )
     if tournament.is_doubles():
         teams = (
-            tournament.teams.select_for_update()
+            tournament.teams.select_for_update(of=("self",))
             .filter(
                 Q(player1__user_id__in=removed_user_ids)
                 | Q(player2__user_id__in=removed_user_ids)

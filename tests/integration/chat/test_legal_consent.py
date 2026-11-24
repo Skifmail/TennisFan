@@ -209,6 +209,7 @@ def test_join_when_custom_conditions_requested_should_hold_access_for_operator_r
     public = client.get(reverse("chat:data_conditions", args=[member.room_id]))
     assert public.status_code == 200
     assert "Запрет обработки для рекламы" in public.content.decode()
+    assert user.email
     assert user.email not in public.content.decode()
     member.disclosure_reviewed = True
     member.save(update_fields=["disclosure_reviewed"])

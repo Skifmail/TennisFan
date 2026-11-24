@@ -116,14 +116,12 @@ def test_ios_click_when_native_navigation_fails_should_navigate_through_page(
         try:
             page = browser.new_page()
             if opaque_origin:
-                page.add_init_script(
-                    """
+                page.add_init_script("""
                     const add = navigator.serviceWorker.addEventListener.bind(navigator.serviceWorker);
                     navigator.serviceWorker.addEventListener = (name, handler, options) => add(name,
                         name === 'message' ? event => handler({origin: '', source: event.source,
                             data: event.data, ports: event.ports}) : handler, options);
-                """
-                )
+                """)
             page.goto(navigation_origin)
             with page.context.expect_event("serviceworker") as found:
                 page.evaluate(
@@ -265,14 +263,12 @@ def test_ios_click_when_delivery_path_unreliable_should_load_real_confirmation(
                 "2" if scenario == "same_path" else "1", timeout=7000
             )
             page.wait_for_function("location.hash.startsWith('#code=')")
-            assert worker.evaluate(
-                """() => new Promise(resolve => {
+            assert worker.evaluate("""() => new Promise(resolve => {
                 const timer = setInterval(() => {
                     if (self.recoverySettled) {clearInterval(timer); resolve(true);}
                 }, 20);
                 setTimeout(() => {clearInterval(timer); resolve(false);}, 7000);
-            })"""
-            )
+            })""")
             assert page.url == navigation_origin + TARGET
         finally:
             browser.close()

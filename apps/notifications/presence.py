@@ -1,6 +1,6 @@
 """Присутствие пользователя в комнате чата для подавления лишних push."""
 
-from typing import Final, cast
+from typing import Final
 
 from django.core.cache import cache
 from django.utils import timezone
@@ -134,4 +134,4 @@ def cancel_pending_chat_push(*, user_id: int, room_id: int) -> int:
         error_code="seen_in_chat",
         finished_at=timezone.now(),
     )
-    return cast(int, updated)
+    return updated

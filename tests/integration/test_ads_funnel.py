@@ -9,7 +9,7 @@ from datetime import date
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from apps.tournaments.models import Tournament, TournamentStatus
+from apps.tournaments.models import Tournament, TournamentDuration, TournamentStatus
 from apps.users.models import Player, User
 from apps.users.verification import (
     get_missing_profile_fields,
@@ -247,12 +247,14 @@ class PendingStartDateTestCase(TestCase):
     def setUp(self) -> None:
         self.client = Client()
         self.tournament = create_tournament("dates-pending")
+        self.tournament.duration = TournamentDuration.MULTI_DAY
+        self.tournament.is_one_day = False
         self.tournament.end_date = date(
             self.tournament.start_date.year + 1,
             self.tournament.start_date.month,
             self.tournament.start_date.day,
         )
-        self.tournament.save(update_fields=["end_date"])
+        self.tournament.save(update_fields=["duration", "is_one_day", "end_date"])
 
     def test_pending_until_bracket_is_generated(self) -> None:
         self.assertTrue(self.tournament.start_date_is_pending)
@@ -293,6 +295,21 @@ class PendingStartDateTestCase(TestCase):
         self.assertContains(response, "Подайте заявку на турнир подходящего уровня.")
         self.assertContains(response, "Регистрация открыта.")
         self.assertNotContains(response, self.tournament.end_date.strftime("%d.%m.%Y"))
+
+    def test_single_day_detail_keeps_onsite_instructions(self) -> None:
+        """Однодневный турнир не предлагает игрокам самим договариваться о матчах."""
+        self.tournament.duration = TournamentDuration.SINGLE_DAY
+        self.tournament.is_one_day = True
+        self.tournament.save(update_fields=["duration", "is_one_day"])
+        response = self.client.get(
+            reverse("tournament_detail", kwargs={"slug": self.tournament.slug}),
+            secure=True,
+        )
+        self.assertContains(response, "Зарегистрируйтесь на турнир.")
+        self.assertContains(
+            response, "Приезжайте к началу турнира на указанную площадку."
+        )
+        self.assertNotContains(response, "Подайте заявку на турнир подходящего уровня.")
 
     def test_detail_page_shows_dates_after_bracket(self) -> None:
         self.tournament.bracket_generated = True

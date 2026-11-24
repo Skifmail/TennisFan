@@ -109,6 +109,7 @@ def test_admin_when_room_opened_should_show_only_its_messages_and_members(
     assert response.status_code == 200
     assert 'id="chat-room-messages"' in html
     assert 'id="chat-room-members"' in html
+    assert user.email and outsider.email
     assert message.text not in html and user.email in html
     assert "Открыть архив переписки" in html
     archived = admin_client.get(

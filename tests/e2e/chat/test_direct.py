@@ -42,9 +42,11 @@ def test_direct_when_started_from_sparring_should_deliver_and_reopen_from_profil
         sender, recipient, outsider = [context.new_page() for context in contexts]
         try:
             sender.goto(base + "/sparring/?type=singles")
-            card = sender.locator(f'#sparring-singles-{sessions["direct_sparring_id"]}')
+            card = sender.locator(f'#sparring-{sessions["direct_sparring_id"]}')
             expect(card).to_be_visible()
-            card.get_by_role("button", name="Написать", exact=False).click()
+            card.get_by_role(
+                "button", name="Написать в чат игроку Михаил", exact=True
+            ).click()
             sender.locator('input[name="personal_data"]').check()
             sender.locator('input[name="rules"]').check()
             sender.get_by_role(
@@ -72,7 +74,9 @@ def test_direct_when_started_from_sparring_should_deliver_and_reopen_from_profil
             recipient.get_by_role("button", name="Отправить", exact=True).click()
             expect(sender.locator("#chat-messages")).to_contain_text("Договорились!")
             sender.goto(base + f'/users/profile/{sessions["direct_target_player_id"]}/')
-            sender.get_by_role("button", name="Написать", exact=False).click()
+            sender.get_by_role(
+                "button", name="Написать игроку Михаил", exact=True
+            ).click()
             sender.wait_for_url(room_url)
             expect(
                 sender.get_by_role("navigation", name="Личные чаты")

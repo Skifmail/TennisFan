@@ -109,14 +109,12 @@ def test_binding_when_sdk_or_server_recovers_should_keep_consistent_state(
             page.route("**/device", device)
             page.goto(SITE_ORIGIN)
             page.evaluate(SDK_MOCK)
-            page.evaluate(
-                """() => {
+            page.evaluate("""() => {
                 window.handoffArmed = 0;
                 window.tennisFanPushHandoff = {beginWaiting: () => {window.handoffArmed++;}, stopWaiting: () => {}};
                 window.mockSubscription.addEventListener = (_name, callback) => {window.bindingChanged = callback;};
                 window.mockNotificationPermission='granted'; window.mockOneSignal.Notifications.permission=true;
-            }"""
-            )
+            }""")
             if scenario in ("rate_limit", "transport", "delayed_response"):
                 page.evaluate(
                     "() => {window.mockSubscription.id='test-subscription'; window.mockSubscription.optedIn=true;}"

@@ -1,13 +1,12 @@
 """Минимальные настройки пользователя и короткая форма администратора."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from django import forms
 from django.conf import settings
-from django.contrib.admin.widgets import AutocompleteMixin
 
 from apps.users.display import format_user_admin_label
-from apps.users.models import Player, User
+from apps.users.models import Gender, Player, User
 
 from .domain.rules import (
     BODY_LIMIT,
@@ -41,7 +40,26 @@ class AudienceSelect(forms.SelectMultiple):
     """Подключает локальные стили и поиск Select2 из комплекта админки."""
 
     i18n_name = "ru"
-    media = AutocompleteMixin.media
+
+    @property
+    def media(self) -> forms.Media:
+        """Подключить локальный Select2 без AJAX-атрибутов AutocompleteMixin."""
+        suffix = "" if settings.DEBUG else ".min"
+        return forms.Media(
+            js=[
+                f"admin/js/vendor/jquery/jquery{suffix}.js",
+                f"admin/js/vendor/select2/select2.full{suffix}.js",
+                f"admin/js/vendor/select2/i18n/{self.i18n_name}.js",
+                "admin/js/jquery.init.js",
+                "admin/js/autocomplete.js",
+            ],
+            css={
+                "screen": [
+                    f"admin/css/vendor/select2/select2{suffix}.css",
+                    "admin/css/autocomplete.css",
+                ]
+            },
+        )
 
 
 class BroadcastForm(_BroadcastForm):
@@ -71,21 +89,23 @@ class BroadcastForm(_BroadcastForm):
                 .values_list("city", flat=True)
                 .distinct()
             )
-            self.fields["cities"].choices = [(city, city) for city in cities]
+            cast(forms.MultipleChoiceField, self.fields["cities"]).choices = [
+                (city, city) for city in cities
+            ]
         if "recipient_ids" in self.fields:
             users = (
                 User.objects.filter(is_active=True)
                 .only("pk", "first_name", "last_name", "email")
                 .order_by("last_name", "first_name", "pk")
             )
-            self.fields["recipient_ids"].choices = [
-                (user.pk, format_user_admin_label(user)) for user in users
-            ]
+            cast(
+                forms.TypedMultipleChoiceField, self.fields["recipient_ids"]
+            ).choices = [(user.pk, format_user_admin_label(user)) for user in users]
         if "audience_mode" in self.fields:
             self.fields["audience_mode"].required = False
-            self.fields["gender"].choices = [
+            cast(forms.ChoiceField, self.fields["gender"]).choices = [
                 ("", "Любой пол"),
-                *Player._meta.get_field("gender").choices,
+                *Gender.choices,
             ]
 
     class Meta:

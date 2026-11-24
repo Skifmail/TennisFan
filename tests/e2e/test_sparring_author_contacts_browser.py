@@ -196,8 +196,7 @@ def test_feed_reply_keeps_author_contacts_hidden_until_match(
                 layout_errors.extend(
                     cast(
                         list[str],
-                        page.evaluate(
-                            """() => {
+                        page.evaluate("""() => {
                             const problems = [];
                             const note = text => problems.push(`${innerWidth}px: ${text}`);
                             if (document.documentElement.scrollWidth > innerWidth) note('страница шире экрана');
@@ -234,8 +233,7 @@ def test_feed_reply_keeps_author_contacts_hidden_until_match(
                                 }
                             }
                             return problems;
-                        }"""
-                        ),
+                        }"""),
                     )
                 )
             assert not layout_errors, "\n".join(layout_errors)
@@ -258,7 +256,7 @@ def test_feed_reply_keeps_author_contacts_hidden_until_match(
             expect(card.locator(".sparring-contact")).to_have_count(0)
             expect(respond).to_be_disabled()
             expect(card.locator(".sparring-card__contact-status")).to_have_text(
-                "Отклик отправлен. Контакты автора откроются после подтверждения "
+                "Отклик отправлен. Контакты автора откроются после создания "
                 "матча. Автор должен ответить в течение 48 ч, иначе матч создастся "
                 "автоматически."
             )

@@ -295,6 +295,7 @@ def test_invitation_when_searching_should_not_expose_contacts_or_members(
     )
     assert response.status_code == 200
     assert "Иван Петров" in response.content.decode()
+    assert target.email
     assert target.email not in response.content.decode()
     assert target.phone not in response.content.decode()
     assert not ChatInvitationCampaign.objects.exists()

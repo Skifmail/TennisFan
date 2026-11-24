@@ -166,6 +166,7 @@ def test_roles_when_administrator_assigns_and_transfers_should_audit_and_preserv
     url = reverse("chat:management", args=[member.room_id])
     response = client.get(url)
     assert response.status_code == 200
+    assert target.email
     assert target.email not in response.content.decode()
     assert (
         client.post(

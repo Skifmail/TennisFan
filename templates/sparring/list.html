@@ -75,7 +75,6 @@
                 <nav class="sparring-compact__popover sparring-compact__personal" aria-label="Личные действия">
                     <a href="{% url 'sparring_my_requests' %}">Мои заявки</a>
                     <a href="{% url 'sparring_my_invitations' %}">Мои приглашения</a>
-                    {% if has_sparring_access %}<a href="{% url 'sparring_invite' %}">Пригласить на спарринг</a>{% endif %}
                     {% if not has_sparring_access %}<p class="sparring-compact__hint">Подписка открывает создание заявок и отклики.</p>{% endif %}
                 </nav>
             </details>
@@ -89,6 +88,10 @@
             {% endif %}
         </div>
     </section>
+    <nav class="sparring-tabs sparring-view-switch" aria-label="Разделы спарринга">
+        <a href="?{{ sparring_filter_query }}{% if current_nearby %}&amp;nearby={{ current_nearby }}{% endif %}" class="sparring-tab sparring-tab--active" aria-current="page">Заявки на спарринг</a>
+        <a href="{% url 'sparring_invite' %}" class="sparring-tab">Найти игрока</a>
+    </nav>
     {% if nearby_error %}
     <p class="text-muted mb-3" style="font-size: var(--font-size-sm);">{{ nearby_error }}</p>
     {% endif %}

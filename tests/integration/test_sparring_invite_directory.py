@@ -58,6 +58,24 @@ class SparringInviteDirectoryTests(TestCase):
         self.kazan_player.save(update_fields=["city", "is_verified"])
         self.client.force_login(self.viewer_user)
 
+    def test_view_switcher_marks_player_search_as_active(self) -> None:
+        """На странице приглашения активна кнопка «Найти игрока»."""
+        response = self.client.get(reverse("sparring_invite"), secure=True)
+        html = response.content.decode()
+
+        self.assertIn('class="sparring-tabs sparring-view-switch"', html)
+        self.assertIn(
+            f'href="{reverse("sparring_list")}" class="sparring-tab">'
+            "Заявки на спарринг</a>",
+            html,
+        )
+        self.assertIn(
+            f'href="{reverse("sparring_invite")}" '
+            'class="sparring-tab sparring-tab--active" '
+            'aria-current="page">Найти игрока</a>',
+            html,
+        )
+
     def test_directory_starts_with_viewer_city_then_other_cities(self) -> None:
         """Сначала «Рядом с вами», затем другие города по алфавиту."""
         response = self.client.get(reverse("sparring_invite"), secure=True)

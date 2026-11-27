@@ -54,11 +54,34 @@ def test_menu_when_access_changes_should_show_clear_primary_action_and_private_m
     html = response.content.decode()
     assert 'class="sparring-compact__mine"' in html
     assert "Мои заявки" in html and "Мои приглашения" in html
+    assert "Пригласить на спарринг" not in html
     assert 'class="sparring-compact__primary"' in html
     assert ("Создать заявку" if access else "Подписка") in html
-    assert ("Пригласить на спарринг" in html) == access
     assert 'class="sparring-compact__filters"' in html
     assert 'class="sparring-compact__filters" open' not in html
+    assert "Заявки на спарринг" in html and "Найти игрока" in html
+
+
+def test_list_shows_view_switcher_with_requests_active_and_filters_kept(
+    client: Client,
+    viewer: Player,
+) -> None:
+    """Под фильтрами активна лента заявок, вторая кнопка ведёт к поиску игрока."""
+    response = client.get(
+        reverse("sparring_list"),
+        {"type": "singles", "city": viewer.city},
+        secure=True,
+    )
+    html = response.content.decode()
+    query = response.context["sparring_filter_query"].replace("&", "&amp;")
+    invite_url = reverse("sparring_invite")
+
+    assert 'class="sparring-tabs sparring-view-switch"' in html
+    assert (
+        f'href="?{query}" class="sparring-tab sparring-tab--active" '
+        'aria-current="page">Заявки на спарринг</a>'
+    ) in html
+    assert f'href="{invite_url}" class="sparring-tab">Найти игрока</a>' in html
 
 
 def test_menu_when_explicit_filters_given_should_show_count_and_keep_multiple_types(

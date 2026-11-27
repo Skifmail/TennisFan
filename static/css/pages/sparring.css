@@ -82,6 +82,18 @@
     justify-content: center;
 }
 
+/* Переключатель между лентой заявок и поиском игрока под фильтрами */
+.sparring-view-switch {
+    width: 100%;
+    max-width: 34rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.sparring-view-switch .sparring-tab {
+    flex: 1 1 0;
+    justify-content: center;
+}
+
 .sparring-toolbar {
     align-items: stretch;
     justify-content: space-between;

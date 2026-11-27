@@ -27,6 +27,11 @@
         </div>
     </header>
 
+    <nav class="sparring-tabs sparring-view-switch" aria-label="Разделы спарринга">
+        <a href="{% url 'sparring_list' %}" class="sparring-tab">Заявки на спарринг</a>
+        <a href="{% url 'sparring_invite' %}" class="sparring-tab sparring-tab--active" aria-current="page">Найти игрока</a>
+    </nav>
+
     <section class="sparring-invite__search" aria-labelledby="invite-search-title">
         <div class="sparring-invite__search-head">
             <h2 id="invite-search-title" class="sparring-invite__search-title">Поиск игрока</h2>

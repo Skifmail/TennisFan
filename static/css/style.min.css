@@ -24828,6 +24828,14 @@ a.home-activity__actor:hover {
     text-underline-offset: 0.2em;
 }
 
+.my-trainings-enrollment__meta {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+}
+
 .my-trainings-enrollment__status {
     display: inline-flex;
     align-items: center;
@@ -28284,220 +28292,1121 @@ img.player-avatar.sparring-card__avatar {
 }
 
 /* ==========================================================================
-   Страница «Пригласить на спарринг» — ровная сетка, единая высота контролов
+   Страница «Пригласить на спарринг»: поиск и справочник игроков по городам
    ========================================================================== */
 
+.sparring-invite,
+.sparring-invite-dialog {
+    --invite-line: color-mix(in srgb, var(--color-primary) 30%, transparent);
+    --invite-line-strong: color-mix(in srgb, var(--color-primary) 58%, transparent);
+    --invite-ease: cubic-bezier(0.23, 1, 0.32, 1);
+    --invite-muted: color-mix(in srgb, var(--color-text) 68%, transparent);
+}
+
 .sparring-invite {
-    max-width: 720px;
+    max-width: 1180px;
+    padding-top: clamp(1.5rem, 3.5vw, 3rem);
+    padding-bottom: clamp(2rem, 4vw, 3.5rem);
+    overflow-wrap: anywhere;
 }
 
-.sparring-invite__results {
+.sparring-invite :is(a, button, input):focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+/* Заголовок страницы */
+.sparring-invite__hero {
+    margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.sparring-invite__crumbs-row {
     display: flex;
-    flex-direction: column;
-    gap: var(--spacing-lg);
-    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
 }
 
-.sparring-invite__results > .card {
-    width: 100%;
-    min-width: 0;
+.sparring-invite__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--invite-muted);
+    font-size: 0.8125rem;
 }
 
-.sparring-invite__profile-name,
-.sparring-invite__profile-meta,
-.sparring-invite__profile-stats {
-    overflow-wrap: break-word;
-    word-break: normal;
-}
-
-.sparring-invite__section-title {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-text-secondary);
-    margin-bottom: var(--spacing-md);
-}
-
-.sparring-invite__nav {
-    margin-bottom: var(--spacing-lg);
-    font-size: var(--font-size-sm);
-}
-
-.sparring-invite__nav a {
+.sparring-invite__crumbs a {
+    color: var(--color-primary);
     text-decoration: none;
 }
 
-.sparring-invite__nav a:hover {
+.sparring-invite__crumbs a:hover {
     text-decoration: underline;
+    text-underline-offset: 0.2em;
 }
 
-.sparring-invite__hint {
-    margin-top: var(--spacing-md);
-    margin-bottom: 0;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-    line-height: 1.45;
+.sparring-invite__hero-text {
+    min-width: 0;
 }
 
-/* Поиск: подпись сверху, поле и кнопка одной высоты в одном ряду */
+.sparring-invite__eyebrow {
+    margin: 0 0 0.55rem;
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.sparring-invite .sparring-invite__title {
+    margin: 0;
+    color: var(--color-primary);
+    font-family: var(--font-heading);
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+}
+
+.sparring-invite__lede {
+    max-width: 64ch;
+    margin: 1rem 0 0;
+    color: var(--color-text);
+    font-size: clamp(0.9375rem, 1.4vw, 1.0625rem);
+    line-height: 1.65;
+    text-wrap: pretty;
+}
+
+.sparring-invite__history {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 999px;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+        background-color 160ms ease,
+        color 160ms ease,
+        border-color 160ms ease,
+        transform 140ms var(--invite-ease);
+}
+
+.sparring-invite__history:active {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .sparring-invite__history:hover {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-primary-dark);
+    }
+}
+
+/* Поиск игрока */
+.sparring-invite__search {
+    padding: clamp(1.125rem, 2.5vw, 1.75rem);
+    border: 1px solid var(--invite-line);
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-card);
+}
+
+.sparring-invite__search-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.sparring-invite__search-title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.sparring-invite__search-note {
+    margin: 0;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+}
+
 .sparring-invite__search-label {
     display: block;
-    margin-bottom: var(--spacing-sm);
-    font-weight: 500;
-    font-size: var(--font-size-sm);
+    margin-bottom: 0.5rem;
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 
 .sparring-invite__search-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
     align-items: stretch;
+    gap: 0.75rem;
 }
 
-.sparring-invite__search-row .form-control {
+.sparring-invite__field {
+    position: relative;
     flex: 1;
     min-width: 0;
+}
+
+.sparring-invite__field-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.9rem;
+    color: var(--color-primary);
+    pointer-events: none;
+    transform: translateY(-50%);
+}
+
+.sparring-invite .sparring-invite__field .form-control {
+    min-height: 48px;
+    height: 48px;
+    padding: 0 0.9rem 0 2.75rem;
+    border-color: var(--invite-line-strong);
+    border-radius: var(--radius-md);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-size: 16px;
+}
+
+.sparring-invite .sparring-invite__field .form-control::placeholder {
+    color: var(--invite-muted);
+}
+
+.sparring-invite .sparring-invite__field .form-control:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgb(166 130 74 / 18%);
+}
+
+.sparring-invite__field input::-webkit-search-cancel-button {
+    appearance: none;
+}
+
+.sparring-invite__search-submit {
+    flex: 0 0 auto;
+    min-width: 8rem;
+    min-height: 48px;
+    height: 48px;
+    padding-inline: 1.5rem;
+    border-radius: var(--radius-md);
+    color: var(--color-primary-dark);
+    font-size: 0.9375rem;
+    transition:
+        background-color 160ms ease,
+        color 160ms ease,
+        transform 140ms var(--invite-ease);
+}
+
+.sparring-invite__search-submit:active {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .sparring-invite__search-submit:hover,
+    .sparring-invite__selected-submit:hover,
+    .sparring-invite-dialog__submit:hover {
+        color: var(--color-primary-dark);
+    }
+}
+
+.sparring-invite__hint {
+    margin: 0.75rem 0 0;
+    color: var(--invite-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.sparring-invite__reset {
+    margin-left: 0.5rem;
+    color: var(--color-primary);
+    text-underline-offset: 0.2em;
+}
+
+/* Выбранный игрок */
+.sparring-invite__selected {
+    margin-top: 1.5rem;
+    padding: clamp(1.125rem, 2.5vw, 1.75rem);
+    border: 1px solid var(--invite-line-strong);
+    border-radius: var(--radius-xl);
+    background:
+        linear-gradient(135deg, rgb(166 130 74 / 10%), transparent 55%),
+        var(--color-bg-card);
+}
+
+.sparring-invite__selected-person {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    min-width: 0;
+}
+
+.sparring-invite__selected-avatar {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 50%;
+    background: var(--color-bg);
+    object-fit: cover;
+}
+
+.sparring-invite__selected-text {
+    min-width: 0;
+}
+
+.sparring-invite__selected-name {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.sparring-invite__selected-meta {
+    margin: 0.2rem 0 0;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+}
+
+.sparring-invite__selected-pending {
+    margin: 1rem 0 0;
+    color: var(--invite-muted);
+    font-size: 0.9375rem;
+    line-height: 1.55;
+}
+
+.sparring-invite__selected-pending a {
+    color: var(--color-primary);
+    text-underline-offset: 0.2em;
+}
+
+.sparring-invite__selected-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px) auto;
+    align-items: end;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--invite-line);
+}
+
+.sparring-invite__date-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.sparring-invite__date-label span {
+    color: var(--invite-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.sparring-invite__date .form-control {
     min-height: 44px;
     height: 44px;
     padding-top: 0;
     padding-bottom: 0;
-    line-height: 1.25;
+    color-scheme: dark;
 }
 
-.sparring-invite__search-row .btn {
-    flex-shrink: 0;
+.sparring-invite__selected-submit {
+    min-height: 44px;
+    padding-inline: 1.25rem;
+    color: var(--color-primary-dark);
+    white-space: nowrap;
+}
+
+/* Переключатель «Дружеская игра» */
+.sparring-switch {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.35rem 0;
+    cursor: pointer;
+}
+
+.sparring-switch__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.sparring-switch__track {
+    position: relative;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 26px;
+    margin-top: 1px;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 999px;
+    background: var(--color-bg);
+    transition:
+        background-color 180ms ease,
+        border-color 180ms ease;
+}
+
+.sparring-switch__thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-text);
+    transition:
+        transform 180ms var(--invite-ease),
+        background-color 180ms ease;
+}
+
+.sparring-switch__input:checked + .sparring-switch__track {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+}
+
+.sparring-switch__input:checked + .sparring-switch__track .sparring-switch__thumb {
+    background: var(--color-primary-dark);
+    transform: translateX(18px);
+}
+
+.sparring-switch__input:focus-visible + .sparring-switch__track {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+.sparring-switch__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.sparring-switch__label {
+    color: var(--color-text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.sparring-switch__hint {
+    color: var(--invite-muted);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+/* Секции справочника */
+.sparring-invite__section {
+    margin-top: clamp(2rem, 4vw, 3rem);
+}
+
+.sparring-invite__section--local {
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+}
+
+.sparring-invite__section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--invite-line);
+}
+
+.sparring-invite__section-title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: clamp(1.125rem, 1.8vw, 1.375rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.3;
+}
+
+.sparring-invite__section-meta {
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.sparring-invite__city-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0.15rem 0.7rem;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 999px;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.sparring-invite__cities {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
+    align-items: start;
+    gap: 1rem;
+}
+
+.sparring-city {
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--invite-line);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-card);
+}
+
+.sparring-city__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.2rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--invite-line);
+}
+
+.sparring-city__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    color: var(--color-text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.sparring-city__title::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary);
+}
+
+.sparring-city__count {
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.sparring-city__players {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sparring-city__player {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 0;
+}
+
+.sparring-city__player + .sparring-city__player {
+    border-top: 1px solid var(--invite-line);
+}
+
+.sparring-city__avatar-link {
+    flex: 0 0 auto;
+    border-radius: 50%;
+}
+
+.sparring-city__avatar {
+    display: block;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 50%;
+    background: var(--color-bg);
+    object-fit: cover;
+}
+
+.sparring-city__person {
+    min-width: 0;
+}
+
+.sparring-city__name {
+    display: block;
+    color: var(--color-text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-decoration: none;
+}
+
+.sparring-city__name:hover {
+    color: var(--color-primary);
+}
+
+.sparring-city__meta {
+    margin: 0.1rem 0 0;
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.sparring-city__invite {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 7.5rem;
-    min-height: 44px;
-    height: 44px;
-    padding-left: var(--spacing-xl);
-    padding-right: var(--spacing-xl);
+    min-height: 40px;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    touch-action: manipulation;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        color 160ms ease,
+        transform 140ms var(--invite-ease);
 }
 
-/* Карточка найденного игрока */
-.sparring-invite__result .card-body {
-    padding: var(--spacing-xl);
+.sparring-city__invite:active {
+    transform: scale(0.97);
 }
 
-.sparring-invite__profile {
+@media (hover: hover) and (pointer: fine) {
+    .sparring-city__invite:hover {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-primary-dark);
+    }
+}
+
+.sparring-city__pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--invite-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sparring-invite__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16.5rem), 1fr));
+    gap: 1rem;
+}
+
+.sparring-invite__empty {
+    margin: 0;
+    padding: 1rem 1.125rem;
+    border: 1px dashed var(--invite-line);
+    border-radius: var(--radius-md);
+    background: rgb(0 31 20 / 55%);
+    color: var(--invite-muted);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.sparring-invite__empty a {
+    color: var(--color-primary);
+    text-underline-offset: 0.2em;
+}
+
+.sparring-invite__more {
+    margin: 0.75rem 0 0;
+    color: var(--invite-muted);
+    font-size: 0.8125rem;
+}
+
+/* Карточка игрока */
+.sparring-player {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.875rem;
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--invite-line);
+    border-radius: var(--radius-lg);
+    background:
+        linear-gradient(160deg, rgb(166 130 74 / 7%), transparent 58%),
+        var(--color-bg-card);
+    transition:
+        border-color 180ms ease,
+        transform 180ms var(--invite-ease),
+        box-shadow 180ms ease;
 }
 
-.sparring-invite__avatar {
-    width: 64px;
-    height: 64px;
-    flex-shrink: 0;
-    border-radius: var(--radius-md);
+@media (hover: hover) and (pointer: fine) {
+    .sparring-player:hover {
+        border-color: var(--invite-line-strong);
+        box-shadow: 0 12px 26px rgb(0 0 0 / 26%);
+        transform: translateY(-2px);
+    }
+}
+
+.sparring-player__top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.sparring-player__avatar-link {
+    flex: 0 0 auto;
+    border-radius: 50%;
+}
+
+.sparring-player__avatar {
+    display: block;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 50%;
+    background: var(--color-bg);
     object-fit: cover;
-    border: 1px solid var(--color-border);
 }
 
-.sparring-invite__avatar--placeholder {
-    width: 64px;
-    height: 64px;
-    flex-shrink: 0;
-    border-radius: var(--radius-md);
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-}
-
-.sparring-invite__profile-text {
+.sparring-player__identity {
     flex: 1;
     min-width: 0;
 }
 
-.sparring-invite__profile-name {
-    font-weight: 600;
-    font-size: var(--font-size-lg);
-    margin-bottom: var(--spacing-xs);
-}
-
-.sparring-invite__profile-meta {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-}
-
-.sparring-invite__profile-stats {
-    margin-top: var(--spacing-xs);
-    font-size: var(--font-size-sm);
+.sparring-player__name {
+    display: block;
     color: var(--color-text);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-decoration: none;
 }
 
-/* Действия: чекбокс | дата | кнопка — выравнивание по нижнему краю полей ввода */
-.sparring-invite__actions-grid {
+.sparring-player__name:hover {
+    color: var(--color-primary);
+}
+
+.sparring-player__meta {
+    margin: 0.2rem 0 0;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+.sparring-player__stats {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto;
-    gap: var(--spacing-md);
-    align-items: end;
-    margin-top: var(--spacing-lg);
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--color-border);
-}
-
-.sparring-invite__cell--check .form-check {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
     margin: 0;
+}
+
+.sparring-player__stat {
+    min-width: 0;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--invite-line);
+    border-radius: var(--radius-md);
+    background: rgb(1 43 28 / 55%);
+}
+
+.sparring-player__stat dt {
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+    text-transform: uppercase;
+}
+
+.sparring-player__stat dd {
+    margin: 0.15rem 0 0;
+    color: var(--color-text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+}
+
+.sparring-player__footer {
+    margin-top: auto;
+}
+
+.sparring-player__invite {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
     min-height: 44px;
+    padding: 0.55rem 1rem;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        color 160ms ease,
+        transform 140ms var(--invite-ease);
 }
 
-.sparring-invite__cell--check .form-check-input {
-    margin-top: 0;
-    flex-shrink: 0;
+.sparring-player__invite:active {
+    transform: scale(0.97);
 }
 
-.sparring-invite__cell--date .form-group {
-    margin-bottom: 0;
+@media (hover: hover) and (pointer: fine) {
+    .sparring-player__invite:hover {
+        border-color: var(--color-primary);
+        background: var(--color-primary);
+        color: var(--color-primary-dark);
+    }
 }
 
-.sparring-invite__cell--date .form-label {
-    margin-bottom: var(--spacing-xs);
-}
-
-.sparring-invite__cell--date .form-control {
+.sparring-player__pending {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
     min-height: 44px;
-    height: 44px;
-    padding-top: 0;
-    padding-bottom: 0;
-    line-height: 1.25;
+    padding: 0.55rem 1rem;
+    border: 1px dashed var(--invite-line);
+    border-radius: var(--radius-md);
+    background: rgb(1 43 28 / 40%);
+    color: var(--invite-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 
-.sparring-invite__cell--submit {
+/* Диалог приглашения */
+.sparring-invite-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(28rem, calc(100% - 2rem));
+    max-width: none;
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-card);
+    color: var(--color-text);
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 45%);
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+        opacity 170ms ease-out,
+        transform 170ms var(--invite-ease);
+}
+
+@starting-style {
+    .sparring-invite-dialog[open] {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+}
+
+.sparring-invite-dialog.is-closing {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+}
+
+.sparring-invite-dialog::backdrop {
+    background: rgb(0 0 0 / 62%);
+    transition: background-color 170ms ease-out;
+}
+
+@starting-style {
+    .sparring-invite-dialog[open]::backdrop {
+        background: rgb(0 0 0 / 0%);
+    }
+}
+
+.sparring-invite-dialog__form {
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    max-height: inherit;
+    min-height: 0;
 }
 
-.sparring-invite__cell--submit .btn {
+.sparring-invite-dialog__header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--invite-line);
+}
+
+.sparring-invite-dialog__person {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.sparring-invite-dialog__avatar {
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: 50%;
+    background: var(--color-bg);
+    object-fit: cover;
+}
+
+.sparring-invite-dialog__heading {
+    min-width: 0;
+}
+
+.sparring-invite-dialog__eyebrow {
+    margin: 0 0 0.2rem;
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.sparring-invite-dialog__title {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.sparring-invite-dialog__city {
+    margin: 0.15rem 0 0;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+}
+
+.sparring-invite-dialog__close {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin: -0.25rem -0.25rem 0 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+        background-color 150ms ease,
+        transform 140ms var(--invite-ease);
+}
+
+.sparring-invite-dialog__close:active {
+    transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .sparring-invite-dialog__close:hover {
+        background: rgb(166 130 74 / 14%);
+    }
+}
+
+.sparring-invite-dialog__body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 0;
+    padding: 1.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.sparring-invite-dialog__date-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--color-text);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.sparring-invite-dialog__date-label span {
+    color: var(--invite-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.sparring-invite-dialog__date .form-control {
     min-height: 44px;
-    height: 44px;
-    padding-left: var(--spacing-xl);
-    padding-right: var(--spacing-xl);
-    min-width: 7.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    color-scheme: dark;
 }
 
-@media (width <= 640px) {
-    .sparring-invite__actions-grid {
-        grid-template-columns: 1fr;
+.sparring-invite-dialog__note {
+    margin: 0;
+    color: var(--invite-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.sparring-invite-dialog__footer {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--invite-line);
+    background: rgb(0 31 20 / 35%);
+}
+
+.sparring-invite-dialog__cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.55rem 1rem;
+    border: 1px solid var(--invite-line-strong);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        transform 140ms var(--invite-ease);
+}
+
+.sparring-invite-dialog__cancel:active {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .sparring-invite-dialog__cancel:hover {
+        border-color: var(--color-primary);
+        background: rgb(166 130 74 / 12%);
+    }
+}
+
+.sparring-invite-dialog__submit {
+    min-height: 44px;
+    padding-inline: 1.25rem;
+    color: var(--color-primary-dark);
+    white-space: nowrap;
+}
+
+/* Адаптив */
+@media (width <= 900px) {
+    .sparring-invite__history {
+        justify-self: start;
+    }
+}
+
+@media (width <= 860px) {
+    .sparring-invite__selected-form {
+        grid-template-columns: minmax(0, 1fr);
         align-items: stretch;
     }
 
-    .sparring-invite__cell--submit {
-        justify-content: stretch;
+    .sparring-invite__selected-submit {
+        width: 100%;
+    }
+}
+
+@media (width <= 720px) {
+    .sparring-invite__search-row {
+        flex-direction: column;
     }
 
-    .sparring-invite__cell--submit .btn {
+    .sparring-invite__search-submit {
         width: 100%;
     }
 
-    .sparring-invite__search-row .btn {
+    .sparring-invite__grid {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+        gap: 0.75rem;
+    }
+}
+
+@media (width <= 480px) {
+    .sparring-invite-dialog__footer {
+        flex-direction: column-reverse;
+    }
+
+    .sparring-invite-dialog__cancel,
+    .sparring-invite-dialog__submit {
         width: 100%;
+    }
+
+    .sparring-invite__selected-avatar {
+        width: 48px;
+        height: 48px;
+    }
+
+    .sparring-city__player {
+        grid-template-columns: auto minmax(0, 1fr);
+        row-gap: 0.5rem;
+    }
+
+    .sparring-city__invite,
+    .sparring-city__pending {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-height: 44px;
+        justify-content: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sparring-invite *,
+    .sparring-invite-dialog,
+    .sparring-invite-dialog * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+
+    .sparring-player:hover,
+    .sparring-invite__history:active,
+    .sparring-invite__search-submit:active,
+    .sparring-player__invite:active,
+    .sparring-invite-dialog__close:active,
+    .sparring-invite-dialog__cancel:active {
+        transform: none;
     }
 }
 

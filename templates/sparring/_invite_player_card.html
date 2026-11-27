@@ -1,0 +1,45 @@
+{% load skill_tags %}
+<article class="sparring-player">
+    <div class="sparring-player__top">
+        <a class="sparring-player__avatar-link" href="{% url 'profile' pk=p.pk %}" tabindex="-1" aria-hidden="true">
+            {% include 'includes/avatar.html' with avatar=p.avatar class="sparring-player__avatar" %}
+        </a>
+        <div class="sparring-player__identity">
+            <a class="sparring-player__name" href="{% url 'profile' pk=p.pk %}">{{ p }}</a>
+            <p class="sparring-player__meta">
+                {{ p.get_skill_level_display }}{% if show_city and p.city %} · {{ p.city }}{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <dl class="sparring-player__stats">
+        <div class="sparring-player__stat">
+            <dt>NTRP</dt>
+            <dd>{{ p.ntrp_level|floatformat:2 }}</dd>
+        </div>
+        <div class="sparring-player__stat">
+            <dt>Рейтинг FAN</dt>
+            <dd>{{ p.total_points|default:0|floatformat:0 }}</dd>
+        </div>
+    </dl>
+
+    <div class="sparring-player__footer">
+        {% if p.pk in pending_invitation_ids %}
+        <span class="sparring-player__pending">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 5 5 9-9"/></svg>
+            Приглашение отправлено
+        </span>
+        {% else %}
+        <a
+            class="sparring-player__invite"
+            href="{% url 'sparring_invite' %}?invitee={{ p.pk }}"
+            data-invite-trigger
+            data-invite-id="{{ p.pk }}"
+            data-invite-name="{{ p }}"
+            data-invite-city="{{ p.city }}"
+            data-invite-avatar="{% if p.avatar %}{{ p.avatar.url }}{% endif %}"
+            aria-haspopup="dialog"
+        >Пригласить</a>
+        {% endif %}
+    </div>
+</article>

@@ -134,4 +134,4 @@ def cancel_pending_chat_push(*, user_id: int, room_id: int) -> int:
         error_code="seen_in_chat",
         finished_at=timezone.now(),
     )
-    return updated
+    return int(updated)

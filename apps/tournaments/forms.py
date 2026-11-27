@@ -29,11 +29,11 @@ class TournamentFormatForm(forms.ModelForm):
 
     def clean_format(self) -> str:
         """Сохранить режим и базовую сетку для существующей логики матчей."""
-        value = self.cleaned_data["format"]
+        value: str = self.cleaned_data["format"]
         if value == "manual":
-            original = self.instance.format
+            original: str = self.instance.format
             self.instance.pairing_mode = PairingMode.MANUAL
-            return (
+            return str(
                 original
                 if original == TournamentFormat.ROUND_ROBIN
                 else TournamentFormat.SINGLE_ELIMINATION

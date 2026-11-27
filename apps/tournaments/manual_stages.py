@@ -276,7 +276,9 @@ def result_is_locked(match: Match) -> bool:
         if stage.tournament.manual_stages.filter(order__gt=stage.order).exists():
             return True
         if stage.kind == Kind.PLACES:
-            return stage.matches.filter(round_index__gt=match.round_index).exists()
+            return bool(
+                stage.matches.filter(round_index__gt=match.round_index).exists()
+            )
     if stage.kind == ManualTournamentStage.Kind.QUALIFIER:
         return bool(
             stage.tournament.manual_stages.exclude(
@@ -631,11 +633,12 @@ def _stage_places(stage: ManualTournamentStage) -> dict[str, int]:
         return _classification(stage, generate=False)
     if stage.kind == Kind.ROUND:
         entities = _entities(stage.tournament)
-        members = [
-            entities[t].team or entities[t].player
-            for t in stage.member_tokens
-            if t in entities
-        ]
+        members: list[Player | TournamentTeam] = []
+        for token in stage.member_tokens:
+            entity = entities.get(token)
+            member = entity.team or entity.player if entity else None
+            if member is not None:
+                members.append(member)
         rows = compute_standings_for_entities(stage.tournament, members, matches)
         return {
             (f"t:{r['team'].pk}" if r["team"] else f"p:{r['player'].pk}"): r["place"]
@@ -670,9 +673,11 @@ def finish_stages(tournament: Tournament, stage_id: str) -> None:
         raise ManualPairingError("Сначала завершите матчи всех этапов.")
     stage = tournament.manual_stages.filter(
         kind__in=CUSTOM_KINDS,
-        pk=int(stage_id)
-        if stage_id.isascii() and stage_id.isdigit() and len(stage_id) < 19
-        else 0,
+        pk=(
+            int(stage_id)
+            if stage_id.isascii() and stage_id.isdigit() and len(stage_id) < 19
+            else 0
+        ),
     ).first()
     if not stage or not (places := _stage_places(stage)):
         raise ManualPairingError(
@@ -739,7 +744,9 @@ def placement_signature(
 ) -> str:
     """Связать подтверждение с просмотренной расстановкой участников."""
     value = "|".join(f"{token}={place}" for token, (place, _) in sorted(places.items()))
-    return Signer(salt="tournament-placements").signature(f"{tournament.pk}|{value}")
+    return str(
+        Signer(salt="tournament-placements").signature(f"{tournament.pk}|{value}")
+    )
 
 
 @transaction.atomic

@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from django.core.management.base import BaseCommand
 from django.urls import reverse
 from django.utils import timezone
@@ -25,10 +27,10 @@ from apps.tournaments.models import Match
 from apps.tournaments.utils import get_match_participant_users
 
 STAGE_BY_DAYS_LEFT: dict[int, str] = {
-    3: SparringReminderStage.D3,
-    1: SparringReminderStage.D1,
-    0: SparringReminderStage.D0,
-    -1: SparringReminderStage.OVERDUE1,
+    3: cast(str, SparringReminderStage.D3),
+    1: cast(str, SparringReminderStage.D1),
+    0: cast(str, SparringReminderStage.D0),
+    -1: cast(str, SparringReminderStage.OVERDUE1),
 }
 
 

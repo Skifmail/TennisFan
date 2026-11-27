@@ -856,7 +856,7 @@ def _viewer_can_see_player_contacts(viewer: Any, player: Player) -> bool:
         | Q(team2__player1=player)
         | Q(team2__player2=player)
     )
-    return (
+    return bool(
         Match.objects.filter(viewer_side)
         .filter(player_side)
         .exclude(status=Match.MatchStatus.CANCELLED)

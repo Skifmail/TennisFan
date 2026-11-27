@@ -1,66 +1,45 @@
 {% extends 'base.html' %}
+{% load static skill_tags %}
 
 {% block title %}Пригласить на спарринг{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1 class="page-title">Пригласить на спарринг</h1>
-    <p class="page-subtitle">
-        Найдите игрока по ФИО или email, отметьте дружескую игру при необходимости и укажите предполагаемую дату.
-        Приглашённый получит уведомление в личном кабинете и в Telegram-боте.
-    </p>
-</div>
-
 <div class="container sparring-invite">
-    <p class="sparring-invite__nav">
-        <a href="{% url 'sparring_list' %}" class="text-primary">← К спаррингу</a>
-        <span class="text-secondary"> · </span>
-        <a href="{% url 'sparring_my_invitations' %}" class="text-primary">Мои приглашения</a>
-    </p>
-
-    {% if selected_player %}
-    <div class="card mb-4 sparring-invite__result">
-        <div class="card-body">
-            <h2 class="sparring-invite__section-title">Игрок рядом</h2>
-            <div class="sparring-invite__profile">
-                <div class="sparring-invite__profile-text">
-                    <div class="sparring-invite__profile-name">
-                        <a href="{% url 'profile' pk=selected_player.pk %}">{{ selected_player }}</a>
-                    </div>
-                    <div class="sparring-invite__profile-meta">{{ selected_player.city }}</div>
-                </div>
-            </div>
-            <form method="post" class="sparring-invite__invite-form">
-                {% csrf_token %}
-                <input type="hidden" name="invitee_id" value="{{ selected_player.pk }}">
-                <div class="sparring-invite__actions-grid">
-                    <div class="sparring-invite__cell sparring-invite__cell--check">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="is_friendly" id="friendly_selected">
-                            <label class="form-check-label" for="friendly_selected">Дружеская игра</label>
-                        </div>
-                    </div>
-                    <div class="sparring-invite__cell sparring-invite__cell--date">
-                        <div class="form-group">
-                            <label class="form-label" for="id_proposed_date_selected">Дата</label>
-                            <input type="date" name="proposed_date" id="id_proposed_date_selected" class="form-control">
-                        </div>
-                    </div>
-                    <div class="sparring-invite__cell sparring-invite__cell--submit">
-                        <button type="submit" class="btn btn-primary">Пригласить</button>
-                    </div>
-                </div>
-            </form>
+    <header class="sparring-invite__hero">
+        <div class="sparring-invite__crumbs-row">
+            <nav class="sparring-invite__crumbs" aria-label="Навигация по разделу">
+                <a href="{% url 'sparring_list' %}">Спарринг</a>
+                <span aria-hidden="true">/</span>
+                <span>Приглашение</span>
+            </nav>
+            <a class="sparring-invite__history" href="{% url 'sparring_my_invitations' %}">
+                Мои приглашения
+                <span aria-hidden="true">↗</span>
+            </a>
         </div>
-    </div>
-    {% endif %}
+        <div class="sparring-invite__hero-text">
+            <p class="sparring-invite__eyebrow">Партнёр для игры</p>
+            <h1 class="sparring-invite__title">Пригласить на спарринг</h1>
+            <p class="sparring-invite__lede">
+                Выберите игрока из своего города или любого другого, отметьте дружескую игру
+                и предложите дату. Приглашённый получит уведомление в личном кабинете и в Telegram-боте.
+            </p>
+        </div>
+    </header>
 
-    <div class="card mb-4">
-        <div class="card-body" style="padding: var(--spacing-2xl);">
-            <h2 class="sparring-invite__section-title">Поиск игрока</h2>
-            <form method="get" class="sparring-invite__search">
-                <label class="sparring-invite__search-label" for="id_q">ФИО или email</label>
-                <div class="sparring-invite__search-row">
+    <section class="sparring-invite__search" aria-labelledby="invite-search-title">
+        <div class="sparring-invite__search-head">
+            <h2 id="invite-search-title" class="sparring-invite__search-title">Поиск игрока</h2>
+            <p class="sparring-invite__search-note">ФИО или email — минимум 2 символа</p>
+        </div>
+        <form method="get" class="sparring-invite__search-form" role="search">
+            <label class="sparring-invite__search-label" for="id_q">ФИО или email</label>
+            <div class="sparring-invite__search-row">
+                <div class="sparring-invite__field">
+                    <svg class="sparring-invite__field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
+                        <circle cx="11" cy="11" r="7"/>
+                        <path d="m20 20-3.6-3.6"/>
+                    </svg>
                     <input
                         type="search"
                         name="q"
@@ -69,79 +48,227 @@
                         value="{{ search_query }}"
                         placeholder="Например: Иванов или user@mail.ru"
                         minlength="2"
+                        autocomplete="off"
+                        aria-describedby="invite-search-hint"
                     >
-                    <button type="submit" class="btn btn-primary">Найти</button>
                 </div>
-            </form>
-            <p class="sparring-invite__hint text-secondary">
-                Минимум 2 символа. Для email можно ввести полный адрес — будет точное совпадение.
-            </p>
+                <button type="submit" class="btn btn-primary sparring-invite__search-submit">Найти</button>
+            </div>
+        </form>
+        <p id="invite-search-hint" class="sparring-invite__hint">
+            Для email можно ввести полный адрес — будет точное совпадение.
+            {% if search_query %}<a class="sparring-invite__reset" href="{% url 'sparring_invite' %}">Сбросить поиск</a>{% endif %}
+        </p>
+    </section>
+
+    {% if selected_player %}
+    <section class="sparring-invite__selected" aria-labelledby="invite-selected-title">
+        <p class="sparring-invite__eyebrow">Выбранный игрок</p>
+        <div class="sparring-invite__selected-person">
+            {% include 'includes/avatar.html' with avatar=selected_player.avatar class="sparring-invite__selected-avatar" %}
+            <div class="sparring-invite__selected-text">
+                <h2 id="invite-selected-title" class="sparring-invite__selected-name">{{ selected_player }}</h2>
+                <p class="sparring-invite__selected-meta">
+                    {{ selected_player.get_skill_level_display }}
+                    {% if selected_player.city %} · {{ selected_player.city }}{% endif %}
+                </p>
+            </div>
         </div>
-    </div>
+
+        {% if selected_player.pk in pending_invitation_ids %}
+        <p class="sparring-invite__selected-pending">
+            Приглашение этому игроку уже отправлено.
+            <a href="{% url 'sparring_my_invitations' %}">Посмотреть в «Моих приглашениях»</a>
+        </p>
+        {% else %}
+        <form method="post" class="sparring-invite__selected-form">
+            {% csrf_token %}
+            <input type="hidden" name="invitee_id" value="{{ selected_player.pk }}">
+            <label class="sparring-switch">
+                <input class="sparring-switch__input" type="checkbox" name="is_friendly">
+                <span class="sparring-switch__track" aria-hidden="true"><span class="sparring-switch__thumb"></span></span>
+                <span class="sparring-switch__text">
+                    <span class="sparring-switch__label">Дружеская игра</span>
+                    <span class="sparring-switch__hint">Без влияния на рейтинг и силу</span>
+                </span>
+            </label>
+            <label class="sparring-invite__date">
+                <span class="sparring-invite__date-label">Дата игры <span>необязательно</span></span>
+                <input class="form-control" type="date" name="proposed_date">
+            </label>
+            <button type="submit" class="btn btn-primary sparring-invite__selected-submit">Отправить приглашение</button>
+        </form>
+        {% endif %}
+    </section>
+    {% endif %}
 
     {% if search_query and search_query|length >= 2 %}
+    <section class="sparring-invite__section" aria-labelledby="invite-results-title">
+        <header class="sparring-invite__section-head">
+            <h2 id="invite-results-title" class="sparring-invite__section-title">Результаты поиска</h2>
+            <span class="sparring-invite__section-meta">{{ search_results|length|ru_pluralize:"игрок,игрока,игроков" }}</span>
+        </header>
         {% if search_results %}
-        <h2 class="sparring-invite__section-title mt-4">Результаты</h2>
-        <div class="sparring-invite__results">
+        <div class="sparring-invite__grid">
             {% for p in search_results %}
-            <div class="card sparring-invite__result">
-                <div class="card-body">
-                    <div class="sparring-invite__profile">
-                        {% if p.avatar %}
-                        <img class="sparring-invite__avatar" src="{{ p.avatar.url }}" alt="">
-                        {% else %}
-                        <div class="sparring-invite__avatar--placeholder" aria-hidden="true"></div>
-                        {% endif %}
-                        <div class="sparring-invite__profile-text">
-                            <div class="sparring-invite__profile-name">{{ p }}</div>
-                            <div class="sparring-invite__profile-meta">{{ p.user.email }}</div>
-                            <div class="sparring-invite__profile-stats">
-                                Сила: {{ p.get_skill_level_display }} · NTRP: {{ p.ntrp_level|floatformat:2 }} ·
-                                Рейтинг FAN: {{ p.total_points|default:0|floatformat:0 }}
-                            </div>
-                        </div>
-                    </div>
-                    <form method="post" class="sparring-invite__invite-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="return_q" value="{{ search_query }}">
-                        <input type="hidden" name="invitee_id" value="{{ p.pk }}">
-                        <div class="sparring-invite__actions-grid">
-                            <div class="sparring-invite__cell sparring-invite__cell--check">
-                                <div class="form-check">
-                                    <input
-                                        class="form-check-input"
-                                        type="checkbox"
-                                        name="is_friendly"
-                                        id="friendly_{{ p.pk }}"
-                                    >
-                                    <label class="form-check-label" for="friendly_{{ p.pk }}">
-                                        Дружеская игра (без рейтинга)
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="sparring-invite__cell sparring-invite__cell--date">
-                                <div class="form-group">
-                                    <label class="form-label" for="date_{{ p.pk }}">Дата игры</label>
-                                    <input
-                                        type="date"
-                                        name="proposed_date"
-                                        id="date_{{ p.pk }}"
-                                        class="form-control"
-                                    >
-                                </div>
-                            </div>
-                            <div class="sparring-invite__cell sparring-invite__cell--submit">
-                                <button type="submit" class="btn btn-primary">Пригласить</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
+            {% include 'sparring/_invite_player_card.html' with p=p show_city=True %}
             {% endfor %}
         </div>
         {% else %}
-        <p class="text-secondary">Никого не нашли. Попробуйте другой запрос или email.</p>
+        <p class="sparring-invite__empty">
+            Никого не нашли. Проверьте написание или попробуйте email целиком.
+            <a href="{% url 'sparring_invite' %}">Показать всех игроков</a>
+        </p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if directory_shown %}
+        {% if directory_local %}
+        <section class="sparring-invite__section sparring-invite__section--local" aria-labelledby="invite-local-title">
+            <header class="sparring-invite__section-head">
+                <h2 id="invite-local-title" class="sparring-invite__section-title">Рядом с вами</h2>
+                <span class="sparring-invite__city-pill">{{ directory_local.city }}</span>
+            </header>
+            <div class="sparring-invite__grid">
+                {% for p in directory_local.players %}
+                {% include 'sparring/_invite_player_card.html' with p=p show_city=False %}
+                {% endfor %}
+            </div>
+            {% if directory_local.hidden_count %}
+            <p class="sparring-invite__more">
+                Ещё {{ directory_local.hidden_count|ru_pluralize:"игрок,игрока,игроков" }} в этом городе — найдите нужного через поиск по имени.
+            </p>
+            {% endif %}
+        </section>
+        {% elif viewer_city and directory_cities %}
+        <section class="sparring-invite__section sparring-invite__section--local" aria-labelledby="invite-local-empty-title">
+            <header class="sparring-invite__section-head">
+                <h2 id="invite-local-empty-title" class="sparring-invite__section-title">Рядом с вами</h2>
+                <span class="sparring-invite__city-pill">{{ viewer_city }}</span>
+            </header>
+            <p class="sparring-invite__empty">В вашем городе других игроков пока нет — посмотрите другие города ниже.</p>
+        </section>
+        {% endif %}
+
+        {% if directory_cities %}
+        <section class="sparring-invite__section" aria-labelledby="invite-other-title">
+            <header class="sparring-invite__section-head">
+                <h2 id="invite-other-title" class="sparring-invite__section-title">
+                    {% if directory_local or viewer_city %}В других городах{% else %}Все игроки{% endif %}
+                </h2>
+                <span class="sparring-invite__section-meta">{{ directory_total|ru_pluralize:"игрок,игрока,игроков" }}</span>
+            </header>
+            <div class="sparring-invite__cities">
+                {% for group in directory_cities %}
+                <section class="sparring-city" aria-labelledby="invite-city-{{ forloop.counter }}">
+                    <header class="sparring-city__head">
+                        <h3 id="invite-city-{{ forloop.counter }}" class="sparring-city__title">{{ group.city }}</h3>
+                        <span class="sparring-city__count">{{ group.total|ru_pluralize:"игрок,игрока,игроков" }}</span>
+                    </header>
+                    <ul class="sparring-city__players">
+                        {% for p in group.players %}
+                        <li class="sparring-city__player">
+                            <a class="sparring-city__avatar-link" href="{% url 'profile' pk=p.pk %}" tabindex="-1" aria-hidden="true">
+                                {% include 'includes/avatar.html' with avatar=p.avatar class="sparring-city__avatar" %}
+                            </a>
+                            <div class="sparring-city__person">
+                                <a class="sparring-city__name" href="{% url 'profile' pk=p.pk %}">{{ p }}</a>
+                                <p class="sparring-city__meta">
+                                    {{ p.get_skill_level_display }} · NTRP {{ p.ntrp_level|floatformat:2 }} · FAN {{ p.total_points|default:0|floatformat:0 }}
+                                </p>
+                            </div>
+                            {% if p.pk in pending_invitation_ids %}
+                            <span class="sparring-city__pending">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 5 5 9-9"/></svg>
+                                Отправлено
+                            </span>
+                            {% else %}
+                            <a
+                                class="sparring-city__invite"
+                                href="{% url 'sparring_invite' %}?invitee={{ p.pk }}"
+                                data-invite-trigger
+                                data-invite-id="{{ p.pk }}"
+                                data-invite-name="{{ p }}"
+                                data-invite-city="{{ p.city }}"
+                                data-invite-avatar="{% if p.avatar %}{{ p.avatar.url }}{% endif %}"
+                                aria-haspopup="dialog"
+                            >Пригласить</a>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% if group.hidden_count %}
+                    <p class="sparring-invite__more">
+                        Ещё {{ group.hidden_count|ru_pluralize:"игрок,игрока,игроков" }} — найдите нужного через поиск по имени.
+                    </p>
+                    {% endif %}
+                </section>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if not directory_total %}
+        <section class="sparring-invite__section" aria-labelledby="invite-empty-title">
+            <header class="sparring-invite__section-head">
+                <h2 id="invite-empty-title" class="sparring-invite__section-title">Игроки платформы</h2>
+            </header>
+            <p class="sparring-invite__empty">Пока на платформе нет других игроков. Загляните позже или создайте заявку на спарринг.</p>
+        </section>
         {% endif %}
     {% endif %}
 </div>
+{% endblock %}
+
+{% block modals %}
+<dialog id="sparring-invite-dialog" class="sparring-invite-dialog" aria-labelledby="sparring-invite-dialog-title">
+    <form method="post" action="{% url 'sparring_invite' %}" class="sparring-invite-dialog__form">
+        {% csrf_token %}
+        <input type="hidden" name="invitee_id" id="sparring-invite-dialog-invitee" value="">
+        <header class="sparring-invite-dialog__header">
+            <div class="sparring-invite-dialog__person">
+                <img
+                    class="sparring-invite-dialog__avatar"
+                    id="sparring-invite-dialog-avatar"
+                    src="{% static 'images/avatar_placeholder.png' %}"
+                    alt=""
+                    width="52"
+                    height="52"
+                >
+                <div class="sparring-invite-dialog__heading">
+                    <p class="sparring-invite-dialog__eyebrow">Приглашение на спарринг</p>
+                    <h2 id="sparring-invite-dialog-title" class="sparring-invite-dialog__title" data-invite-dialog-name></h2>
+                    <p class="sparring-invite-dialog__city" data-invite-dialog-city></p>
+                </div>
+            </div>
+            <button type="button" class="sparring-invite-dialog__close" data-invite-dialog-close aria-label="Закрыть">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg>
+            </button>
+        </header>
+        <div class="sparring-invite-dialog__body">
+            <label class="sparring-switch">
+                <input class="sparring-switch__input" type="checkbox" name="is_friendly">
+                <span class="sparring-switch__track" aria-hidden="true"><span class="sparring-switch__thumb"></span></span>
+                <span class="sparring-switch__text">
+                    <span class="sparring-switch__label">Дружеская игра</span>
+                    <span class="sparring-switch__hint">Без влияния на рейтинг и силу</span>
+                </span>
+            </label>
+            <label class="sparring-invite-dialog__date">
+                <span class="sparring-invite-dialog__date-label">Дата игры <span>необязательно</span></span>
+                <input class="form-control" type="date" name="proposed_date">
+            </label>
+            <p class="sparring-invite-dialog__note">Игрок получит уведомление в личном кабинете и в Telegram-боте.</p>
+        </div>
+        <footer class="sparring-invite-dialog__footer">
+            <button type="button" class="sparring-invite-dialog__cancel" data-invite-dialog-close>Отмена</button>
+            <button type="submit" class="btn btn-primary sparring-invite-dialog__submit">Отправить приглашение</button>
+        </footer>
+    </form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/sparring-invite.js' %}" defer></script>
 {% endblock %}

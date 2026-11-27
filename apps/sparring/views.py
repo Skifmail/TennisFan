@@ -85,6 +85,7 @@ from .nearby import (
     nearby_players,
     places_within_radius,
 )
+from .player_directory import sparring_player_directory
 from .player_search import search_players_for_sparring_invite
 from .services import (
     accept_sparring_invitation,
@@ -1217,6 +1218,56 @@ def doubles_delete_request(request, pk):
 # ---------------------------------------------------------------------------
 
 
+def player_directory_context(
+    player: Player,
+    *,
+    selected_player: Player | None,
+    search_query: str,
+) -> dict[str, object]:
+    """Подготовить данные справочника игроков и статусов приглашений.
+
+    Args:
+        player: Игрок, открывший страницу.
+        selected_player: Игрок, выбранный ссылкой ``?invitee=``.
+        search_query: Текущий поисковый запрос.
+
+    Returns:
+        dict[str, object]: Контекст шаблона для списка игроков по городам.
+    """
+    pending_ids = set(
+        SparringInvitation.objects.filter(
+            inviter=player,
+            status=SparringInvitation.Status.PENDING,
+        ).values_list("invitee_id", flat=True)
+    )
+
+    context: dict[str, object] = {
+        "viewer_city": (player.city or "").strip(),
+        "pending_invitation_ids": pending_ids,
+        "directory_shown": len(search_query) < 2,
+        "directory_local": None,
+        "directory_cities": [],
+        "directory_total": 0,
+    }
+    if len(search_query) >= 2:
+        return context
+
+    local, cities = sparring_player_directory(
+        player,
+        exclude_ids=[selected_player.pk] if selected_player else (),
+    )
+    groups = ([local] if local else []) + cities
+
+    context.update(
+        {
+            "directory_local": local,
+            "directory_cities": cities,
+            "directory_total": sum(group.total for group in groups),
+        }
+    )
+    return context
+
+
 @login_required
 @require_filled_profile
 @require_verified_player
@@ -1311,6 +1362,11 @@ def sparring_invite(request):
             "search_query": search_query,
             "search_results": search_results,
             "selected_player": selected_player,
+            **player_directory_context(
+                player,
+                selected_player=selected_player,
+                search_query=search_query,
+            ),
         },
     )
 

@@ -156,6 +156,18 @@ class SparringInviteDirectoryTests(TestCase):
         self.assertNotContains(response, "Борис Казанский")
         self.assertContains(response, "Сбросить поиск")
 
+    def test_search_by_city_returns_players_from_that_city(self) -> None:
+        """Поиск по названию города находит всех игроков из этого города."""
+        response = self.client.get(
+            reverse("sparring_invite"),
+            {"q": "Жуковский"},
+            secure=True,
+        )
+
+        self.assertContains(response, "Результаты поиска")
+        self.assertContains(response, "Пётр Жук")
+        self.assertNotContains(response, "Борис Казанский")
+
     def test_same_city_in_different_case_is_grouped_as_local(self) -> None:
         """Город в другом регистре не создаёт отдельную секцию."""
         lower_case = make_player(

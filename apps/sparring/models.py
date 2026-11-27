@@ -162,7 +162,7 @@ class SparringRequest(models.Model):
         seconds = (self.confirmation_deadline - timezone.now()).total_seconds()
         if seconds <= 0:
             return 0
-        return max(1, math.ceil(seconds / 3600))
+        return int(max(1, math.ceil(seconds / 3600)))
 
     def refresh_confirmation_deadline(self) -> None:
         """Пересчитать дедлайн по самому раннему ожидающему отклику."""

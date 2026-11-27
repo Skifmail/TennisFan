@@ -372,15 +372,17 @@ class ParticipantSelect(forms.SelectMultiple):
         css = {"all": ("css/admin_tournament_participants.css",)}
 
     def create_option(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        option = super().create_option(*args, **kwargs)
+        option: dict[str, Any] = super().create_option(*args, **kwargs)
         player = getattr(option["value"], "instance", None)
         if player is not None:
             phone = player.user.phone.strip()
-            option["attrs"].update({
-                "data-city": player.city.strip(),
-                "data-phone": phone,
-                "data-tel": phone_to_tel_href(phone),
-            })
+            option["attrs"].update(
+                {
+                    "data-city": player.city.strip(),
+                    "data-phone": phone,
+                    "data-tel": phone_to_tel_href(phone),
+                }
+            )
         return option
 
 

@@ -62,10 +62,10 @@ def manage_stages(request: HttpRequest, slug: str) -> HttpResponse:
             if action == "add_stage":
                 selected = request.POST.getlist("members")
                 kind = request.POST.get("kind", "")
-                seeds = {}
+                round_seeds: dict[int, str] = {}
                 for index, token in enumerate(selected, 1):
                     if kind == "custom_round":
-                        seeds[index] = token
+                        round_seeds[index] = token
                         continue
                     seed = request.POST.get(f"position_{token}", "")
                     if (
@@ -73,17 +73,17 @@ def manage_stages(request: HttpRequest, slug: str) -> HttpResponse:
                         or not seed.isdecimal()
                         or len(seed) > 6
                         or not 1 <= int(seed) <= len(entities)
-                        or int(seed) in seeds
+                        or int(seed) in round_seeds
                     ):
                         raise ManualPairingError(
                             "Укажите разные позиции посева для выбранных участников."
                         )
-                    seeds[int(seed)] = token
+                    round_seeds[int(seed)] = token
                 add_stage(
                     tournament,
                     request.POST.get("name", ""),
                     kind,
-                    [seeds[i] for i in sorted(seeds)],
+                    [round_seeds[i] for i in sorted(round_seeds)],
                     tour_name=request.POST.get("tour_name", ""),
                 )
                 messages.success(request, "Этап создан. Матчи доступны участникам.")

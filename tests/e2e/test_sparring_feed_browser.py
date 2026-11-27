@@ -159,7 +159,14 @@ def test_compact_menu_when_desktop_or_mobile_should_support_multi_select_and_act
             ).to_be_visible()
             expect(
                 mine.get_by_role("link", name="Пригласить на спарринг", exact=True)
-            ).to_have_count(1 if paid else 0)
+            ).to_have_count(0)
+            view_switch = page.locator(".sparring-view-switch")
+            expect(
+                view_switch.get_by_role("link", name="Заявки на спарринг", exact=True)
+            ).to_have_attribute("aria-current", "page")
+            expect(
+                view_switch.get_by_role("link", name="Найти игрока", exact=True)
+            ).to_have_attribute("href", "/sparring/invite/")
             page.get_by_role("heading", name="Спарринг", exact=True).click()
             expect(mine.locator("nav")).not_to_be_visible()
             expect(page.locator(".sparring-compact__primary")).to_have_text(

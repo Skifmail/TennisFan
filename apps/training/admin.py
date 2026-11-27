@@ -362,25 +362,31 @@ class TrainingEnrollmentAdmin(admin.ModelAdmin):
     @admin.display(description="Заявка / контакт", ordering="created_at")
     def applicant_summary(self, obj: TrainingEnrollment) -> str:
         """Объединить имя, контакт, номер и дату заявки без дублирования профиля."""
-        return render_to_string(
-            "admin/training/trainingenrollment/applicant_summary.html",
-            {"enrollment": obj},
+        return str(
+            render_to_string(
+                "admin/training/trainingenrollment/applicant_summary.html",
+                {"enrollment": obj},
+            )
         )
 
     @admin.display(description="Тренировка", ordering="training__title")
     def training_summary(self, obj: TrainingEnrollment) -> str:
         """Показать тренировку и место в одной компактной ячейке."""
-        return render_to_string(
-            "admin/training/trainingenrollment/training_summary.html",
-            {"enrollment": obj},
+        return str(
+            render_to_string(
+                "admin/training/trainingenrollment/training_summary.html",
+                {"enrollment": obj},
+            )
         )
 
     @admin.display(description="Тренер / распределение", ordering="assigned_at")
     def coach_summary(self, obj: TrainingEnrollment) -> str:
         """Различить исходного тренера и получателя без отдельных колонок."""
-        return render_to_string(
-            "admin/training/trainingenrollment/coach_summary.html",
-            {"enrollment": obj},
+        return str(
+            render_to_string(
+                "admin/training/trainingenrollment/coach_summary.html",
+                {"enrollment": obj},
+            )
         )
 
     def formfield_for_choice_field(
@@ -444,9 +450,11 @@ class TrainingEnrollmentAdmin(admin.ModelAdmin):
         """Кнопки отправляют POST через отдельные формы вне формы списка Django."""
         if not obj.pk or obj.assigned_at:
             return "—"
-        return render_to_string(
-            "admin/training/trainingenrollment/distribution_actions.html",
-            {"enrollment": obj},
+        return str(
+            render_to_string(
+                "admin/training/trainingenrollment/distribution_actions.html",
+                {"enrollment": obj},
+            )
         )
 
     def get_urls(self) -> list[URLPattern]:

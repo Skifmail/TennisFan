@@ -68,11 +68,12 @@ def search_players_for_sparring_invite(
                 return by_email[:limit]
 
     # Собираем OR по вариантам строки и полям (без SQL Lower — совместимо с SQLite + кириллица)
-    name_email_q = Q()
+    name_email_city_q = Q()
     for v in variants:
-        name_email_q |= Q(user__email__icontains=v)
-        name_email_q |= Q(user__first_name__icontains=v)
-        name_email_q |= Q(user__last_name__icontains=v)
+        name_email_city_q |= Q(user__email__icontains=v)
+        name_email_city_q |= Q(user__first_name__icontains=v)
+        name_email_city_q |= Q(user__last_name__icontains=v)
+        name_email_city_q |= Q(city__icontains=v)
 
     annotated = base.annotate(
         _full_name=Concat(
@@ -85,9 +86,10 @@ def search_players_for_sparring_invite(
     full_q = Q()
     for v in variants:
         full_q |= Q(_full_name__icontains=v)
+        full_q |= Q(city__icontains=v)
 
     return (
-        annotated.filter(name_email_q | full_q)
+        annotated.filter(name_email_city_q | full_q)
         .distinct()
-        .order_by("user__last_name", "user__first_name")[:limit]
+        .order_by("city", "user__last_name", "user__first_name")[:limit]
     )

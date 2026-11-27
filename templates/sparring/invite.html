@@ -35,10 +35,10 @@
     <section class="sparring-invite__search" aria-labelledby="invite-search-title">
         <div class="sparring-invite__search-head">
             <h2 id="invite-search-title" class="sparring-invite__search-title">Поиск игрока</h2>
-            <p class="sparring-invite__search-note">ФИО или email — минимум 2 символа</p>
+            <p class="sparring-invite__search-note">ФИО, email или город — минимум 2 символа</p>
         </div>
         <form method="get" class="sparring-invite__search-form" role="search">
-            <label class="sparring-invite__search-label" for="id_q">ФИО или email</label>
+            <label class="sparring-invite__search-label" for="id_q">ФИО, email или город</label>
             <div class="sparring-invite__search-row">
                 <div class="sparring-invite__field">
                     <svg class="sparring-invite__field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
@@ -51,7 +51,7 @@
                         id="id_q"
                         class="form-control"
                         value="{{ search_query }}"
-                        placeholder="Например: Иванов или user@mail.ru"
+                        placeholder="Например: Иванов, user@mail.ru или Москва"
                         minlength="2"
                         autocomplete="off"
                         aria-describedby="invite-search-hint"
